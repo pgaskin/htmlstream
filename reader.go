@@ -4507,7 +4507,8 @@ func Tag(name string, ms ...Matcher) Matcher {
 }
 
 // TagNS matches start and end tags with the local name local in the
-// namespace ns (see [Token.NS]) which match all of ms.
+// namespace ns (see [Token.NS]) which match all of ms. Unlike [Tag], it
+// doesn't match stray end tags, which have no namespace.
 func TagNS(ns, local string, ms ...Matcher) Matcher {
 	return func(t *Token) bool {
 		if t.kind != StartTag && t.kind != EndTag || t.NS() != ns {
@@ -4676,6 +4677,10 @@ func (t *Token) Local() []byte {
 }
 
 // NS returns the namespace URI of a start or end tag, or an empty string.
+// A stray end tag (see [Token.Stray]) has no namespace, since it closes no
+// element (HTML parsers handle a stray </p> or </br> under HTML rules as an
+// element in the XHTML namespace, see Element model in the package
+// documentation).
 //
 // Under HTML rules (see [Token.HTMLRules]), this is the namespace an HTML
 // parser would put the element in (XHTML, SVG or MathML); namespace
