@@ -351,6 +351,7 @@ var writerFound = []modeSeed{
 	{"<mAth>000000000000000<g><g//>00", 0x01},
 	{"<svg dX dX=/>00", '='}, // a known difference (rewritten by xnetDroppedSlash)
 	{"<teXtAreA><![CDATA[\x00]]>", '?'},
+	{"<svg><sCript> 0000000000", 0x01}, // an SVG script, normal text for HTML parsers
 	{"<heAd/><nosCript>0", 0x01},
 	{"<title><![CDATA[0\r]]>\n", '\r'},
 	{"</BodY><!DOCTYPE><!0", '`'}, // a known difference (rewritten by specDoctypes)

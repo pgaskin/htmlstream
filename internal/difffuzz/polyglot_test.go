@@ -742,7 +742,13 @@ func xmlDOM(s string, space bool) (string, error) {
 				depth++
 			}
 			stack = append(stack, skip)
-			names = append(names, tok.Name.Local)
+			name := tok.Name.Local
+			if tok.Name.Space != htmlstream.NamespaceXHTML {
+				// only the contents of HTML scripts and styles are
+				// normalized, as in htmlDOMScripting
+				name = ""
+			}
+			names = append(names, name)
 		case xml.EndElement:
 			if !stack[len(stack)-1] {
 				flush()
