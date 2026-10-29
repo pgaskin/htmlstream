@@ -352,6 +352,7 @@ var writerFound = []modeSeed{
 	{"<svg dX dX=/>00", '='}, // a known difference (rewritten by xnetDroppedSlash)
 	{"<teXtAreA><![CDATA[\x00]]>", '?'},
 	{"<heAd/><nosCript>0", 0x01},
+	{"<title><![CDATA[0\r]]>\n", '\r'},
 }
 
 // hooksFound are inputs and modes which found bugs with FuzzPolyglotHooks.
@@ -606,14 +607,14 @@ func xmlSyntaxInput(t *testing.T, in string, scripting bool) string {
 			}
 			buf = tok.AppendText(buf[:0])
 			if whole && tok.Kind() == htmlstream.Text && (parent == "title" || parent == "textarea") {
-				data := tok.Data()
+				// the undecoded data, with line ends normalized as XML
+				// parsers do before reading CDATA sections (a CR before
+				// "]]>" and an LF after it are two line ends)
+				data := bytes.ReplaceAll(bytes.ReplaceAll(tok.Data(), []byte("\r\n"), []byte("\n")), []byte("\r"), []byte("\n"))
 				if s, ok := bytes.CutPrefix(ascii.TrimSpace(data), []byte("<![CDATA[")); ok {
 					if s, ok = bytes.CutSuffix(s, []byte("]]>")); ok && !bytes.Contains(s, []byte("]]>")) {
-						// the undecoded data, with line ends normalized as
-						// XML parsers do, also in CDATA sections
 						i := bytes.Index(data, []byte("<![CDATA["))
 						buf = slices.Concat(data[:i], s, data[i+len("<![CDATA[")+len(s)+len("]]>"):])
-						buf = bytes.ReplaceAll(bytes.ReplaceAll(buf, []byte("\r\n"), []byte("\n")), []byte("\r"), []byte("\n"))
 					}
 				}
 			}
