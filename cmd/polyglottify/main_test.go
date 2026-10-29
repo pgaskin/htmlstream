@@ -47,6 +47,7 @@ func TestUsageErrors(t *testing.T) {
 		{[]string{"-doctype", "<!DOCTYPE 1>"}, `polyglottify: invalid -doctype "<!DOCTYPE 1>": name "1" isn't an XML name` + "\n"},
 		{[]string{"-doctype", `<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">`}, "selects quirks mode"},
 		{[]string{"-xmldecl", "yes"}, `polyglottify: invalid -xmldecl "yes": must be none, add or keep` + "\n"},
+		{[]string{"-indent", "x"}, `polyglottify: invalid -indent "x" or -indent-prefix "": must have only spaces and tabs` + "\n"},
 		{[]string{"-max-depth", "0"}, "polyglottify: invalid -max-depth 0: must be positive\n"},
 		{[]string{"-max-token-size", "-1"}, "polyglottify: invalid -max-token-size -1: must be positive\n"},
 		{[]string{"-max-stack-bytes", "0"}, "polyglottify: invalid -max-stack-bytes 0: must be positive\n"},
@@ -77,7 +78,7 @@ func TestHelp(t *testing.T) {
 	if code != 0 || stdout != "" || !strings.HasPrefix(stderr, "usage: polyglottify [flags] [file|-]...\n") {
 		t.Errorf("got %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
-	for _, f := range []string{"-doctype", "-xmldecl", "-strict", "-quiet", "-i", "-xml-syntax", "-scripting", "-max-token-size", "-max-depth", "-max-stack-bytes", "-max-raw-text", "-final-newline"} {
+	for _, f := range []string{"-doctype", "-xmldecl", "-strict", "-quiet", "-i", "-xml-syntax", "-scripting", "-max-token-size", "-max-depth", "-max-stack-bytes", "-max-raw-text", "-final-newline", "-indent", "-indent-prefix"} {
 		if !strings.Contains(stderr, "\n  "+f) {
 			t.Errorf("usage doesn't have %s", f)
 		}
@@ -120,6 +121,21 @@ func TestFinalNewline(t *testing.T) {
 	stdout, stderr, code := runCmd(t, "<p>x</p>\n", "-final-newline")
 	if want := "<!DOCTYPE html>\n" + htmlStart + "<p>x</p>" + htmlEnd + "\n"; code != 0 || stderr != "" || stdout != want {
 		t.Errorf("got %d, stderr %q, stdout\n\t%s\nwant\n\t%s", code, stderr, stdout, want)
+	}
+}
+
+func TestIndent(t *testing.T) {
+	stdout, stderr, code := runCmd(t, "<div><p>x</p></div>", "-indent", `\t`, "-indent-prefix", " ")
+	want := "<!DOCTYPE html>\n" + ` <html xmlns="http://www.w3.org/1999/xhtml"><head>
+ 	<meta charset="UTF-8" />
+ </head>
+ <body>
+ 	<div>
+ 		<p>x</p>
+ 	</div>
+ </body></html>`
+	if code != 0 || stderr != "" || stdout != want {
+		t.Errorf("got %d, stderr %q, stdout\n%s\nwant\n%s", code, stderr, stdout, want)
 	}
 }
 

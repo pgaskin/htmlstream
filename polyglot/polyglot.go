@@ -108,6 +108,7 @@ import (
 	"fmt"
 	"hash/maphash"
 	"io"
+	"iter"
 	"slices"
 	"strconv"
 	"strings"
@@ -212,8 +213,10 @@ type Options struct {
 	// text or the end of the text (up to 64 KiB), the whitespace at the
 	// start of the head, buffered until the next token (up to 256 bytes),
 	// the whitespace and comments between the head end tag and the body,
-	// buffered until the body starts (up to 64 KiB), the output before the
-	// root element with [KeepXMLDecl], and the output held by [Writer.Hold].
+	// buffered until the body starts (up to 64 KiB), with [Options.Indent],
+	// the whitespace and comments at block boundaries, buffered until the
+	// next token (up to 64 KiB), the output before the root element with
+	// [KeepXMLDecl], and the output held by [Writer.Hold].
 	Warn func(w Warning)
 
 	// MaxRawText limits the size of script and style contents, noscript
@@ -252,10 +255,61 @@ type Options struct {
 	// which HTML parsers append to the body and XML parsers ignore. A line
 	// break ending whitespace at the end of the body (e.g., the line break
 	// at the end of the input, which HTML parsers put in the body) is written
-	// there instead of in the body, so HTML parsers read the same body;
+	// there instead of in the body, and so is the line break [Options.Indent]
+	// writes before the body end tag, so HTML parsers read the same body;
 	// otherwise, the body HTML parsers read ends with a line break more than
 	// the one XML parsers read. No Text event is reported for it.
 	FinalNewline bool
+
+	// Indent, if not empty, indents the output: the whitespace between block
+	// boundaries (the start and end tags of block-level elements, see
+	// [htmlutil.IsBlock], and of table cells, and the elements in the head)
+	// is replaced with a line break followed by Indent once for each level
+	// of block-level elements around it (up to 64 levels), and the comments
+	// there are put on lines of their own. A line break is added where
+	// there is no whitespace, and one empty line is kept where the input
+	// has one or more between two elements. The spaces and tabs starting
+	// the lines of text are replaced with the indentation of the contents
+	// of the block-level element around it. The children of the html
+	// element aren't indented, and there is no line break between the html
+	// start tag and the head, and after the body (see [Convert]). With
+	// [Options.FinalNewline], the line break before the body end tag is
+	// written after the html end tag instead.
+	//
+	// Other whitespace is written as it is: in inline content (where adding
+	// or removing whitespace would change the rendered text), in
+	// preformatted elements (pre, listing, textarea), in elements whose
+	// contents are text (title, script, style, and noscript, which HTML
+	// parsers with scripting enabled read as text), in SVG and MathML
+	// content, and whitespace before which HTML parsers reopen formatting
+	// elements (see [Convert]), which changes the structure. The
+	// classification of elements is that of the default styles of HTML:
+	// style sheets which make block-level elements inline, or set
+	// white-space to keep the whitespace in other elements, make the
+	// changed whitespace visible.
+	//
+	// Indentation changes the whitespace text of the document for HTML and
+	// XML parsers alike. The whitespace held back until the next token to
+	// decide (see [Options.Warn], up to 64 KiB) is reported to the Text hook
+	// when it is written as it is, and the whitespace replaced and the line
+	// breaks and indentation written aren't. The Text hook gets the text
+	// before the spaces and tabs starting its lines are replaced. Markup
+	// inserted by the hooks (and written by [Writer.HoldDiscard]) is
+	// written as it is, and doesn't change the indentation.
+	Indent string
+
+	// IndentPrefix, if not empty, is written at the start of each line of
+	// the output after the first one, except in comments and in the
+	// contents written as they are with Indent (preformatted elements,
+	// elements whose contents are text, and SVG and MathML content). It
+	// doesn't start empty lines. It can be used without Indent, to indent a
+	// document as a whole, and then replaces the spaces and tabs starting
+	// the lines of text, as Indent does. Like Indent, it changes the
+	// whitespace text of the document.
+	//
+	// Indent and IndentPrefix must contain only spaces and tabs: other
+	// characters fail the conversion with an error wrapping [ErrInvalidOp].
+	IndentPrefix string
 
 	// OnTag, if not nil, is called before each element tag is written, with a
 	// description of the tag (see [Tag]). It is called for the tags of the
@@ -766,7 +820,8 @@ const (
 // the head end tag and the body is reported after the tag events of the head
 // content after it, and the whitespace at the start of the head after the
 // head start tag event, before or after the event of the charset meta
-// element (see [Convert]).
+// element (see [Convert]). With [Options.Indent], whitespace replaced by the
+// indentation isn't reported (see there).
 //
 // The event is owned by the writer and valid during the call, like [Tag]. Its
 // fields are for reading, like those of Tag, and the bytes of Data must not
@@ -1386,9 +1441,13 @@ func NewWriter(w io.Writer, opt Options) *Writer {
 		p.opt.MaxDepth = htmlstream.DefaultMaxDepth
 	}
 	p.opt.MaxDepth = max(p.opt.MaxDepth, 3)
+	if strings.Trim(p.opt.Indent, " \t") != "" || strings.Trim(p.opt.IndentPrefix, " \t") != "" {
+		p.fail("Indent and IndentPrefix must contain only spaces and tabs")
+	}
 	switch p.opt.XMLDecl {
 	case AddXMLDecl:
 		p.w.WriteString(xmlDeclaration + "\n")
+		p.lay.line, p.lay.depth = p.layout(), 0
 		p.declOut = true
 	case KeepXMLDecl:
 		// written before the output held back, if the input has one
@@ -1397,8 +1456,13 @@ func NewWriter(w io.Writer, opt Options) *Writer {
 	}
 	switch p.opt.DoctypeMode {
 	case ReplaceDoctype:
+		if p.lay.line {
+			p.lay.line = false
+			p.w.WriteString(p.opt.IndentPrefix)
+		}
 		p.w.WriteString(p.opt.Doctype)
 		p.w.WriteByte('\n')
+		p.lay.line, p.lay.depth = p.layout(), 0
 		p.cw.free = len(p.opt.Doctype) + 1 // not counted for MaxRawText
 		var d htmlutil.Document
 		r := htmlstream.NewReader(strings.NewReader(p.opt.Doctype))
@@ -1806,6 +1870,9 @@ func (p *polyglot) emit(b []byte) {
 	if p.removing() {
 		return
 	}
+	if p.lay.line && len(b) != 0 && b[0] != '\n' {
+		p.lineStart()
+	}
 	if len(p.holds) > p.pendHolds {
 		p.hbuf = append(p.hbuf, b...)
 		p.checkHold()
@@ -1817,6 +1884,9 @@ func (p *polyglot) emit(b []byte) {
 func (p *polyglot) emitString(s string) {
 	if p.removing() {
 		return
+	}
+	if p.lay.line && s != "" && s[0] != '\n' {
+		p.lineStart()
 	}
 	if len(p.holds) > p.pendHolds {
 		p.hbuf = append(p.hbuf, s...)
@@ -1855,6 +1925,9 @@ func (p *polyglot) tag(b []byte, e Tag) {
 		return
 	}
 	if p.opt.OnTag == nil {
+		if p.layout() && !(e.Void && !e.Start) {
+			p.layoutTag(e.Name, e.NS, e.Start, e.Void)
+		}
 		p.emit(b)
 		if e.fixed && e.Start {
 			p.charsetEnd = p.written()
@@ -1886,6 +1959,9 @@ func (p *polyglot) tag(b []byte, e Tag) {
 	p.before, p.after = ev.before[:0], ev.after[:0]
 	if ev.edited {
 		b = p.buf
+	}
+	if p.layout() && !ev.omit && !(e.Void && !e.Start) {
+		p.layoutTag(ev.w.name, e.NS, e.Start, e.Void)
 	}
 	p.emit(ev.before)
 	if !ev.omit {
@@ -2326,14 +2402,24 @@ type polyglot struct {
 	// implied end tags held back until the next token, followed by body and
 	// html end tags if keptByEnd (see queueToken), and the text after them,
 	// held back while it is whitespace (afterEndText is set once it isn't)
-	implied   htmlstream.TokenBuffer
-	keptByEnd bool
+	implied      htmlstream.TokenBuffer
+	keptByEnd    bool
+	afterEnd     htmlstream.TokenBuffer
+	afterEndText bool
 
 	// with FinalNewline, the whitespace directly in the body, until the next
 	// token, for a line break at its end (see bodySpaceToken)
-	bodySpace    heldSpace
-	afterEnd     htmlstream.TokenBuffer
-	afterEndText bool
+	bodySpace heldSpace
+
+	// with Indent and IndentPrefix (see layoutTag)
+	lay struct {
+		edge   bool      // the output is at a block boundary
+		start  bool      // the boundary is a start tag
+		hidden bool      // edge before the hidden element open (see layoutKind)
+		held   heldSpace // whitespace and comments at the boundary, until the next token
+		line   bool      // the next output starts a line (see lineStart), with depth levels of indentation
+		depth  int32
+	}
 
 	// the last start tag event, kept with the element by pushOut
 	startNS   string // the namespace reported
@@ -2448,6 +2534,13 @@ type outCtx struct {
 	// innermost element which limits it (a table cell, an integration
 	// point, etc.)
 	selects int32
+
+	// with Indent and IndentPrefix: the indentation level of the contents,
+	// whether the whitespace in them is kept as it is (see layoutOff), and
+	// whether they are in the head (outside a template)
+	layDepth int32
+	layOff   bool
+	layHead  bool
 }
 
 // noCtx is the outCtx of the empty output stack.
@@ -2734,6 +2827,14 @@ func (p *polyglot) endProlog() {
 	c.holding = false
 	if p.decl {
 		p.w.WriteString(xmlDeclaration + "\n")
+		if p.opt.IndentPrefix != "" {
+			// the output held back starts on the next line
+			if len(c.hold) != 0 {
+				p.w.WriteString(p.opt.IndentPrefix)
+			} else {
+				p.lay.line, p.lay.depth = true, 0
+			}
+		}
 		p.declOut = true
 		if err := p.w.Flush(); err != nil {
 			return
@@ -2789,6 +2890,7 @@ func (p *polyglot) keepDoctype(tok *htmlstream.Token) {
 	}
 	p.buf = append(b, ">\n"...)
 	p.markup(p.buf)
+	p.lay.line, p.lay.depth = p.layout(), 0
 }
 
 // hasInternalSubset reports whether the data of a doctype read with XML
@@ -2934,13 +3036,13 @@ func (p *polyglot) headSpaceToken(tok *htmlstream.Token) bool {
 // when the body starts. It reports whether b was held back: past
 // maxAfterHead bytes, the parts held back are written in the head instead,
 // and so are b and the rest.
-func (p *polyglot) holdAfterHead(tok *htmlstream.Token, b []byte) bool {
+func (p *polyglot) holdAfterHead(tok *htmlstream.Token, b []byte, first, last bool) bool {
 	if p.afterHead.size()+len(b) > maxAfterHead {
 		p.afterHeadFull = true
 		p.afterHead.write(p)
 		return false
 	}
-	p.afterHead.add(tok, b)
+	p.afterHead.add(tok, b, first, last)
 	return true
 }
 
@@ -2982,25 +3084,52 @@ type heldSpace struct {
 	data  []byte // the whitespace and comments, in order
 }
 
-// heldPart is whitespace (text of a token) or a comment (markup), ending at
-// end in data.
+// heldPart is whitespace (text of a token) or a comment (markup, the first
+// or last part of a comment split into multiple tokens if first or last
+// isn't set), ending at end in data.
 type heldPart struct {
-	tok int // the index of the token in toks, or -1 for a comment
-	end int
+	tok         int // the index of the token in toks, or -1 for a comment
+	end         int
+	first, last bool
 }
 
 func (h *heldSpace) size() int { return len(h.data) }
 
 // add holds back the text b of tok, or the markup of a comment if tok is
-// nil.
-func (h *heldSpace) add(tok *htmlstream.Token, b []byte) {
+// nil (first and last are those of commentPart).
+func (h *heldSpace) add(tok *htmlstream.Token, b []byte, first, last bool) {
 	i := -1
 	if tok != nil {
 		h.toks.Append(tok)
 		i = h.toks.Len() - 1
 	}
 	h.data = append(h.data, b...)
-	h.parts = append(h.parts, heldPart{i, len(h.data)})
+	h.parts = append(h.parts, heldPart{i, len(h.data), first, last})
+}
+
+// all returns the parts held back: the token (nil for a comment) and the
+// data.
+func (h *heldSpace) all() iter.Seq2[heldPart, []byte] {
+	return func(yield func(heldPart, []byte) bool) {
+		start := 0
+		for _, part := range h.parts {
+			if !yield(part, h.data[start:part.end]) {
+				return
+			}
+			start = part.end
+		}
+	}
+}
+
+// comments reports whether h has comments.
+func (h *heldSpace) comments() bool {
+	return slices.ContainsFunc(h.parts, func(part heldPart) bool { return part.tok < 0 })
+}
+
+// reset empties h.
+func (h *heldSpace) reset() {
+	h.toks.Reset()
+	h.parts, h.data = h.parts[:0], h.data[:0]
 }
 
 // cutNewline removes a line break at the end of the whitespace, and reports
@@ -3019,17 +3148,197 @@ func (h *heldSpace) cutNewline() bool {
 
 // write writes the parts held back, and empties h.
 func (h *heldSpace) write(p *polyglot) {
-	start := 0
-	for _, part := range h.parts {
-		if b := h.data[start:part.end]; part.tok < 0 {
-			p.markup(b)
+	for part, b := range h.all() {
+		if part.tok < 0 {
+			p.writeComment(b, part.first, part.last)
 		} else {
 			p.text(h.toks.At(part.tok), b)
 		}
-		start = part.end
 	}
-	h.toks.Reset()
-	h.parts, h.data = h.parts[:0], h.data[:0]
+	h.reset()
+}
+
+// Layout (Options.Indent and Options.IndentPrefix).
+
+// layout reports whether Indent or IndentPrefix is set.
+func (p *polyglot) layout() bool { return p.opt.Indent != "" || p.opt.IndentPrefix != "" }
+
+// maxIndent is the number of levels of block-level elements indented.
+const maxIndent = 64
+
+// The kinds of elements for the layout.
+const (
+	layoutInline = iota // whitespace around them is written as it is
+	layoutBlock         // block-level: whitespace around them is indentation
+	layoutHidden        // not rendered, on a line of its own at a block boundary
+)
+
+// layoutKind returns the kind of the element with the name (lowercase for
+// HTML elements, html set), in the head if head is set.
+func layoutKind(name string, html, head bool) int {
+	switch {
+	case !html:
+		return layoutInline
+	case head:
+		return layoutBlock
+	}
+	switch name {
+	case "html", "head", "td", "th", "col", "colgroup", "template":
+		return layoutBlock
+	case "script", "style", "link", "meta", "base", "noscript":
+		return layoutHidden
+	}
+	if htmlutil.IsBlock(htmlutil.HTMLName(name)) {
+		return layoutBlock
+	}
+	return layoutInline
+}
+
+// layoutOff reports whether the whitespace in the HTML element with the name
+// is written as it is (see Options.Indent).
+func layoutOff(name string) bool {
+	switch name {
+	case "pre", "listing", "textarea", "title", "script", "style", "noscript", "xmp", "plaintext":
+		return true
+	}
+	return false
+}
+
+// layoutTag writes the layout before an element tag (not the end tag event
+// of a void element) about to be written, with the name written and the
+// namespace reported.
+func (p *polyglot) layoutTag(name, ns string, start, void bool) {
+	c := p.ctx() // for an end tag, the element is already closed
+	html := ns == htmlstream.NamespaceXHTML
+	l := &p.lay
+	switch kind := layoutKind(name, html, c.layHead); {
+	case c.layOff:
+		p.layoutFlush()
+		l.edge = false
+		return
+	case html && (name == "html" || name == "head" && start):
+		// no whitespace between the html start tag and the head
+		p.layoutFlush()
+		l.edge, l.start = true, true
+		return
+	case html && name == "html":
+		return // after the body
+	case kind == layoutHidden:
+		// on a line of its own at a block boundary, which it doesn't end
+		if start {
+			l.hidden = l.edge
+		}
+		if l.edge && start && p.opt.Indent != "" {
+			p.layoutBreak(c.layDepth, start, true)
+		} else {
+			p.layoutFlush()
+		}
+		l.edge = l.hidden && (void || !start)
+		return
+	case kind == layoutBlock:
+		switch {
+		case l.edge && p.opt.Indent != "" && !start && l.start && !l.held.comments():
+			l.held.reset() // an empty element on one line
+		case l.edge && p.opt.Indent != "" && !start && html && name == "body" && p.opt.FinalNewline:
+			// the line break is written after the html end tag instead
+			p.layoutBreak(c.layDepth, start, false)
+		case l.edge && p.opt.Indent != "":
+			p.layoutBreak(c.layDepth, start, true)
+		default:
+			p.layoutFlush()
+		}
+		l.edge, l.start = true, start && !void
+	default:
+		p.layoutFlush()
+		l.edge = false
+	}
+	if start && !void && (!html || layoutOff(name)) {
+		l.edge = false // contents written as they are
+	}
+}
+
+// layoutText holds back whitespace text b of tok at a block boundary, and
+// reports whether it did.
+func (p *polyglot) layoutText(tok *htmlstream.Token, b []byte) bool {
+	l := &p.lay
+	// (form feed, which XML doesn't allow, is replaced: not whitespace)
+	if l.edge && p.opt.Indent != "" && !p.ctx().layOff && ascii.IsBlank(b) && bytes.IndexByte(b, '\f') < 0 && l.held.size()+len(b) <= maxSpaceHold {
+		l.held.add(tok, b, false, false)
+		return true
+	}
+	p.layoutFlush()
+	if len(b) != 0 {
+		l.edge = false
+	}
+	return false
+}
+
+// layoutComment holds back the markup b of a comment (first and last are
+// those of commentPart) at a block boundary, and reports whether it did.
+func (p *polyglot) layoutComment(b []byte, first, last bool) bool {
+	l := &p.lay
+	part := p.doc.Part()
+	if l.edge && p.opt.Indent != "" && first && last && len(p.out) != 0 && part != htmlutil.BeforeHead && !p.ctx().layOff && l.held.size()+len(b) <= maxSpaceHold {
+		l.held.add(nil, b, true, true)
+		return true
+	}
+	p.layoutFlush()
+	l.edge = l.edge && (part == htmlutil.BeforeHTML || part == htmlutil.BeforeHead)
+	return false
+}
+
+// layoutFlush writes the whitespace and comments held back as they are.
+func (p *polyglot) layoutFlush() {
+	h := &p.lay.held
+	if h.size() == 0 {
+		return
+	}
+	for part, b := range h.all() {
+		if part.tok < 0 {
+			p.markup(b)
+		} else {
+			p.writeText(h.toks.At(part.tok), b)
+		}
+	}
+	h.reset()
+}
+
+// layoutBreak replaces the whitespace held back at a block boundary before
+// a tag (a start tag if start) with a line break and the indentation for the
+// depth (if line is set), writing the comments held back on lines of their
+// own, with an empty line where the input has one between them or between
+// elements.
+func (p *polyglot) layoutBreak(depth int32, start, line bool) {
+	h := &p.lay.held
+	inner := depth // the comments before an end tag are in the element
+	if !start {
+		inner++
+	}
+	lines := 0 // the line breaks of the whitespace before the next part
+	for part, b := range h.all() {
+		if part.tok >= 0 {
+			lines += bytes.Count(b, []byte("\n"))
+			continue
+		}
+		p.layoutLine(inner, lines > 1 && !p.lay.start)
+		p.markup(b)
+		p.lay.start, lines = false, 0
+	}
+	h.reset()
+	if line {
+		p.layoutLine(depth, lines > 1 && !p.lay.start && start)
+	}
+}
+
+// layoutLine writes a line break (two for an empty line) and the
+// indentation for the depth.
+func (p *polyglot) layoutLine(depth int32, empty bool) {
+	p.endText()
+	if empty {
+		p.emitString("\n")
+	}
+	p.emitString("\n")
+	p.lay.line, p.lay.depth = true, depth
 }
 
 // Output stack.
@@ -3079,6 +3388,13 @@ func (p *polyglot) pushOut(e outElem) {
 		c.nreopened++
 	} else {
 		c.input = i
+	}
+	if p.layout() {
+		if !e.unwrap && e.name != "html" && layoutKind(e.name, e.ns == "", c.layHead) == layoutBlock {
+			c.layDepth++
+		}
+		c.layOff = c.layOff || e.ns != "" || layoutOff(e.name)
+		c.layHead = e.ns == "" && (e.name == "head" || e.name != "template" && c.layHead)
 	}
 	e.ctx = c
 	if e.key != nil {
@@ -3549,12 +3865,22 @@ func (p *polyglot) commentPart(b []byte, first, last bool) {
 		out = append(out, "-->"...)
 	}
 	p.buf = out
-	if p.doc.Part() == htmlutil.AfterHead && p.inHeadTop() && !p.afterHeadFull && p.holdAfterHead(nil, out) {
+	if p.doc.Part() == htmlutil.AfterHead && p.inHeadTop() && !p.afterHeadFull && p.holdAfterHead(nil, out, first, last) {
 		return
 	}
-	p.markup(out)
+	p.writeComment(out, first, last)
+}
+
+// writeComment writes the markup of a comment (or of part of one, see
+// commentPart), followed by a line break before the root element.
+func (p *polyglot) writeComment(b []byte, first, last bool) {
+	if p.layout() && p.layoutComment(b, first, last) {
+		return
+	}
+	p.markup(b)
 	if last && p.doc.Part() == htmlutil.BeforeHTML {
 		p.emitString("\n")
+		p.lay.line, p.lay.depth = p.layout(), 0
 	}
 }
 
@@ -3586,12 +3912,12 @@ func (p *polyglot) textToken(tok *htmlstream.Token, start, end int) {
 	case part == htmlutil.BeforeHTML, part == htmlutil.BeforeHead:
 		return // whitespace before the html element or the head, which HTML parsers drop
 	case p.charsetWait:
-		p.headSpace.add(tok, b) // see placeCharset
+		p.headSpace.add(tok, b, false, false) // see placeCharset
 		return
 	case p.opt.FinalNewline && p.bodySpaceToken(tok):
-		p.bodySpace.add(tok, b)
+		p.bodySpace.add(tok, b, false, false)
 		return
-	case part == htmlutil.AfterHead && p.inHeadTop() && !p.afterHeadFull && p.holdAfterHead(tok, b):
+	case part == htmlutil.AfterHead && p.inHeadTop() && !p.afterHeadFull && p.holdAfterHead(tok, b, false, false):
 		return
 	}
 	if top := p.top(); top != nil && (top.name == "iframe" || top.name == "noembed" || top.name == "noframes") && top.ns == "" {
@@ -3917,9 +4243,14 @@ func (p *polyglot) textPart(tok *htmlstream.Token, b []byte, unchanged bool) {
 
 // text writes escaped text, as part of the current text node.
 func (p *polyglot) text(tok *htmlstream.Token, b []byte) {
-	if p.removing() {
+	if p.removing() || p.layout() && p.layoutText(tok, b) {
 		return
 	}
+	p.writeText(tok, b)
+}
+
+// writeText writes text like text, without the layout.
+func (p *polyglot) writeText(tok *htmlstream.Token, b []byte) {
 	b = p.replaceChars(b)
 	if p.opt.OnText != nil {
 		if ev := p.callText(Text{Data: b, First: !p.textOpen, Token: tok}); ev.set {
@@ -3933,7 +4264,39 @@ func (p *polyglot) text(tok *htmlstream.Token, b []byte) {
 	}
 	p.raw = AppendEscapeText(p.raw[:0], b)
 	p.textOpen = true
-	p.emit(p.raw)
+	c := p.ctx()
+	if !p.layout() || c.layOff {
+		p.emit(p.raw)
+		return
+	}
+	// the prefix and the indentation start the lines of the text, replacing
+	// its spaces and tabs there (also at the start of a token continuing a
+	// line)
+	for b := p.raw; len(b) != 0; {
+		if p.lay.line {
+			b = bytes.TrimLeft(b, " \t")
+		}
+		i := bytes.IndexByte(b, '\n')
+		if i < 0 {
+			p.emit(b)
+			break
+		}
+		p.emit(b[:i+1])
+		b = b[i+1:]
+		p.lay.line, p.lay.depth = true, c.layDepth
+	}
+}
+
+// lineStart writes the prefix and the indentation at the start of a line
+// (see Options.Indent and Options.IndentPrefix).
+func (p *polyglot) lineStart() {
+	p.lay.line = false
+	p.emitString(p.opt.IndentPrefix)
+	if p.opt.Indent != "" {
+		for range min(p.lay.depth, maxIndent) {
+			p.emitString(p.opt.Indent)
+		}
+	}
 }
 
 // AppendEscapeText appends s to dst, escaped for use as text like [Convert]

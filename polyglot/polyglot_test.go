@@ -2554,8 +2554,9 @@ func TestHeadSpaceLimits(t *testing.T) {
 }
 
 // TestFinalNewline checks that FinalNewline ends the output with a line
-// break, taken from whitespace at the end of the body, whatever the chunk
-// size.
+// break, taken from whitespace at the end of the body, and with Indent from
+// the line break before the body end tag, whatever the chunk size, and that
+// converting the output with Indent again gives the same output.
 func TestFinalNewline(t *testing.T) {
 	const start = `<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body>`
 	for _, tc := range []struct{ in, out string }{
@@ -2581,6 +2582,126 @@ func TestFinalNewline(t *testing.T) {
 			if wout, _, err := writerWarnings(strings.NewReader(tc.in), chunk, opt); err != nil || wout != out {
 				t.Errorf("%q, chunk size %d: got %q, error %v", tc.in, chunk, wout, err)
 			}
+		}
+	}
+	// with Indent, the line break before the body end tag is taken instead
+	for _, tc := range []struct{ in, prefix, out string }{
+		{"<p>a</p>\n", "", "\n  <p>a</p></body></html>\n"},
+		{"<p>a</p>\n</body>\n</html>\n", "", "\n  <p>a</p></body></html>\n"},
+		{"<div><p>x", "", "\n  <div>\n    <p>x</p>\n  </div></body></html>\n"},
+		{"<p>x</p>\n<!-- a -->\n\n", "", "\n  <p>x</p>\n  <!-- a --></body></html>\n"},
+		{"<p>x</p><script>s</script>\n", "", "\n  <p>x</p>\n  <script>s</script></body></html>\n"},
+		{"<pre>x\n</pre>\n", "", "\n  <pre>x\n</pre></body></html>\n"},
+		{"<p>a</p>b\n", "", "\n  <p>a</p>b\n  </body></html>\n"},
+		{"<b>x</b> \n", "", "<b>x</b> </body></html>\n"},
+		{"\n", "", "</body></html>\n"},
+		{"<div><p>x</p></div>\n", "\t", "\n\t  <div>\n\t    <p>x</p>\n\t  </div></body></html>\n"},
+	} {
+		opt := Options{DoctypeMode: NoDoctype, FinalNewline: true, Indent: "  ", IndentPrefix: tc.prefix}
+		out, warnings, err := convertWarnings(strings.NewReader(tc.in), opt)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, body, _ := strings.Cut(out, "<body>"); body != tc.out || warnings != "" {
+			t.Errorf("%q with Indent, prefix %q:\n got %q\nwant %q\nwarnings: %s", tc.in, tc.prefix, body, tc.out, warnings)
+		}
+		for _, chunk := range []int{1, 3} {
+			if wout, _, err := writerWarnings(strings.NewReader(tc.in), chunk, opt); err != nil || wout != out {
+				t.Errorf("%q with Indent, prefix %q, chunk size %d: got %q, error %v", tc.in, tc.prefix, chunk, wout, err)
+			}
+		}
+		if again, _, err := convertWarnings(strings.NewReader(out), opt); err != nil || again != out {
+			t.Errorf("%q with Indent, prefix %q: converting the output again: error %v, got %q", tc.in, tc.prefix, err, again)
+		}
+	}
+}
+
+// TestIndent checks the output with Indent and IndentPrefix, whatever the
+// chunk size and with hooks which do nothing, that converting it again gives
+// the same output, and the error for an indentation which isn't whitespace.
+func TestIndent(t *testing.T) {
+	for _, tc := range []struct {
+		name, in, indent, prefix, out string
+	}{
+		{"Blocks", "<!DOCTYPE html><title>t</title><div><p>a <b>b</b>\nc</p><ul><li>x<li>y</ul></div><p>z", "  ", "", `<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head>
+  <meta charset="UTF-8" />
+  <title>t</title>
+</head>
+<body>
+  <div>
+    <p>a <b>b</b>
+      c</p>
+    <ul>
+      <li>x</li>
+      <li>y</li>
+    </ul>
+  </div>
+  <p>z</p>
+</body></html>`},
+		{"Kept", "<pre>\n a\n  b</pre><p>x <span>y</span> <!-- c --> z</p><svg><g> <rect/> </g></svg><textarea> t\n u</textarea>", "\t", "", "<!DOCTYPE html>\n" + `<html xmlns="http://www.w3.org/1999/xhtml"><head>
+	<meta charset="UTF-8" />
+</head>
+<body>
+	<pre> a
+  b</pre>
+	<p>x <span>y</span> <!-- c --> z</p><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><g> <rect></rect> </g></svg><textarea> t
+ u</textarea></body></html>`},
+		{"CommentsAndEmptyLines", "<body>\n<!-- a -->\n\n<div>\n\n<p>x</p>\n\n\n<!-- b -->\n<p>y</p>\n\n</div><div>\n</div>", "  ", "", `<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head>
+  <meta charset="UTF-8" />
+</head>
+<body>
+  <!-- a -->
+
+  <div>
+    <p>x</p>
+
+    <!-- b -->
+    <p>y</p>
+  </div>
+  <div></div>
+</body></html>`},
+		{"Prefix", "<!-- c --><title>t</title><p>a\n  b</p><pre>c\nd</pre>", "", "\t", "<!DOCTYPE html>\n\t<!-- c -->\n" + "\t" + `<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><title>t</title></head><body><p>a
+	b</p><pre>c
+d</pre></body></html>`},
+		{"IndentPrefix", "<div><p>a\n   b</p></div>", " ", "\t", "<!DOCTYPE html>\n" + "\t" + `<html xmlns="http://www.w3.org/1999/xhtml"><head>
+	 <meta charset="UTF-8" />
+	</head>
+	<body>
+	 <div>
+	  <p>a
+	   b</p>
+	 </div>
+	</body></html>`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			opt := Options{Indent: tc.indent, IndentPrefix: tc.prefix}
+			out, warnings, err := convertWarnings(strings.NewReader(tc.in), opt)
+			if err != nil || warnings != "" {
+				t.Fatalf("error %v, warnings %s", err, warnings)
+			}
+			if out != tc.out {
+				t.Errorf("got\n%s\nwant\n%s", out, tc.out)
+			}
+			for _, chunk := range []int{1, 3} {
+				if wout, _, err := writerWarnings(strings.NewReader(tc.in), chunk, opt); err != nil || wout != out {
+					t.Errorf("chunk size %d: error %v, got\n%s", chunk, err, wout)
+				}
+			}
+			hooked := opt
+			hooked.OnTag, hooked.OnText = func(*Tag) {}, func(*Text) {}
+			if hout, _, err := convertWarnings(strings.NewReader(tc.in), hooked); err != nil || hout != out {
+				t.Errorf("with hooks: error %v, got\n%s", err, hout)
+			}
+			if again, _, err := convertWarnings(strings.NewReader(out), opt); err != nil || again != out {
+				t.Errorf("converting the output again: error %v, got\n%s", err, again)
+			}
+		})
+	}
+	for _, opt := range []Options{{Indent: "x"}, {IndentPrefix: "\n"}} {
+		if err := Convert(io.Discard, strings.NewReader("<p>x"), opt); !errors.Is(err, ErrInvalidOp) {
+			t.Errorf("%+v: error %v", opt, err)
 		}
 	}
 }

@@ -158,6 +158,45 @@ func TestPolyglot(t *testing.T) {
 	}
 }
 
+// TestPolyglotFinalNewline checks that with FinalNewline and Indent, the
+// HTML DOM of the output of a body ending at a block boundary is the same
+// as without FinalNewline, and differs from the XML DOM only by the line
+// break after the html end tag.
+func TestPolyglotFinalNewline(t *testing.T) {
+	for _, in := range []string{
+		"<p>a</p>",
+		"<p>a</p>\n</body>\n</html>\n",
+		"<div><p>x",
+		"<p>x</p>\n<!-- a -->\n",
+		"<p>x</p><script>s</script>\n",
+		"<pre>x\n</pre>\n",
+	} {
+		var outs [2]string
+		for i, final := range []bool{false, true} {
+			var b bytes.Buffer
+			if err := polyglot.Convert(&b, strings.NewReader(in), polyglot.Options{Indent: "\t", FinalNewline: final}); err != nil {
+				t.Fatalf("%q: %v", in, err)
+			}
+			outs[i] = b.String()
+		}
+		out, ok := strings.CutSuffix(outs[1], "</html>\n")
+		if !ok {
+			t.Errorf("%q: output doesn't end with a line break after the html end tag: %q", in, outs[1])
+			continue
+		}
+		if want, got := htmlDOMScripting(t, outs[0], false, true), htmlDOMScripting(t, outs[1], false, true); got != want {
+			t.Errorf("%q: HTML DOM differs with FinalNewline:\noutput: %q\nDOM (without -, with +):\n%s", in, outs[1], domDiff(want, got))
+		}
+		xml, err := xmlDOM(outs[1], true)
+		if err != nil {
+			t.Fatalf("%q: output is not well-formed XML: %v", in, err)
+		}
+		if html := htmlDOMScripting(t, out+"</html>", false, true); xml != html {
+			t.Errorf("%q: XML DOM differs from the HTML DOM without the last line break:\noutput: %q\nDOM (XML -, HTML +):\n%s", in, outs[1], domDiff(xml, html))
+		}
+	}
+}
+
 // domDiff returns the lines of the DOM dumps a and b (see htmlDOM) between
 // their common leading and trailing lines, with a line of context on each
 // side, prefixed with "-" for a and "+" for b.

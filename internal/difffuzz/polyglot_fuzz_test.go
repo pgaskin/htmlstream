@@ -163,6 +163,7 @@ func FuzzPolyglotDOM(f *testing.F) {
 			return // a Reader error, like an unsupported encoding
 		}
 		checkPolyglot(t, in, in, b.String(), warnings, false, false)
+		checkIndent(t, in, b.String(), warnings)
 		if !slices.ContainsFunc(warnings, isPTableWarning) {
 			return
 		}
@@ -262,6 +263,43 @@ func checkPolyglot(t *testing.T, in, html, out string, warnings []string, script
 	}
 	if xml != outDOM {
 		t.Fatalf("%q: XML DOM differs from HTML DOM:\noutput: %s\nDOM (XML -, HTML +):\n%s", in, out, domDiff(xml, outDOM))
+	}
+}
+
+// checkIndent checks the output of in with Indent and IndentPrefix against
+// out, its output without: the warnings are the same, and without warnings,
+// the HTML and XML DOMs are the same (see checkPolyglot), and the HTML DOM
+// is the same as that of out except for whitespace-only text and the spaces
+// and tabs at the start of lines of text. Inputs skipped by checkPolyglot
+// for x/net's differences are skipped.
+func checkIndent(t *testing.T, in, out string, warnings []string) {
+	var indented []string
+	var b bytes.Buffer
+	err := polyglot.Convert(&b, strings.NewReader(in), polyglot.Options{
+		Indent:       "\t",
+		IndentPrefix: " ",
+		Warn: func(w polyglot.Warning) {
+			indented = append(indented, fmt.Sprintf("%d: %s", w.Pos, w.Msg))
+		},
+	})
+	if err != nil {
+		t.Fatalf("%q: with Indent: %v", in, err)
+	}
+	// the indentation can put the charset meta element past byte 1024
+	past1024 := func(w string) bool { return strings.Contains(w, "past the first 1024 bytes") }
+	indented = slices.DeleteFunc(indented, past1024)
+	warnings = slices.DeleteFunc(slices.Clone(warnings), past1024)
+	if !slices.Equal(indented, warnings) {
+		t.Fatalf("%q: with Indent: warnings %q, without %q", in, indented, warnings)
+	}
+	if len(warnings) != 0 || xnetForeignTemplate(in) || xnetScriptEscape(in) {
+		return
+	}
+	checkPolyglot(t, in, "", b.String(), nil, false, false)
+	lines := regexp.MustCompile(`\\n( |\\t)*`)
+	want := lines.ReplaceAllString(htmlDOMScripting(t, out, false, false), `\n`)
+	if got := lines.ReplaceAllString(htmlDOMScripting(t, b.String(), false, false), `\n`); got != want {
+		t.Fatalf("%q: HTML DOM differs with Indent:\noutput: %s\nwith Indent: %s\nDOM (without -, with +):\n%s", in, out, b.String(), domDiff(want, got))
 	}
 }
 
