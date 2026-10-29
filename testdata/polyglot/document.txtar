@@ -1,0 +1,293 @@
+Document structure: doctypes, head and body, content after the body,
+misplaced html, head and body tags, frames, charset declarations, and
+noscript.
+-- Minimal --
+-- in --
+<title>T</title><p>Hello <b>world</b>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><title>T</title></head><body><p>Hello <b>world</b></p></body></html>
+-- Empty --
+-- in --
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body></body></html>
+-- XHTML --
+-- in --
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<title>t</title>
+</head>
+<body><p>x<br/>y</p></body>
+</html>
+
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="UTF-8" />
+
+<title>t</title>
+
+</head><body><p>x<br />y</p>
+
+</body></html>
+-- Doctype --
+-- in --
+<!-- c --><!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN"><p>x
+-- out --
+<!DOCTYPE html><!-- c --><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p>x</p></body></html>
+-- XMLStylesheet --
+-- in --
+<?xml-stylesheet href="x.css"?><p>x</p>
+-- out --
+<!DOCTYPE html><!--?xml-stylesheet href="x.css"?--><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p>x</p></body></html>
+-- XMLDeclarationForms --
+Only <?xml followed by whitespace or ?> is an XML declaration, as in
+Universal mode: the other forms are processing instructions, which HTML
+parsers read as bogus comments, like at the end of the input. The first
+XML declaration before the root element is removed, and others are
+written as comments like processing instructions.
+-- in --
+<?xml?foo bar><?xml><?xmlfoo?><?xml?a?><?xml	version="1.0"?><?xml?><p>a<?xml version="1.0"?>b<?xml
+-- out --
+<!DOCTYPE html><!--?xml?foo bar--><!--?xml--><!--?xmlfoo?--><!--?xml?a?--><!--?xml?--><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p>a<!--?xml version="1.0"?-->b<!--?xml--></p></body></html>
+-- XMLDeclarationEmpty --
+<?xml?> is an XML declaration.
+-- in --
+<?xml?><p>a
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p>a</p></body></html>
+-- XMLDeclarationTwice --
+A second XML declaration is written as a comment, as HTML parsers read
+it.
+-- in --
+<?xml version='1.0'?><?xml version='1.0'?><p>a
+-- out --
+<!DOCTYPE html><!--?xml version='1.0'?--><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p>a</p></body></html>
+-- XMLDeclarationInBody --
+An XML declaration after the start of the root element is written as a
+comment, as HTML parsers read it.
+-- in --
+<!DOCTYPE html><p>a<?xml version="1.0"?>b
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p>a<!--?xml version="1.0"?-->b</p></body></html>
+-- CharsetMetaInexact --
+HTML parsers match http-equiv values exactly (ASCII
+case-insensitively), so the first two aren't charset declarations and
+are kept. Declarations with an encoding label HTML parsers don't know,
+or without one, are dropped too, so the output has one encoding
+declaration.
+-- in --
+<meta http-equiv="Content-Type " content="text/html; charset=latin1"><meta http-equiv=" Content-Type"><meta HTTP-EQUIV=CONTENT-TYPE content="text/html;charset=latin1"><meta charset=latin1><meta http-equiv=content-type content=x><meta charset=x><meta Charset><meta http-equiv="Content-Type">
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><meta http-equiv="Content-Type " content="text/html; charset=latin1" /><meta http-equiv=" Content-Type" /></head><body></body></html>
+-- CharsetMetaOtherAttributes --
+Only the declaration is removed: the charset attribute, or http-equiv
+with the content attribute it uses. A meta element with other attributes
+(not counting xmlns, which is dropped from meta) is kept. HTML parsers use
+the first of duplicate attributes, so the last one isn't a declaration.
+-- in --
+<meta charset=utf-8 name=viewport content="width=device-width"><meta http-equiv=content-type content="text/html; charset=x" id=a><meta charset=a http-equiv=Content-Type content=b name=c><meta charset=a xmlns="http://www.w3.org/1999/xhtml"><meta http-equiv=refresh http-equiv=content-type content=5><p><meta charset=x itemprop=y>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width" /><meta id="a" /><meta name="c" /><meta http-equiv="refresh" content="5" /></head><body><p><meta itemprop="y" /></p></body></html>
+-- CharsetMetaFirst1024 --
+The charset meta element ends at byte 1024 of the output, where HTML
+parsers still find it before parsing.
+-- in --
+<!--xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx--><p>a
+-- out --
+<!DOCTYPE html><!--xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx--><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p>a</p></body></html>
+-- CharsetMetaPast1024 --
+-- in --
+<!--xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx--><p>a
+-- out --
+<!DOCTYPE html><!--xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx--><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p>a</p></body></html>
+-- warn --
+937: wrote the charset meta element past the first 1024 bytes (HTML parsers which aren't told the encoding will not find it before parsing the output)
+-- CharsetMetaPast1024HTMLAttr --
+-- in --
+<html class="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"><p>a
+-- out --
+<!DOCTYPE html><html class="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p>a</p></body></html>
+-- warn --
+1115: wrote the charset meta element past the first 1024 bytes (HTML parsers which aren't told the encoding will not find it before parsing the output)
+-- CharsetMetaPast1024HeadAttr --
+-- in --
+<head id="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"><p>a
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head id="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"><meta charset="UTF-8" /></head><body><p>a</p></body></html>
+-- warn --
+0: wrote the charset meta element past the first 1024 bytes (HTML parsers which aren't told the encoding will not find it before parsing the output)
+-- HeadContentAfterHead --
+-- in --
+<head><title>t</title></head><link rel=x><body>b
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><title>t</title><link rel="x" /></head><body>b</body></html>
+-- ContentAfterBody --
+-- in --
+<body>x</body>y</html>z
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body>xyz</body></html>
+-- EndTagAfterBodyInElement htmldiff --
+-- in --
+<body><a><div></body></a>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><a><div></div></a></body></html>
+-- warn --
+21: applied </a> after </body> closed div (HTML parsers would have kept div open when applying it)
+-- ContentAfterBodyInForeign htmldiff --
+-- in --
+<body><svg></body>x
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"></svg>x</body></html>
+-- warn --
+18: wrote content after </body> outside the svg it closed (HTML parsers would have kept svg open and put the content in it)
+-- IgnoredEndTagAfterBodyInElement --
+-- in --
+<body><a><div></body></b>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><a><div></div></a></body></html>
+-- StrayEndTagAfterBodyInElement htmldiff --
+-- in --
+<html><a></html></p></br>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><a></a><p></p><br /></body></html>
+-- warn --
+16: wrote content after </html> outside the a it closed (HTML parsers would have kept a open and put the content in it)
+-- ContentAfterBodyInElement htmldiff --
+HTML parsers keep the a open after </html>
+-- in --
+<html><a></html>x
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><a></a>x</body></html>
+-- warn --
+16: wrote content after </html> outside the a it closed (HTML parsers would have kept a open and put the content in it)
+-- ContentAfterMisplacedBodyEnd htmldiff --
+the end tag of a misplaced body closes the a for the Reader
+-- in --
+x<body><a></body>y
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body>x<a></a>y</body></html>
+-- warn --
+17: wrote content after </body> outside the a it closed (HTML parsers would have kept a open and put the content in it)
+-- ContentAfterBodyEndInElement htmldiff --
+-- in --
+<body><div>x</body><p>y
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><div>x</div><p>y</p></body></html>
+-- warn --
+19: wrote content after </body> outside the div it closed (HTML parsers would have kept div open and put the content in it)
+-- MisplacedBody --
+-- in --
+<body class=a><p>x<body><html><head id=c>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body class="a"><p>x</p></body></html>
+-- MisplacedBodyAttrs htmldiff --
+-- in --
+<body class=a><p>x<body id=b>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body class="a"><p>x</p></body></html>
+-- warn --
+18: dropped attributes of misplaced <body> (HTML parsers would have added them to the existing element)
+-- Frame --
+-- in --
+<frame>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><frame /></body></html>
+-- warn --
+0: kept frame outside a frameset (HTML parsers would have ignored it)
+-- FramesetInBody --
+-- in --
+<p>a<frameset>b</frameset>c</p>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p>a<frameset>b</frameset>c</p></body></html>
+-- warn --
+4: wrote frameset in the body (frameset documents aren't supported, and HTML parsers would have ignored it after body content)
+-- Noscript --
+-- in --
+<noscript><img src=a></noscript>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><noscript></noscript></head><body><img src="a" /></body></html>
+-- HeadNoscript --
+with scripting disabled, content other than link, meta, style, etc.
+closes a noscript in the head
+-- in --
+<head><noscript><link rel=a><style>p{}</style></head></noscript><noscript> <meta name=x>x</noscript>y<noscript><p>z</noscript>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><noscript><link rel="a" /><style>p{}</style></noscript><noscript> <meta name="x" /></noscript></head><body>xy<noscript><p>z</p></noscript></body></html>
+-- ImpliedHeadNoscript --
+-- in --
+<noscript><link rel=a><style>p{}</style></noscript><p>x<html><noscript><img src=a></noscript>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><noscript><link rel="a" /><style>p{}</style></noscript></head><body><p>x<noscript><img src="a" /></noscript></p></body></html>
+-- ImpliedHeadNoscriptText htmldiff nonidempotent --
+-- in --
+<noscript>x</noscript>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><noscript>x</noscript></head><body></body></html>
+-- warn --
+10: kept text in a noscript in the implied head (HTML parsers would have closed the noscript and moved the text to the body)
+-- ImpliedHeadNoscriptTitle htmldiff nonidempotent --
+-- in --
+<html><noscript><title>t</title></noscript><img src=a>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><noscript><title>t</title></noscript></head><body><img src="a" /></body></html>
+-- warn --
+16: kept title in a noscript in the implied head (HTML parsers would have closed the noscript before it)
+-- ImpliedHeadNoscriptEndTag htmldiff --
+-- in --
+<noscript></html> x
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><noscript></noscript></head><body> x</body></html>
+-- warn --
+10: applied </html> in a noscript in the implied head (HTML parsers would have ignored it)
+-- ImpliedHeadNoscriptClosedEndTag htmldiff --
+the a starts the body, closing the noscript and the head; HTML
+parsers ignore the noscript end tag, and keep the a open
+-- in --
+<noscript><a></noscript>x
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><noscript></noscript></head><body><a></a>x</body></html>
+-- warn --
+24: wrote content after </noscript> outside the a it closed (HTML parsers would have kept a open and put the content in it)
+-- NoscriptAfterHead --
+noscript after the head (also implied, or ended by a stray </head>)
+is in the body
+-- in --
+</head><noscript>x</noscript><title>t</title></head><noscript><p>y</noscript>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><noscript>x</noscript><title>t</title><noscript><p>y</p></noscript></body></html>
+-- MisplacedHeadNoscript htmldiff --
+the head start tag after the body content is ignored by HTML
+parsers, so the noscript is in the body
+-- in --
+0<head><noscript>x</noscript>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body>0<noscript></noscript>x</body></html>
+-- warn --
+17: closed noscript after a misplaced <head> at the content after it (HTML parsers would have kept it open as body content)
+-- MisplacedHeadNoscriptHeadContent --
+-- in --
+<p>0</p><head><noscript><link rel=a></noscript>x
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p>0</p><noscript><link rel="a" /></noscript>x</body></html>
+-- BodyNoscriptEndTagClosesP htmldiff --
+the noscript end tag is ignored when the p is open
+-- in --
+<body><noscript><p>x</noscript>y<noscript><div>z</noscript>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><noscript><p>x</p></noscript>y<noscript><div>z</div></noscript></body></html>
+-- warn --
+31: wrote content after </noscript> outside the p it closed (HTML parsers would have kept p open and put the content in it)
+-- BodyNoscriptEndTag --
+-- in --
+<body><noscript><b>x</noscript>y
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><noscript><b>x</b></noscript><b>y</b></body></html>
+-- HeadNoscriptNested --
+-- in --
+<head><noscript><noscript class=a><!--c--></noscript>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><noscript><noscript class="a"><!--c--></noscript></noscript></head><body></body></html>
+-- warn --
+16: kept noscript inside a noscript in the head (HTML parsers would have ignored it)

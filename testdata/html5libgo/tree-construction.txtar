@@ -1,0 +1,2345 @@
+Tree construction tests of html5lib-tests without parse errors, for the
+sax tests: the cases of tree-construction/*.dat in the copy of the tests in
+golang.org/x/net v0.60.0 (html/testdata/html5lib-tests/) whose #errors and
+#new-errors sections are empty, other than #document-fragment cases and
+cases without a doctype (in webkit02.dat, whose #errors sections leave out
+the missing doctype and other parse errors). Each case is named after its
+file and its number in the file, with the script-off or script-on flag of
+the case, and has the #data section as in and the #document section as
+document, unchanged. The tests are under the license in LICENSE.
+-- blocks/2 --
+-- in --
+<!doctype html><address><p>foo</address>bar
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <address>
+|       <p>
+|         "foo"
+|     "bar"
+-- blocks/4 --
+-- in --
+<!doctype html><article><p>foo</article>bar
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <article>
+|       <p>
+|         "foo"
+|     "bar"
+-- blocks/6 --
+-- in --
+<!doctype html><aside><p>foo</aside>bar
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <aside>
+|       <p>
+|         "foo"
+|     "bar"
+-- blocks/8 --
+-- in --
+<!doctype html><blockquote><p>foo</blockquote>bar
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <blockquote>
+|       <p>
+|         "foo"
+|     "bar"
+-- blocks/10 --
+-- in --
+<!doctype html><center><p>foo</center>bar
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <center>
+|       <p>
+|         "foo"
+|     "bar"
+-- blocks/12 --
+-- in --
+<!doctype html><details><p>foo</details>bar
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <details>
+|       <p>
+|         "foo"
+|     "bar"
+-- blocks/14 --
+-- in --
+<!doctype html><dialog><p>foo</dialog>bar
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <dialog>
+|       <p>
+|         "foo"
+|     "bar"
+-- blocks/16 --
+-- in --
+<!doctype html><dir><p>foo</dir>bar
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <dir>
+|       <p>
+|         "foo"
+|     "bar"
+-- blocks/18 --
+-- in --
+<!doctype html><div><p>foo</div>bar
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <div>
+|       <p>
+|         "foo"
+|     "bar"
+-- blocks/20 --
+-- in --
+<!doctype html><dl><p>foo</dl>bar
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <dl>
+|       <p>
+|         "foo"
+|     "bar"
+-- blocks/22 --
+-- in --
+<!doctype html><fieldset><p>foo</fieldset>bar
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <fieldset>
+|       <p>
+|         "foo"
+|     "bar"
+-- blocks/24 --
+-- in --
+<!doctype html><figcaption><p>foo</figcaption>bar
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <figcaption>
+|       <p>
+|         "foo"
+|     "bar"
+-- blocks/26 --
+-- in --
+<!doctype html><figure><p>foo</figure>bar
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <figure>
+|       <p>
+|         "foo"
+|     "bar"
+-- blocks/28 --
+-- in --
+<!doctype html><footer><p>foo</footer>bar
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <footer>
+|       <p>
+|         "foo"
+|     "bar"
+-- blocks/30 --
+-- in --
+<!doctype html><header><p>foo</header>bar
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <header>
+|       <p>
+|         "foo"
+|     "bar"
+-- blocks/32 --
+-- in --
+<!doctype html><hgroup><p>foo</hgroup>bar
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <hgroup>
+|       <p>
+|         "foo"
+|     "bar"
+-- blocks/34 --
+-- in --
+<!doctype html><listing><p>foo</listing>bar
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <listing>
+|       <p>
+|         "foo"
+|     "bar"
+-- blocks/36 --
+-- in --
+<!doctype html><menu><p>foo</menu>bar
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <menu>
+|       <p>
+|         "foo"
+|     "bar"
+-- blocks/38 --
+-- in --
+<!doctype html><nav><p>foo</nav>bar
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <nav>
+|       <p>
+|         "foo"
+|     "bar"
+-- blocks/40 --
+-- in --
+<!doctype html><ol><p>foo</ol>bar
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <ol>
+|       <p>
+|         "foo"
+|     "bar"
+-- blocks/42 --
+-- in --
+<!doctype html><pre><p>foo</pre>bar
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <pre>
+|       <p>
+|         "foo"
+|     "bar"
+-- blocks/44 --
+-- in --
+<!doctype html><section><p>foo</section>bar
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <section>
+|       <p>
+|         "foo"
+|     "bar"
+-- blocks/46 --
+-- in --
+<!doctype html><summary><p>foo</summary>bar
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <summary>
+|       <p>
+|         "foo"
+|     "bar"
+-- blocks/48 --
+-- in --
+<!doctype html><ul><p>foo</ul>bar
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <ul>
+|       <p>
+|         "foo"
+|     "bar"
+-- doctype01/1 --
+-- in --
+<!DOCTYPE html>Hello
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     "Hello"
+-- doctype01/2 --
+-- in --
+<!dOctYpE HtMl>Hello
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     "Hello"
+-- html5test-com/6 --
+-- in --
+<!DOCTYPE html>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+-- isindex/4 --
+-- in --
+<!doctype html><isindex>x</isindex>x
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <isindex>
+|       "x"
+|     "x"
+-- main-element/2 --
+-- in --
+<!doctype html><main><p>foo</main>bar
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <main>
+|       <p>
+|         "foo"
+|     "bar"
+-- plain-text-unsafe/24 --
+-- in --
+<!DOCTYPE html><pre>
+
+A</pre>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <pre>
+|       "
+A"
+-- plain-text-unsafe/25 --
+-- in --
+<!DOCTYPE html><pre>
+
+A</pre>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <pre>
+|       "
+A"
+-- plain-text-unsafe/26 --
+-- in --
+<!DOCTYPE html><pre>
+A</pre>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <pre>
+|       "A"
+-- search-element/2 --
+-- in --
+<!doctype html><search><p>foo</search>bar
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <search>
+|       <p>
+|         "foo"
+|     "bar"
+-- template/110 --
+-- in --
+<!DOCTYPE HTML><template><tr><td>cell</td></tr></template>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|     <template>
+|       content
+|         <tr>
+|           <td>
+|             "cell"
+|   <body>
+-- template/111 --
+-- in --
+<!DOCTYPE HTML><template> <tr> <td>cell</td> </tr> </template>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|     <template>
+|       content
+|         " "
+|         <tr>
+|           " "
+|           <td>
+|             "cell"
+|           " "
+|         " "
+|   <body>
+-- tests1/34 --
+-- in --
+<!DOCTYPE html><li>hello<li>world<ul>how<li>do</ul>you</body><!--do-->
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <li>
+|       "hello"
+|     <li>
+|       "world"
+|       <ul>
+|         "how"
+|         <li>
+|           "do"
+|       "you"
+|   <!-- do -->
+-- tests10/1 --
+-- in --
+<!DOCTYPE html><svg></svg>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <svg svg>
+-- tests10/3 --
+-- in --
+<!DOCTYPE html><body><svg></svg>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <svg svg>
+-- tests10/4 --
+-- in --
+<!DOCTYPE html><body><select><svg></svg></select>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <select>
+|       <svg svg>
+-- tests10/5 --
+-- in --
+<!DOCTYPE html><body><select><option><svg></svg></option></select>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <select>
+|       <option>
+|         <svg svg>
+-- tests10/11 --
+-- in --
+<!DOCTYPE html><body><table><tbody><tr><td><svg><g>foo</g><g>bar</g></svg></td></tr></tbody></table>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <table>
+|       <tbody>
+|         <tr>
+|           <td>
+|             <svg svg>
+|               <svg g>
+|                 "foo"
+|               <svg g>
+|                 "bar"
+-- tests10/12 --
+-- in --
+<!DOCTYPE html><body><table><tbody><tr><td><svg><g>foo</g><g>bar</g></svg><p>baz</td></tr></tbody></table>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <table>
+|       <tbody>
+|         <tr>
+|           <td>
+|             <svg svg>
+|               <svg g>
+|                 "foo"
+|               <svg g>
+|                 "bar"
+|             <p>
+|               "baz"
+-- tests10/13 --
+-- in --
+<!DOCTYPE html><body><table><caption><svg><g>foo</g><g>bar</g></svg><p>baz</caption></table>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <table>
+|       <caption>
+|         <svg svg>
+|           <svg g>
+|             "foo"
+|           <svg g>
+|             "bar"
+|         <p>
+|           "baz"
+-- tests10/23 --
+-- in --
+<!DOCTYPE html><body xlink:href=foo><svg xlink:href=foo></svg>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     xlink:href="foo"
+|     <svg svg>
+|       xlink href="foo"
+-- tests10/24 --
+-- in --
+<!DOCTYPE html><body xlink:href=foo xml:lang=en><svg><g xml:lang=en xlink:href=foo></g></svg>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     xlink:href="foo"
+|     xml:lang="en"
+|     <svg svg>
+|       <svg g>
+|         xlink href="foo"
+|         xml lang="en"
+-- tests10/25 --
+-- in --
+<!DOCTYPE html><body xlink:href=foo xml:lang=en><svg><g xml:lang=en xlink:href=foo /></svg>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     xlink:href="foo"
+|     xml:lang="en"
+|     <svg svg>
+|       <svg g>
+|         xlink href="foo"
+|         xml lang="en"
+-- tests10/26 --
+-- in --
+<!DOCTYPE html><body xlink:href=foo xml:lang=en><svg><g xml:lang=en xlink:href=foo />bar</svg>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     xlink:href="foo"
+|     xml:lang="en"
+|     <svg svg>
+|       <svg g>
+|         xlink href="foo"
+|         xml lang="en"
+|       "bar"
+-- tests11/1 --
+-- in --
+<!DOCTYPE html><body><svg attributeName='' attributeType='' baseFrequency='' baseProfile='' calcMode='' clipPathUnits='' diffuseConstant='' edgeMode='' filterUnits='' glyphRef='' gradientTransform='' gradientUnits='' kernelMatrix='' kernelUnitLength='' keyPoints='' keySplines='' keyTimes='' lengthAdjust='' limitingConeAngle='' markerHeight='' markerUnits='' markerWidth='' maskContentUnits='' maskUnits='' numOctaves='' pathLength='' patternContentUnits='' patternTransform='' patternUnits='' pointsAtX='' pointsAtY='' pointsAtZ='' preserveAlpha='' preserveAspectRatio='' primitiveUnits='' refX='' refY='' repeatCount='' repeatDur='' requiredExtensions='' requiredFeatures='' specularConstant='' specularExponent='' spreadMethod='' startOffset='' stdDeviation='' stitchTiles='' surfaceScale='' systemLanguage='' tableValues='' targetX='' targetY='' textLength='' viewBox='' viewTarget='' xChannelSelector='' yChannelSelector='' zoomAndPan=''></svg>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <svg svg>
+|       attributeName=""
+|       attributeType=""
+|       baseFrequency=""
+|       baseProfile=""
+|       calcMode=""
+|       clipPathUnits=""
+|       diffuseConstant=""
+|       edgeMode=""
+|       filterUnits=""
+|       glyphRef=""
+|       gradientTransform=""
+|       gradientUnits=""
+|       kernelMatrix=""
+|       kernelUnitLength=""
+|       keyPoints=""
+|       keySplines=""
+|       keyTimes=""
+|       lengthAdjust=""
+|       limitingConeAngle=""
+|       markerHeight=""
+|       markerUnits=""
+|       markerWidth=""
+|       maskContentUnits=""
+|       maskUnits=""
+|       numOctaves=""
+|       pathLength=""
+|       patternContentUnits=""
+|       patternTransform=""
+|       patternUnits=""
+|       pointsAtX=""
+|       pointsAtY=""
+|       pointsAtZ=""
+|       preserveAlpha=""
+|       preserveAspectRatio=""
+|       primitiveUnits=""
+|       refX=""
+|       refY=""
+|       repeatCount=""
+|       repeatDur=""
+|       requiredExtensions=""
+|       requiredFeatures=""
+|       specularConstant=""
+|       specularExponent=""
+|       spreadMethod=""
+|       startOffset=""
+|       stdDeviation=""
+|       stitchTiles=""
+|       surfaceScale=""
+|       systemLanguage=""
+|       tableValues=""
+|       targetX=""
+|       targetY=""
+|       textLength=""
+|       viewBox=""
+|       viewTarget=""
+|       xChannelSelector=""
+|       yChannelSelector=""
+|       zoomAndPan=""
+-- tests11/2 --
+-- in --
+<!DOCTYPE html><BODY><SVG ATTRIBUTENAME='' ATTRIBUTETYPE='' BASEFREQUENCY='' BASEPROFILE='' CALCMODE='' CLIPPATHUNITS='' DIFFUSECONSTANT='' EDGEMODE='' FILTERUNITS='' GLYPHREF='' GRADIENTTRANSFORM='' GRADIENTUNITS='' KERNELMATRIX='' KERNELUNITLENGTH='' KEYPOINTS='' KEYSPLINES='' KEYTIMES='' LENGTHADJUST='' LIMITINGCONEANGLE='' MARKERHEIGHT='' MARKERUNITS='' MARKERWIDTH='' MASKCONTENTUNITS='' MASKUNITS='' NUMOCTAVES='' PATHLENGTH='' PATTERNCONTENTUNITS='' PATTERNTRANSFORM='' PATTERNUNITS='' POINTSATX='' POINTSATY='' POINTSATZ='' PRESERVEALPHA='' PRESERVEASPECTRATIO='' PRIMITIVEUNITS='' REFX='' REFY='' REPEATCOUNT='' REPEATDUR='' REQUIREDEXTENSIONS='' REQUIREDFEATURES='' SPECULARCONSTANT='' SPECULAREXPONENT='' SPREADMETHOD='' STARTOFFSET='' STDDEVIATION='' STITCHTILES='' SURFACESCALE='' SYSTEMLANGUAGE='' TABLEVALUES='' TARGETX='' TARGETY='' TEXTLENGTH='' VIEWBOX='' VIEWTARGET='' XCHANNELSELECTOR='' YCHANNELSELECTOR='' ZOOMANDPAN=''></SVG>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <svg svg>
+|       attributeName=""
+|       attributeType=""
+|       baseFrequency=""
+|       baseProfile=""
+|       calcMode=""
+|       clipPathUnits=""
+|       diffuseConstant=""
+|       edgeMode=""
+|       filterUnits=""
+|       glyphRef=""
+|       gradientTransform=""
+|       gradientUnits=""
+|       kernelMatrix=""
+|       kernelUnitLength=""
+|       keyPoints=""
+|       keySplines=""
+|       keyTimes=""
+|       lengthAdjust=""
+|       limitingConeAngle=""
+|       markerHeight=""
+|       markerUnits=""
+|       markerWidth=""
+|       maskContentUnits=""
+|       maskUnits=""
+|       numOctaves=""
+|       pathLength=""
+|       patternContentUnits=""
+|       patternTransform=""
+|       patternUnits=""
+|       pointsAtX=""
+|       pointsAtY=""
+|       pointsAtZ=""
+|       preserveAlpha=""
+|       preserveAspectRatio=""
+|       primitiveUnits=""
+|       refX=""
+|       refY=""
+|       repeatCount=""
+|       repeatDur=""
+|       requiredExtensions=""
+|       requiredFeatures=""
+|       specularConstant=""
+|       specularExponent=""
+|       spreadMethod=""
+|       startOffset=""
+|       stdDeviation=""
+|       stitchTiles=""
+|       surfaceScale=""
+|       systemLanguage=""
+|       tableValues=""
+|       targetX=""
+|       targetY=""
+|       textLength=""
+|       viewBox=""
+|       viewTarget=""
+|       xChannelSelector=""
+|       yChannelSelector=""
+|       zoomAndPan=""
+-- tests11/3 --
+-- in --
+<!DOCTYPE html><body><svg attributename='' attributetype='' basefrequency='' baseprofile='' calcmode='' clippathunits='' diffuseconstant='' edgemode='' filterunits='' filterres='' glyphref='' gradienttransform='' gradientunits='' kernelmatrix='' kernelunitlength='' keypoints='' keysplines='' keytimes='' lengthadjust='' limitingconeangle='' markerheight='' markerunits='' markerwidth='' maskcontentunits='' maskunits='' numoctaves='' pathlength='' patterncontentunits='' patterntransform='' patternunits='' pointsatx='' pointsaty='' pointsatz='' preservealpha='' preserveaspectratio='' primitiveunits='' refx='' refy='' repeatcount='' repeatdur='' requiredextensions='' requiredfeatures='' specularconstant='' specularexponent='' spreadmethod='' startoffset='' stddeviation='' stitchtiles='' surfacescale='' systemlanguage='' tablevalues='' targetx='' targety='' textlength='' viewbox='' viewtarget='' xchannelselector='' ychannelselector='' zoomandpan=''></svg>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <svg svg>
+|       attributeName=""
+|       attributeType=""
+|       baseFrequency=""
+|       baseProfile=""
+|       calcMode=""
+|       clipPathUnits=""
+|       diffuseConstant=""
+|       edgeMode=""
+|       filterUnits=""
+|       filterres=""
+|       glyphRef=""
+|       gradientTransform=""
+|       gradientUnits=""
+|       kernelMatrix=""
+|       kernelUnitLength=""
+|       keyPoints=""
+|       keySplines=""
+|       keyTimes=""
+|       lengthAdjust=""
+|       limitingConeAngle=""
+|       markerHeight=""
+|       markerUnits=""
+|       markerWidth=""
+|       maskContentUnits=""
+|       maskUnits=""
+|       numOctaves=""
+|       pathLength=""
+|       patternContentUnits=""
+|       patternTransform=""
+|       patternUnits=""
+|       pointsAtX=""
+|       pointsAtY=""
+|       pointsAtZ=""
+|       preserveAlpha=""
+|       preserveAspectRatio=""
+|       primitiveUnits=""
+|       refX=""
+|       refY=""
+|       repeatCount=""
+|       repeatDur=""
+|       requiredExtensions=""
+|       requiredFeatures=""
+|       specularConstant=""
+|       specularExponent=""
+|       spreadMethod=""
+|       startOffset=""
+|       stdDeviation=""
+|       stitchTiles=""
+|       surfaceScale=""
+|       systemLanguage=""
+|       tableValues=""
+|       targetX=""
+|       targetY=""
+|       textLength=""
+|       viewBox=""
+|       viewTarget=""
+|       xChannelSelector=""
+|       yChannelSelector=""
+|       zoomAndPan=""
+-- tests11/4 --
+-- in --
+<!DOCTYPE html><body><math attributeName='' attributeType='' baseFrequency='' baseProfile='' calcMode='' clipPathUnits='' diffuseConstant='' edgeMode='' filterUnits='' glyphRef='' gradientTransform='' gradientUnits='' kernelMatrix='' kernelUnitLength='' keyPoints='' keySplines='' keyTimes='' lengthAdjust='' limitingConeAngle='' markerHeight='' markerUnits='' markerWidth='' maskContentUnits='' maskUnits='' numOctaves='' pathLength='' patternContentUnits='' patternTransform='' patternUnits='' pointsAtX='' pointsAtY='' pointsAtZ='' preserveAlpha='' preserveAspectRatio='' primitiveUnits='' refX='' refY='' repeatCount='' repeatDur='' requiredExtensions='' requiredFeatures='' specularConstant='' specularExponent='' spreadMethod='' startOffset='' stdDeviation='' stitchTiles='' surfaceScale='' systemLanguage='' tableValues='' targetX='' targetY='' textLength='' viewBox='' viewTarget='' xChannelSelector='' yChannelSelector='' zoomAndPan=''></math>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <math math>
+|       attributename=""
+|       attributetype=""
+|       basefrequency=""
+|       baseprofile=""
+|       calcmode=""
+|       clippathunits=""
+|       diffuseconstant=""
+|       edgemode=""
+|       filterunits=""
+|       glyphref=""
+|       gradienttransform=""
+|       gradientunits=""
+|       kernelmatrix=""
+|       kernelunitlength=""
+|       keypoints=""
+|       keysplines=""
+|       keytimes=""
+|       lengthadjust=""
+|       limitingconeangle=""
+|       markerheight=""
+|       markerunits=""
+|       markerwidth=""
+|       maskcontentunits=""
+|       maskunits=""
+|       numoctaves=""
+|       pathlength=""
+|       patterncontentunits=""
+|       patterntransform=""
+|       patternunits=""
+|       pointsatx=""
+|       pointsaty=""
+|       pointsatz=""
+|       preservealpha=""
+|       preserveaspectratio=""
+|       primitiveunits=""
+|       refx=""
+|       refy=""
+|       repeatcount=""
+|       repeatdur=""
+|       requiredextensions=""
+|       requiredfeatures=""
+|       specularconstant=""
+|       specularexponent=""
+|       spreadmethod=""
+|       startoffset=""
+|       stddeviation=""
+|       stitchtiles=""
+|       surfacescale=""
+|       systemlanguage=""
+|       tablevalues=""
+|       targetx=""
+|       targety=""
+|       textlength=""
+|       viewbox=""
+|       viewtarget=""
+|       xchannelselector=""
+|       ychannelselector=""
+|       zoomandpan=""
+-- tests11/5 --
+-- in --
+<!DOCTYPE html><body><svg contentScriptType='' contentStyleType='' externalResourcesRequired='' filterRes=''></svg>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <svg svg>
+|       contentscripttype=""
+|       contentstyletype=""
+|       externalresourcesrequired=""
+|       filterres=""
+-- tests11/6 --
+-- in --
+<!DOCTYPE html><body><svg CONTENTSCRIPTTYPE='' CONTENTSTYLETYPE='' EXTERNALRESOURCESREQUIRED='' FILTERRES=''></svg>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <svg svg>
+|       contentscripttype=""
+|       contentstyletype=""
+|       externalresourcesrequired=""
+|       filterres=""
+-- tests11/7 --
+-- in --
+<!DOCTYPE html><body><svg contentscripttype='' contentstyletype='' externalresourcesrequired='' filterres=''></svg>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <svg svg>
+|       contentscripttype=""
+|       contentstyletype=""
+|       externalresourcesrequired=""
+|       filterres=""
+-- tests11/8 --
+-- in --
+<!DOCTYPE html><body><math contentScriptType='' contentStyleType='' externalResourcesRequired='' filterRes=''></math>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <math math>
+|       contentscripttype=""
+|       contentstyletype=""
+|       externalresourcesrequired=""
+|       filterres=""
+-- tests11/9 --
+-- in --
+<!DOCTYPE html><body><svg><altGlyph /><altGlyphDef /><altGlyphItem /><animateColor /><animateMotion /><animateTransform /><clipPath /><feBlend /><feColorMatrix /><feComponentTransfer /><feComposite /><feConvolveMatrix /><feDiffuseLighting /><feDisplacementMap /><feDistantLight /><feFlood /><feFuncA /><feFuncB /><feFuncG /><feFuncR /><feGaussianBlur /><feImage /><feMerge /><feMergeNode /><feMorphology /><feOffset /><fePointLight /><feSpecularLighting /><feSpotLight /><feTile /><feTurbulence /><foreignObject /><glyphRef /><linearGradient /><radialGradient /><textPath /></svg>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <svg svg>
+|       <svg altGlyph>
+|       <svg altGlyphDef>
+|       <svg altGlyphItem>
+|       <svg animateColor>
+|       <svg animateMotion>
+|       <svg animateTransform>
+|       <svg clipPath>
+|       <svg feBlend>
+|       <svg feColorMatrix>
+|       <svg feComponentTransfer>
+|       <svg feComposite>
+|       <svg feConvolveMatrix>
+|       <svg feDiffuseLighting>
+|       <svg feDisplacementMap>
+|       <svg feDistantLight>
+|       <svg feFlood>
+|       <svg feFuncA>
+|       <svg feFuncB>
+|       <svg feFuncG>
+|       <svg feFuncR>
+|       <svg feGaussianBlur>
+|       <svg feImage>
+|       <svg feMerge>
+|       <svg feMergeNode>
+|       <svg feMorphology>
+|       <svg feOffset>
+|       <svg fePointLight>
+|       <svg feSpecularLighting>
+|       <svg feSpotLight>
+|       <svg feTile>
+|       <svg feTurbulence>
+|       <svg foreignObject>
+|       <svg glyphRef>
+|       <svg linearGradient>
+|       <svg radialGradient>
+|       <svg textPath>
+-- tests11/10 --
+-- in --
+<!DOCTYPE html><body><svg><altglyph /><altglyphdef /><altglyphitem /><animatecolor /><animatemotion /><animatetransform /><clippath /><feblend /><fecolormatrix /><fecomponenttransfer /><fecomposite /><feconvolvematrix /><fediffuselighting /><fedisplacementmap /><fedistantlight /><feflood /><fefunca /><fefuncb /><fefuncg /><fefuncr /><fegaussianblur /><feimage /><femerge /><femergenode /><femorphology /><feoffset /><fepointlight /><fespecularlighting /><fespotlight /><fetile /><feturbulence /><foreignobject /><glyphref /><lineargradient /><radialgradient /><textpath /></svg>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <svg svg>
+|       <svg altGlyph>
+|       <svg altGlyphDef>
+|       <svg altGlyphItem>
+|       <svg animateColor>
+|       <svg animateMotion>
+|       <svg animateTransform>
+|       <svg clipPath>
+|       <svg feBlend>
+|       <svg feColorMatrix>
+|       <svg feComponentTransfer>
+|       <svg feComposite>
+|       <svg feConvolveMatrix>
+|       <svg feDiffuseLighting>
+|       <svg feDisplacementMap>
+|       <svg feDistantLight>
+|       <svg feFlood>
+|       <svg feFuncA>
+|       <svg feFuncB>
+|       <svg feFuncG>
+|       <svg feFuncR>
+|       <svg feGaussianBlur>
+|       <svg feImage>
+|       <svg feMerge>
+|       <svg feMergeNode>
+|       <svg feMorphology>
+|       <svg feOffset>
+|       <svg fePointLight>
+|       <svg feSpecularLighting>
+|       <svg feSpotLight>
+|       <svg feTile>
+|       <svg feTurbulence>
+|       <svg foreignObject>
+|       <svg glyphRef>
+|       <svg linearGradient>
+|       <svg radialGradient>
+|       <svg textPath>
+-- tests11/11 --
+-- in --
+<!DOCTYPE html><BODY><SVG><ALTGLYPH /><ALTGLYPHDEF /><ALTGLYPHITEM /><ANIMATECOLOR /><ANIMATEMOTION /><ANIMATETRANSFORM /><CLIPPATH /><FEBLEND /><FECOLORMATRIX /><FECOMPONENTTRANSFER /><FECOMPOSITE /><FECONVOLVEMATRIX /><FEDIFFUSELIGHTING /><FEDISPLACEMENTMAP /><FEDISTANTLIGHT /><FEFLOOD /><FEFUNCA /><FEFUNCB /><FEFUNCG /><FEFUNCR /><FEGAUSSIANBLUR /><FEIMAGE /><FEMERGE /><FEMERGENODE /><FEMORPHOLOGY /><FEOFFSET /><FEPOINTLIGHT /><FESPECULARLIGHTING /><FESPOTLIGHT /><FETILE /><FETURBULENCE /><FOREIGNOBJECT /><GLYPHREF /><LINEARGRADIENT /><RADIALGRADIENT /><TEXTPATH /></SVG>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <svg svg>
+|       <svg altGlyph>
+|       <svg altGlyphDef>
+|       <svg altGlyphItem>
+|       <svg animateColor>
+|       <svg animateMotion>
+|       <svg animateTransform>
+|       <svg clipPath>
+|       <svg feBlend>
+|       <svg feColorMatrix>
+|       <svg feComponentTransfer>
+|       <svg feComposite>
+|       <svg feConvolveMatrix>
+|       <svg feDiffuseLighting>
+|       <svg feDisplacementMap>
+|       <svg feDistantLight>
+|       <svg feFlood>
+|       <svg feFuncA>
+|       <svg feFuncB>
+|       <svg feFuncG>
+|       <svg feFuncR>
+|       <svg feGaussianBlur>
+|       <svg feImage>
+|       <svg feMerge>
+|       <svg feMergeNode>
+|       <svg feMorphology>
+|       <svg feOffset>
+|       <svg fePointLight>
+|       <svg feSpecularLighting>
+|       <svg feSpotLight>
+|       <svg feTile>
+|       <svg feTurbulence>
+|       <svg foreignObject>
+|       <svg glyphRef>
+|       <svg linearGradient>
+|       <svg radialGradient>
+|       <svg textPath>
+-- tests11/12 --
+-- in --
+<!DOCTYPE html><body><math><altGlyph /><altGlyphDef /><altGlyphItem /><animateColor /><animateMotion /><animateTransform /><clipPath /><feBlend /><feColorMatrix /><feComponentTransfer /><feComposite /><feConvolveMatrix /><feDiffuseLighting /><feDisplacementMap /><feDistantLight /><feFlood /><feFuncA /><feFuncB /><feFuncG /><feFuncR /><feGaussianBlur /><feImage /><feMerge /><feMergeNode /><feMorphology /><feOffset /><fePointLight /><feSpecularLighting /><feSpotLight /><feTile /><feTurbulence /><foreignObject /><glyphRef /><linearGradient /><radialGradient /><textPath /></math>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <math math>
+|       <math altglyph>
+|       <math altglyphdef>
+|       <math altglyphitem>
+|       <math animatecolor>
+|       <math animatemotion>
+|       <math animatetransform>
+|       <math clippath>
+|       <math feblend>
+|       <math fecolormatrix>
+|       <math fecomponenttransfer>
+|       <math fecomposite>
+|       <math feconvolvematrix>
+|       <math fediffuselighting>
+|       <math fedisplacementmap>
+|       <math fedistantlight>
+|       <math feflood>
+|       <math fefunca>
+|       <math fefuncb>
+|       <math fefuncg>
+|       <math fefuncr>
+|       <math fegaussianblur>
+|       <math feimage>
+|       <math femerge>
+|       <math femergenode>
+|       <math femorphology>
+|       <math feoffset>
+|       <math fepointlight>
+|       <math fespecularlighting>
+|       <math fespotlight>
+|       <math fetile>
+|       <math feturbulence>
+|       <math foreignobject>
+|       <math glyphref>
+|       <math lineargradient>
+|       <math radialgradient>
+|       <math textpath>
+-- tests11/13 --
+-- in --
+<!DOCTYPE html><body><svg><solidColor /></svg>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <svg svg>
+|       <svg solidcolor>
+-- tests12/1 --
+-- in --
+<!DOCTYPE html><body><p>foo<math><mtext><i>baz</i></mtext><annotation-xml><svg><desc><b>eggs</b></desc><g><foreignObject><P>spam<TABLE><tr><td><img></td></table></foreignObject></g><g>quux</g></svg></annotation-xml></math>bar
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|       "foo"
+|       <math math>
+|         <math mtext>
+|           <i>
+|             "baz"
+|         <math annotation-xml>
+|           <svg svg>
+|             <svg desc>
+|               <b>
+|                 "eggs"
+|             <svg g>
+|               <svg foreignObject>
+|                 <p>
+|                   "spam"
+|                 <table>
+|                   <tbody>
+|                     <tr>
+|                       <td>
+|                         <img>
+|             <svg g>
+|               "quux"
+|       "bar"
+-- tests12/2 --
+-- in --
+<!DOCTYPE html><body>foo<math><mtext><i>baz</i></mtext><annotation-xml><svg><desc><b>eggs</b></desc><g><foreignObject><P>spam<TABLE><tr><td><img></td></table></foreignObject></g><g>quux</g></svg></annotation-xml></math>bar
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     "foo"
+|     <math math>
+|       <math mtext>
+|         <i>
+|           "baz"
+|       <math annotation-xml>
+|         <svg svg>
+|           <svg desc>
+|             <b>
+|               "eggs"
+|           <svg g>
+|             <svg foreignObject>
+|               <p>
+|                 "spam"
+|               <table>
+|                 <tbody>
+|                   <tr>
+|                     <td>
+|                       <img>
+|           <svg g>
+|             "quux"
+|     "bar"
+-- tests14/1 --
+-- in --
+<!DOCTYPE html><html><body><xyz:abc></xyz:abc>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <xyz:abc>
+-- tests14/2 --
+-- in --
+<!DOCTYPE html><html><body><xyz:abc></xyz:abc><span></span>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <xyz:abc>
+|     <span>
+-- tests14/5 --
+-- in --
+<!DOCTYPE html><html 123=456>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   123="456"
+|   <head>
+|   <body>
+-- tests14/7 --
+-- in --
+<!DOCTYPE html><html><body 789=012>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     789="012"
+-- tests16/48 --
+-- in --
+<!doctype html><script><!--<script </script </script>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|     <script>
+|       "<!--<script </script "
+|   <body>
+-- tests16/61 --
+-- in --
+<!doctype html><script><!--<script --></script>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|     <script>
+|       "<!--<script -->"
+|   <body>
+-- tests16/62 --
+-- in --
+<!doctype html><script><!--<script><\/script>--></script>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|     <script>
+|       "<!--<script><\/script>-->"
+|   <body>
+-- tests16/63 --
+-- in --
+<!doctype html><script><!--<script></scr'+'ipt>--></script>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|     <script>
+|       "<!--<script></scr'+'ipt>-->"
+|   <body>
+-- tests16/64 --
+-- in --
+<!doctype html><script><!--<script></script><script></script></script>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|     <script>
+|       "<!--<script></script><script></script>"
+|   <body>
+-- tests16/65 --
+-- in --
+<!doctype html><script><!--<script></script><script></script>--><!--</script>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|     <script>
+|       "<!--<script></script><script></script>--><!--"
+|   <body>
+-- tests16/66 --
+-- in --
+<!doctype html><script><!--<script></script><script></script>-- ></script>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|     <script>
+|       "<!--<script></script><script></script>-- >"
+|   <body>
+-- tests16/67 --
+-- in --
+<!doctype html><script><!--<script></script><script></script>- -></script>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|     <script>
+|       "<!--<script></script><script></script>- ->"
+|   <body>
+-- tests16/68 --
+-- in --
+<!doctype html><script><!--<script></script><script></script>- - ></script>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|     <script>
+|       "<!--<script></script><script></script>- - >"
+|   <body>
+-- tests16/69 --
+-- in --
+<!doctype html><script><!--<script></script><script></script>-></script>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|     <script>
+|       "<!--<script></script><script></script>->"
+|   <body>
+-- tests16/74 --
+-- in --
+<!doctype html><style><!--</style>X
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|     <style>
+|       "<!--"
+|   <body>
+|     "X"
+-- tests16/76 --
+-- in --
+<!doctype html><style><!--<br><html xmlns:v="urn:schemas-microsoft-com:vml"><!--[if !mso]><style></style>X
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|     <style>
+|       "<!--<br><html xmlns:v="urn:schemas-microsoft-com:vml"><!--[if !mso]><style>"
+|   <body>
+|     "X"
+-- tests16/78 --
+-- in --
+<!doctype html><style><!--...</style><!-- --><style>@import ...</style>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|     <style>
+|       "<!--..."
+|     <!--   -->
+|     <style>
+|       "@import ..."
+|   <body>
+-- tests16/80 --
+-- in --
+<!doctype html><style>...<!--[if IE]><style>...</style>X
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|     <style>
+|       "...<!--[if IE]><style>..."
+|   <body>
+|     "X"
+-- tests16/82 --
+-- in --
+<!doctype html><title>&lt;/title></title>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|     <title>
+|       "</title>"
+|   <body>
+-- tests16/85 script-off --
+-- in --
+<!doctype html><noscript><!--<noscript></noscript>--></noscript>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|     <noscript>
+|       <!-- <noscript></noscript> -->
+|   <body>
+-- tests16/86 script-on --
+-- in --
+<!doctype html><noscript><!--</noscript>X<noscript>--></noscript>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|     <noscript>
+|       "<!--"
+|   <body>
+|     "X"
+|     <noscript>
+|       "-->"
+-- tests16/87 script-off --
+-- in --
+<!doctype html><noscript><!--</noscript>X<noscript>--></noscript>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|     <noscript>
+|       <!-- </noscript>X<noscript> -->
+|   <body>
+-- tests16/88 script-on --
+-- in --
+<!doctype html><noscript><iframe></noscript>X
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|     <noscript>
+|       "<iframe>"
+|   <body>
+|     "X"
+-- tests16/91 --
+-- in --
+<!doctype html><noframes><body><script><!--...</script></body></noframes></html>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|     <noframes>
+|       "<body><script><!--...</script></body>"
+|   <body>
+-- tests16/93 --
+-- in --
+<!doctype html><textarea>&lt;/textarea></textarea>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <textarea>
+|       "</textarea>"
+-- tests16/94 --
+-- in --
+<!doctype html><textarea>&lt;</textarea>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <textarea>
+|       "<"
+-- tests16/95 --
+-- in --
+<!doctype html><textarea>a&lt;b</textarea>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <textarea>
+|       "a<b"
+-- tests16/97 --
+-- in --
+<!doctype html><iframe>...<!--X->...<!--/X->...</iframe>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <iframe>
+|       "...<!--X->...<!--/X->..."
+-- tests17/13 --
+-- in --
+<!doctype html><table><tr></table>a
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <table>
+|       <tbody>
+|         <tr>
+|     "a"
+-- tests18/32 --
+-- in --
+<!doctype html><frameset></frameset><noframes>abc</noframes><!--abc-->
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <frameset>
+|   <noframes>
+|     "abc"
+|   <!-- abc -->
+-- tests18/34 --
+-- in --
+<!doctype html><frameset></frameset></html><noframes>abc</noframes><!--abc-->
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <frameset>
+|   <noframes>
+|     "abc"
+| <!-- abc -->
+-- tests19/30 --
+-- in --
+<!doctype html><dd><optgroup><dd>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <dd>
+|       <optgroup>
+|     <dd>
+-- tests19/39 --
+-- in --
+<!doctype html><html><frameset></frameset></html><!--foo-->
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <frameset>
+| <!-- foo -->
+-- tests19/40 --
+-- in quoted --
+"<!doctype html><html><frameset></frameset></html>  "
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <frameset>
+|   "  "
+-- tests19/85 --
+-- in --
+<!doctype html><meta charset="ascii">
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|     <meta>
+|       charset="ascii"
+|   <body>
+-- tests19/86 --
+-- in --
+<!doctype html><meta http-equiv="content-type" content="text/html;charset=ascii">
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|     <meta>
+|       content="text/html;charset=ascii"
+|       http-equiv="content-type"
+|   <body>
+-- tests19/87 --
+-- in --
+<!doctype html><head><!--aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa--><meta charset="utf8">
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|     <!-- aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa -->
+|     <meta>
+|       charset="utf8"
+|   <body>
+-- tests19/96 --
+-- in --
+<!doctype html><body><bgsound>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <bgsound>
+-- tests19/97 --
+-- in --
+<!doctype html><body><basefont>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <basefont>
+-- tests2/1 --
+-- in --
+<!DOCTYPE html>Test
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     "Test"
+-- tests2/30 --
+-- in --
+<!DOCTYPE html><p></P>X
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|     "X"
+-- tests2/40 --
+-- in --
+<!DOCTYPE html><datalist><option>foo</datalist>bar
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <datalist>
+|       <option>
+|         "foo"
+|     "bar"
+-- tests2/41 --
+-- in --
+<!DOCTYPE html><font><input><input></font>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <font>
+|       <input>
+|       <input>
+-- tests2/42 --
+-- in --
+<!DOCTYPE html><!-- XXX - XXX -->
+-- document --
+| <!DOCTYPE html>
+| <!--  XXX - XXX  -->
+| <html>
+|   <head>
+|   <body>
+-- tests2/44 --
+-- in --
+<!DOCTYPE html><!-- XXX - XXX - XXX -->
+-- document --
+| <!DOCTYPE html>
+| <!--  XXX - XXX - XXX  -->
+| <html>
+|   <head>
+|   <body>
+-- tests2/47 --
+-- in --
+<!DOCTYPE html><body><title>test</body></title>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <title>
+|       "test</body>"
+-- tests2/48 --
+-- in --
+<!DOCTYPE html><body><title>X</title><meta name=z><link rel=foo><style>
+x { content:"</style" } </style>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <title>
+|       "X"
+|     <meta>
+|       name="z"
+|     <link>
+|       rel="foo"
+|     <style>
+|       "
+x { content:"</style" } "
+-- tests2/49 --
+-- in --
+<!DOCTYPE html><select><optgroup></optgroup></select>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <select>
+|       <optgroup>
+-- tests2/51 --
+-- in --
+<!DOCTYPE html>  <html>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+-- tests2/52 --
+-- in --
+<!DOCTYPE html><script>
+</script>  <title>x</title>  </head>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|     <script>
+|       "
+"
+|     "  "
+|     <title>
+|       "x"
+|     "  "
+|   <body>
+-- tests2/57 --
+-- in quoted --
+"<!DOCTYPE html>X</html> "
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     "X "
+-- tests2/63 --
+-- in --
+<!doctype html><div><form></form><div></div></div>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <div>
+|       <form>
+|       <div>
+-- tests20/40 --
+-- in --
+<!doctype html><button><p></button>x
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <button>
+|       <p>
+|     "x"
+-- tests24/1 --
+-- in --
+<!DOCTYPE html>&NotEqualTilde;
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     "≂̸"
+-- tests24/2 --
+-- in --
+<!DOCTYPE html>&NotEqualTilde;A
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     "≂̸A"
+-- tests24/3 --
+-- in --
+<!DOCTYPE html>&ThickSpace;
+-- document quoted --
+"| <!DOCTYPE html>\n| <html>\n|   <head>\n|   <body>\n|     \"  \""
+-- tests24/4 --
+-- in --
+<!DOCTYPE html>&ThickSpace;A
+-- document quoted --
+"| <!DOCTYPE html>\n| <html>\n|   <head>\n|   <body>\n|     \"  A\""
+-- tests24/5 --
+-- in --
+<!DOCTYPE html>&NotSubset;
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     "⊂⃒"
+-- tests24/6 --
+-- in --
+<!DOCTYPE html>&NotSubset;A
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     "⊂⃒A"
+-- tests24/7 --
+-- in --
+<!DOCTYPE html>&Gopf;
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     "𝔾"
+-- tests24/8 --
+-- in --
+<!DOCTYPE html>&Gopf;A
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     "𝔾A"
+-- tests25/2 --
+-- in --
+<!DOCTYPE html><body><area>A
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <area>
+|     "A"
+-- tests25/3 --
+-- in --
+<!DOCTYPE html><body><base>A
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <base>
+|     "A"
+-- tests25/4 --
+-- in --
+<!DOCTYPE html><body><basefont>A
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <basefont>
+|     "A"
+-- tests25/5 --
+-- in --
+<!DOCTYPE html><body><bgsound>A
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <bgsound>
+|     "A"
+-- tests25/6 --
+-- in --
+<!DOCTYPE html><body><br>A
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <br>
+|     "A"
+-- tests25/9 --
+-- in --
+<!DOCTYPE html><body><embed>A
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <embed>
+|     "A"
+-- tests25/11 --
+-- in --
+<!DOCTYPE html><body><hr>A
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <hr>
+|     "A"
+-- tests25/12 --
+-- in --
+<!DOCTYPE html><body><img>A
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <img>
+|     "A"
+-- tests25/13 --
+-- in --
+<!DOCTYPE html><body><input>A
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <input>
+|     "A"
+-- tests25/14 --
+-- in --
+<!DOCTYPE html><body><keygen>A
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <keygen>
+|     "A"
+-- tests25/21 --
+-- in --
+<!DOCTYPE html><body><link>A
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <link>
+|     "A"
+-- tests25/22 --
+-- in --
+<!DOCTYPE html><body><meta>A
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <meta>
+|     "A"
+-- tests25/23 --
+-- in --
+<!DOCTYPE html><body><param>A
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <param>
+|     "A"
+-- tests25/24 --
+-- in --
+<!DOCTYPE html><body><source>A
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <source>
+|     "A"
+-- tests25/25 --
+-- in --
+<!DOCTYPE html><body><track>A
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <track>
+|     "A"
+-- tests25/26 --
+-- in --
+<!DOCTYPE html><body><wbr>A
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <wbr>
+|     "A"
+-- tests3/5 --
+-- in --
+<!DOCTYPE html><html><head></head><body><pre>
+</pre></body></html>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <pre>
+-- tests3/6 --
+-- in --
+<!DOCTYPE html><html><head></head><body><pre>
+foo</pre></body></html>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <pre>
+|       "foo"
+-- tests3/7 --
+-- in --
+<!DOCTYPE html><html><head></head><body><pre>
+
+foo</pre></body></html>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <pre>
+|       "
+foo"
+-- tests3/8 --
+-- in --
+<!DOCTYPE html><html><head></head><body><pre>
+foo
+</pre></body></html>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <pre>
+|       "foo
+"
+-- tests3/9 --
+-- in --
+<!DOCTYPE html><html><head></head><body><pre>x</pre><span>
+</span></body></html>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <pre>
+|       "x"
+|     <span>
+|       "
+"
+-- tests3/10 --
+-- in --
+<!DOCTYPE html><html><head></head><body><pre>x
+y</pre></body></html>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <pre>
+|       "x
+y"
+-- tests3/12 --
+-- in --
+<!DOCTYPE html><pre>&#x0a;&#x0a;A</pre>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <pre>
+|       "
+A"
+-- tests3/17 --
+-- in --
+<!DOCTYPE html><textarea>
+</textarea>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <textarea>
+-- tests3/18 --
+-- in --
+<!DOCTYPE html><textarea>
+foo</textarea>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <textarea>
+|       "foo"
+-- tests3/19 --
+-- in --
+<!DOCTYPE html><textarea>
+
+foo</textarea>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <textarea>
+|       "
+foo"
+-- tests3/23 --
+-- in --
+<!doctype html><html><body><p><table></table></body></html>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|     <table>
+-- tests6/3 --
+-- in --
+<!doctype html><title>&amp;</title>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|     <title>
+|       "&"
+|   <body>
+-- tests6/4 --
+-- in --
+<!doctype html><title><!--&amp;--></title>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|     <title>
+|       "<!--&-->"
+|   <body>
+-- tests7/1 --
+-- in --
+<!doctype html><body><title>X</title>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <title>
+|       "X"
+-- tests7/10 --
+-- in --
+<!doctype html><html> <head>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+-- tests7/11 --
+-- in --
+<!doctype html> <head>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+-- tests7/12 --
+-- in --
+<!doctype html><table><style> <tr>x </style> </table>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <table>
+|       <style>
+|         " <tr>x "
+|       " "
+-- tests7/13 --
+-- in --
+<!doctype html><table><TBODY><script> <tr>x </script> </table>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <table>
+|       <tbody>
+|         <script>
+|           " <tr>x "
+|         " "
+-- tests7/14 --
+-- in --
+<!doctype html><p><applet><p>X</p></applet>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|       <applet>
+|         <p>
+|           "X"
+-- tests7/15 --
+-- in --
+<!doctype html><p><object type="application/x-non-existant-plugin"><p>X</p></object>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|       <object>
+|         type="application/x-non-existant-plugin"
+|         <p>
+|           "X"
+-- tests7/16 --
+-- in --
+<!doctype html><listing>
+X</listing>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <listing>
+|       "X"
+-- tests7/25 --
+-- in --
+<!doctype html><select>X</select>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <select>
+|       "X"
+-- tests7/26 --
+-- in --
+<!DOCTYPE hTmL><html></html>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+-- tests7/27 --
+-- in --
+<!DOCTYPE HTML><html></html>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+-- tests9/1 --
+-- in --
+<!DOCTYPE html><math></math>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <math math>
+-- tests9/2 --
+-- in --
+<!DOCTYPE html><body><math></math>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <math math>
+-- tests9/5 --
+-- in --
+<!DOCTYPE html><body><select><math></math></select>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <select>
+|       <math math>
+-- tests9/6 --
+-- in --
+<!DOCTYPE html><body><select><option><math></math></option></select>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <select>
+|       <option>
+|         <math math>
+-- tests9/12 --
+-- in --
+<!DOCTYPE html><body><table><tbody><tr><td><math><mi>foo</mi><mi>bar</mi></math></td></tr></tbody></table>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <table>
+|       <tbody>
+|         <tr>
+|           <td>
+|             <math math>
+|               <math mi>
+|                 "foo"
+|               <math mi>
+|                 "bar"
+-- tests9/13 --
+-- in --
+<!DOCTYPE html><body><table><tbody><tr><td><math><mi>foo</mi><mi>bar</mi></math><p>baz</td></tr></tbody></table>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <table>
+|       <tbody>
+|         <tr>
+|           <td>
+|             <math math>
+|               <math mi>
+|                 "foo"
+|               <math mi>
+|                 "bar"
+|             <p>
+|               "baz"
+-- tests9/14 --
+-- in --
+<!DOCTYPE html><body><table><caption><math><mi>foo</mi><mi>bar</mi></math><p>baz</caption></table>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <table>
+|       <caption>
+|         <math math>
+|           <math mi>
+|             "foo"
+|           <math mi>
+|             "bar"
+|         <p>
+|           "baz"
+-- tests9/24 --
+-- in --
+<!DOCTYPE html><body xlink:href=foo><math xlink:href=foo></math>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     xlink:href="foo"
+|     <math math>
+|       xlink href="foo"
+-- tests9/25 --
+-- in --
+<!DOCTYPE html><body xlink:href=foo xml:lang=en><math><mi xml:lang=en xlink:href=foo></mi></math>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     xlink:href="foo"
+|     xml:lang="en"
+|     <math math>
+|       <math mi>
+|         xlink href="foo"
+|         xml lang="en"
+-- tests9/26 --
+-- in --
+<!DOCTYPE html><body xlink:href=foo xml:lang=en><math><mi xml:lang=en xlink:href=foo /></math>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     xlink:href="foo"
+|     xml:lang="en"
+|     <math math>
+|       <math mi>
+|         xlink href="foo"
+|         xml lang="en"
+-- tests9/27 --
+-- in --
+<!DOCTYPE html><body xlink:href=foo xml:lang=en><math><mi xml:lang=en xlink:href=foo />bar</math>
+-- document --
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     xlink:href="foo"
+|     xml:lang="en"
+|     <math math>
+|       <math mi>
+|         xlink href="foo"
+|         xml lang="en"
+|       "bar"

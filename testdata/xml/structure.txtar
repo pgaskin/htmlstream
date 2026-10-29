@@ -1,0 +1,89 @@
+Elements closed without an end tag, stray end tags and content outside the
+root element.
+-- Misnested --
+-- in --
+<a><b></a></b>
+-- tokens --
+1 StartTag a "<a>"
+2 StartTag b "<b>"
+2 EndTag b [implied] [unsound] ""
+1 EndTag a "</a>"
+0 EndTag b [stray] "</b>"
+-- Unclosed --
+-- in --
+<a><b>x
+-- tokens --
+1 StartTag a "<a>"
+2 StartTag b "<b>"
+2 Text "x" text="x"
+2 EndTag b [implied] [unsound] ""
+1 EndTag a [implied] [unsound] ""
+-- Stray --
+-- in --
+</x><a/></a>
+-- tokens --
+0 EndTag x [stray] "</x>"
+0 StartTag a [self-closing] "<a/>"
+0 EndTag a [stray] "</a>"
+-- MultipleRoots --
+-- in --
+x<a/>y<b>z</b>
+-- tokens --
+0 Text "x" text="x"
+0 StartTag a [self-closing] "<a/>"
+0 Text "y" text="y"
+1 StartTag b "<b>"
+1 Text "z" text="z"
+1 EndTag b "</b>"
+-- WhitespaceOutsideRoot --
+-- in --
+
+<a/>
+
+-- tokens --
+0 Text "\n" text="\n"
+0 StartTag a [self-closing] "<a/>"
+0 Text "\n" text="\n"
+-- StructureByteOrderMark --
+-- in quoted --
+"\xef\xbb\xbf<a/>"
+-- tokens --
+0 Text "\ufeff" text="\ufeff"
+0 StartTag a [self-closing] "<a/>"
+-- SelfClosing --
+-- in --
+<a/><b /><c
+/>
+-- tokens --
+0 StartTag a [self-closing] "<a/>"
+0 StartTag b [self-closing] "<b />"
+0 StartTag c [self-closing] "<c\n/>"
+-- SlashSpace --
+-- in --
+<a/ >x</a>
+-- tokens --
+1 StartTag a "<a/ >"
+1 Text "x" text="x"
+1 EndTag a "</a>"
+-- EndTagAttributes --
+-- in --
+<a>x</a b="1">
+-- tokens --
+1 StartTag a "<a>"
+1 Text "x" text="x"
+1 EndTag a "</a b=\"1\">"
+-- LessThanInText --
+-- in --
+<a>1 < 2 & 3 </ 4</a>
+-- tokens --
+1 StartTag a "<a>"
+1 Text "1 < 2 & 3 " text="1 < 2 & 3 "
+1 Comment [bogus] "</ 4</a>" text=" 4</a"
+1 EndTag a [implied] [unsound] ""
+-- Incomplete --
+-- in --
+<a><b c="x
+-- tokens --
+1 StartTag a "<a>"
+1 StartTag b [incomplete] [unsound] "<b c=\"x"
+1 EndTag a [implied] [unsound] ""

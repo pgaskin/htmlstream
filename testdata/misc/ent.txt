@@ -1,0 +1,13 @@
+&amp &amp; &AMP; &Amp;
+&notin; &notin &notit; &noti &not
+&ampx &amp;x &copy2 &copy;2
+&#0; &#x0; &#65 &#x41; &#X41; &#xD800; &#x110000; &#99999999999999999999; &#x80; &#x9F; &#150; &#x81;
+&#; &#x; &# &#xg; &; & &a
+&nLt; &NotEqualTilde; &fjlig;
+&lt&gt&quot&apos&apos;
+a\rb\r\nc\r\r\nd
+a\x00b
+<textarea>a\x00&lt;\r\n</textarea>
+<script>a\x00\r\n</script>
+<a b="x\r\ny\x00&notit;&notin;&not &amp=1&amp;=1">
+<a b=&ampx>

@@ -1,0 +1,143 @@
+Doctypes, with internal subsets.
+-- System --
+-- in --
+<!DOCTYPE a SYSTEM "a.dtd"><a/>
+-- tokens --
+0 Doctype "<!DOCTYPE a SYSTEM \"a.dtd\">"
+0 StartTag a [self-closing] "<a/>"
+-- Public --
+-- in --
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml"/>
+-- tokens --
+0 Doctype "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Strict//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd\">"
+0 Text "\n" text="\n"
+0 StartTag html [self-closing] "<html xmlns=\"http://www.w3.org/1999/xhtml\"/>" ns="http://www.w3.org/1999/xhtml" xmlns="http://www.w3.org/1999/xhtml"
+-- Subset --
+-- in --
+<!DOCTYPE a [
+<!ELEMENT a (#PCDATA)>
+<!ENTITY gt2 ">">
+<!ENTITY q '"'>
+<!ENTITY % pe "<!ENTITY x 'y'>">
+%pe;
+<!ATTLIST a b CDATA "]>">
+<!-- ]> ' -->
+<?pi ]> it's?>
+]>
+<a>&gt2;&q;&x;</a>
+-- tokens --
+0 Doctype "<!DOCTYPE a [\n<!ELEMENT a (#PCDATA)>\n<!ENTITY gt2 \">\">\n<!ENTITY q '\"'>\n<!ENTITY % pe \"<!ENTITY x 'y'>\">\n%pe;\n<!ATTLIST a b CDATA \"]>\">\n<!-- ]> ' -->\n<?pi ]> it's?>\n]>"
+0 Text "\n" text="\n"
+1 StartTag a "<a>"
+1 Text "&gt2;&q;&x;" text="&gt2;&q;&x;"
+1 EndTag a "</a>"
+-- ConditionalSections --
+Conditional sections are only allowed in the external subset.
+-- in --
+<!DOCTYPE a [<![INCLUDE[<!ENTITY a "]]>">]]><![IGNORE[<![ x ]]>]]>]><a/>
+-- tokens --
+0 Doctype "<!DOCTYPE a [<![INCLUDE[<!ENTITY a \"]]>\">]]><![IGNORE[<![ x ]]>]]>]>"
+0 StartTag a [self-closing] "<a/>"
+-- QuoteOutsideDeclaration --
+-- in --
+<!DOCTYPE a [ ' ]><a/>
+-- tokens --
+0 Doctype "<!DOCTYPE a [ ' ]>"
+0 StartTag a [self-closing] "<a/>"
+-- BracketInLiteral --
+-- in --
+<!DOCTYPE a SYSTEM "x[y" [<!ENTITY a "b">]><a/>
+-- tokens --
+0 Doctype "<!DOCTYPE a SYSTEM \"x[y\" [<!ENTITY a \"b\">]>"
+0 StartTag a [self-closing] "<a/>"
+-- DoctypeUnterminated --
+-- in --
+<!DOCTYPE a [<!ENTITY a "b">
+-- tokens --
+0 Doctype [incomplete] [unsound] "<!DOCTYPE a [<!ENTITY a \"b\">"
+-- UnterminatedSubset --
+-- in --
+<!DOCTYPE a [<!ENTITY a "b"><a/>
+-- tokens --
+0 Doctype [incomplete] [unsound] "<!DOCTYPE a [<!ENTITY a \"b\"><a/>"
+-- HTMLSyntax universal --
+Outside XML mode, a ">" outside the internal subset ends the doctype also in a
+quoted literal, as in HTML parsers.
+-- in --
+<!DOCTYPE a SYSTEM "a>b"><p>x</p>
+-- tokens --
+0 Doctype "<!DOCTYPE a SYSTEM \"a>"
+0 Text "b\">" text="b\">"
+1 StartTag p "<p>" ns="http://www.w3.org/1999/xhtml"
+1 Text "x" text="x"
+1 EndTag p "</p>"
+-- HTMLSyntaxSubset universal --
+A "[" in a quoted literal doesn't start the internal subset, and the quotes in
+the declarations of the subset protect ">" in it.
+-- in --
+<!DOCTYPE a SYSTEM "x[y" [<!ENTITY gt2 ">">]><p>x</p>
+-- tokens --
+0 Doctype "<!DOCTYPE a SYSTEM \"x[y\" [<!ENTITY gt2 \">\">]>"
+1 StartTag p "<p>" ns="http://www.w3.org/1999/xhtml"
+1 Text "x" text="x"
+1 EndTag p "</p>"
+-- HTMLSyntaxUnterminated universal --
+Outside XML mode, a doctype whose internal subset reaches the end of the input
+ends at the first ">" in it.
+-- in --
+<!DOCTYPE a [<!ENTITY a "b"><p>x</p>
+-- tokens --
+0 Doctype "<!DOCTYPE a [<!ENTITY a \"b\">"
+1 StartTag p "<p>" ns="http://www.w3.org/1999/xhtml"
+1 Text "x" text="x"
+1 EndTag p "</p>"
+-- HTMLSyntaxLater universal --
+Outside XML mode, only the first doctype is read with an internal subset or
+quoted literals: later ones end at the first ">".
+-- in --
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><!DOCTYPE a SYSTEM "x[y" [<!ENTITY gt2 ">">]><!DOCTYPE a [><!DOCTYPE a [><p>x</p>
+-- tokens --
+0 Doctype "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Strict//EN \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd\">"
+0 Doctype "<!DOCTYPE a SYSTEM \"x[y\" [<!ENTITY gt2 \">"
+0 Text "\">]>" text="\">]>"
+0 Doctype "<!DOCTYPE a [>"
+0 Doctype "<!DOCTYPE a [>"
+1 StartTag p "<p>" ns="http://www.w3.org/1999/xhtml"
+1 Text "x" text="x"
+1 EndTag p "</p>"
+-- XMLProlog universal --
+After an XML declaration, a doctype before the first tag ends like in XML
+mode, whatever the rules of the document.
+-- in --
+<?xml version="1.0"?><!DOCTYPE a SYSTEM "a>b"><p>x</p>
+-- tokens --
+0 ProcInst xml "<?xml version=\"1.0\"?>" data=" version=\"1.0\""
+0 Doctype "<!DOCTYPE a SYSTEM \"a>b\">"
+1 StartTag p "<p>" ns="http://www.w3.org/1999/xhtml"
+1 Text "x" text="x"
+1 EndTag p "</p>"
+-- XMLPrologLater universal --
+After an XML declaration, later doctypes end at the first ">".
+-- in --
+<?xml version="1.0"?><!DOCTYPE a SYSTEM "a>b"><!DOCTYPE a [<!ENTITY a "b">]><p>x</p>
+-- tokens --
+0 ProcInst xml "<?xml version=\"1.0\"?>" data=" version=\"1.0\""
+0 Doctype "<!DOCTYPE a SYSTEM \"a>b\">"
+0 Doctype "<!DOCTYPE a [<!ENTITY a \"b\">"
+0 Text "]>" text="]>"
+1 StartTag p "<p>" ns="http://www.w3.org/1999/xhtml"
+1 Text "x" text="x"
+1 EndTag p "</p>"
+-- DoctypeLowercase --
+-- in --
+<!doctype a><a/>
+-- tokens --
+0 Doctype "<!doctype a>"
+0 StartTag a [self-closing] "<a/>"
+-- AfterRoot --
+-- in --
+<a/><!DOCTYPE b>
+-- tokens --
+0 StartTag a [self-closing] "<a/>"
+0 Doctype "<!DOCTYPE b>"

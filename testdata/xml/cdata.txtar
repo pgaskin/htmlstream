@@ -1,0 +1,72 @@
+CDATA sections.
+-- CDATASimple --
+-- in --
+<a><![CDATA[x<y&z]]></a>
+-- tokens --
+1 StartTag a "<a>"
+1 CDATA "<![CDATA[x<y&z]]>" text="x<y&z"
+1 EndTag a "</a>"
+-- Brackets --
+-- in --
+<a><![CDATA[]]]]><![CDATA[>]]><![CDATA[a]b]]c]]]></a>
+-- tokens --
+1 StartTag a "<a>"
+1 CDATA "<![CDATA[]]]]>" text="]]"
+1 CDATA "<![CDATA[>]]>" text=">"
+1 CDATA "<![CDATA[a]b]]c]]]>" text="a]b]]c]"
+1 EndTag a "</a>"
+-- CDATAEmpty --
+-- in --
+<a><![CDATA[]]></a>
+-- tokens --
+1 StartTag a "<a>"
+1 CDATA "<![CDATA[]]>" text=""
+1 EndTag a "</a>"
+-- CDATAMarkup --
+-- in --
+<a><![CDATA[<b>&amp;</b><!-- c --><?pi?>]]></a>
+-- tokens --
+1 StartTag a "<a>"
+1 CDATA "<![CDATA[<b>&amp;</b><!-- c --><?pi?>]]>" text="<b>&amp;</b><!-- c --><?pi?>"
+1 EndTag a "</a>"
+-- CDATAOutsideRoot --
+-- in --
+<![CDATA[x]]><a/><![CDATA[y]]>
+-- tokens --
+0 CDATA "<![CDATA[x]]>" text="x"
+0 StartTag a [self-closing] "<a/>"
+0 CDATA "<![CDATA[y]]>" text="y"
+-- CDATAUnterminated --
+-- in --
+<a><![CDATA[x</a>
+-- tokens --
+1 StartTag a "<a>"
+1 CDATA [incomplete] [unsound] "<![CDATA[x</a>" text="x</a>"
+1 EndTag a [implied] [unsound] ""
+-- CDATALowercase --
+Not a CDATA section.
+-- in --
+<a><![cdata[x]]></a>
+-- tokens --
+1 StartTag a "<a>"
+1 Comment [bogus] "<![cdata[x]]>" text="[cdata[x]]"
+1 EndTag a "</a>"
+-- InAttribute --
+-- in --
+<a b="<![CDATA[x]]>"/>
+-- tokens --
+0 StartTag a [self-closing] "<a b=\"<![CDATA[x]]>\"/>" b="<![CDATA[x]]>"
+-- EndInText --
+-- in --
+<a>]]></a>
+-- tokens --
+1 StartTag a "<a>"
+1 Text "]]>" text="]]>"
+1 EndTag a "</a>"
+-- Newlines --
+-- in quoted --
+"<a><![CDATA[x\r\ny\rz]]></a>"
+-- tokens --
+1 StartTag a "<a>"
+1 CDATA "<![CDATA[x\r\ny\rz]]>" text="x\ny\nz"
+1 EndTag a "</a>"

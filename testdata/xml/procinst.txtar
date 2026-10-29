@@ -1,0 +1,144 @@
+Processing instructions, including the XML declaration, with any target.
+-- XMLDecl --
+-- in --
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<a/>
+-- tokens --
+0 ProcInst xml "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>" data=" version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\""
+0 Text "\n" text="\n"
+0 StartTag a [self-closing] "<a/>"
+-- XMLDeclSingleQuotes --
+-- in --
+<?xml version='1.0' encoding='ISO-8859-1'?><a/>
+-- tokens --
+0 ProcInst xml "<?xml version='1.0' encoding='ISO-8859-1'?>" data=" version='1.0' encoding='ISO-8859-1'"
+0 StartTag a [self-closing] "<a/>"
+-- Stylesheet --
+-- in --
+<?xml-stylesheet type="text/xsl" href="a.xsl"?><a/>
+-- tokens --
+0 ProcInst xml-stylesheet "<?xml-stylesheet type=\"text/xsl\" href=\"a.xsl\"?>" data=" type=\"text/xsl\" href=\"a.xsl\""
+0 StartTag a [self-closing] "<a/>"
+-- Targets --
+-- in --
+<a><?pi?><?pi  data ?><?pi	x?><?x?y?><?pi a?b>c??></a>
+-- tokens --
+1 StartTag a "<a>"
+1 ProcInst pi "<?pi?>" data=""
+1 ProcInst pi "<?pi  data ?>" data="  data "
+1 ProcInst pi "<?pi\tx?>" data="\tx"
+1 ProcInst x "<?x?y?>" data="?y"
+1 ProcInst pi "<?pi a?b>c??>" data=" a?b>c?"
+1 EndTag a "</a>"
+-- QuestionMarks --
+-- in --
+<a><??><? x?></a>
+-- tokens --
+1 StartTag a "<a>"
+1 ProcInst  "<??>" data=""
+1 ProcInst  "<? x?>" data=" x"
+1 EndTag a "</a>"
+-- ProcInstOutsideRoot --
+-- in --
+<?pi before?><a/><?pi after?>
+-- tokens --
+0 ProcInst pi "<?pi before?>" data=" before"
+0 StartTag a [self-closing] "<a/>"
+0 ProcInst pi "<?pi after?>" data=" after"
+-- InEndTag --
+Not a processing instruction.
+-- in --
+<a>x</a <?pi?>>
+-- tokens --
+1 StartTag a "<a>"
+1 Text "x" text="x"
+1 EndTag a [unsound] "</a <?pi?>"
+0 Text ">" text=">"
+-- ProcInstUnterminated --
+-- in --
+<a><?pi data</a>
+-- tokens --
+1 StartTag a "<a>"
+1 ProcInst pi [incomplete] [unsound] "<?pi data</a>" data=" data</a>"
+1 EndTag a [implied] [unsound] ""
+-- UnterminatedGt --
+-- in --
+<a><?pi data></a>
+-- tokens --
+1 StartTag a "<a>"
+1 ProcInst pi [incomplete] [unsound] "<?pi data></a>" data=" data></a>"
+1 EndTag a [implied] [unsound] ""
+-- NoTarget --
+-- in --
+<a><?></a><?b?>
+-- tokens --
+1 StartTag a "<a>"
+1 ProcInst ></a>< "<?></a><?b?>" data="?b"
+1 EndTag a [implied] [unsound] ""
+-- HTMLRules universal --
+In documents read as HTML, a processing instruction ends at the first ">",
+like the bogus comment HTML parsers read, and is a bogus comment unless that
+">" follows "?", as in HTML mode with XML syntax. After an XML declaration,
+the ones before the first tag end at "?>", as in XML mode.
+-- in --
+<?xml version="1.0"?><?xml-stylesheet href="a>b.css"?><?pi a>b?><p>Hello<?xml:namespace prefix = o ns = "urn:o" /><o:p></o:p></p><p><?php echo $a->b; ?><?pi x?><?><??></p><x:y xmlns:x="urn:x"><?pi a>b?></x:y><p><?php echo
+-- tokens --
+0 ProcInst xml "<?xml version=\"1.0\"?>" data=" version=\"1.0\""
+0 ProcInst xml-stylesheet "<?xml-stylesheet href=\"a>b.css\"?>" data=" href=\"a>b.css\""
+0 ProcInst pi "<?pi a>b?>" data=" a>b"
+1 StartTag p "<p>" ns="http://www.w3.org/1999/xhtml"
+1 Text "Hello" text="Hello"
+1 Comment [bogus] "<?xml:namespace prefix = o ns = \"urn:o\" />" text="?xml:namespace prefix = o ns = \"urn:o\" /"
+2 StartTag o:p "<o:p>" ns="http://www.w3.org/1999/xhtml"
+2 EndTag o:p "</o:p>"
+1 EndTag p "</p>"
+1 StartTag p "<p>" ns="http://www.w3.org/1999/xhtml"
+1 Comment [bogus] "<?php echo $a->" text="?php echo $a-"
+1 Text "b; ?>" text="b; ?>"
+1 ProcInst pi "<?pi x?>" data=" x"
+1 Comment [bogus] "<?>" text="?"
+1 ProcInst  "<??>" data=""
+1 EndTag p "</p>"
+1 StartTag x:y "<x:y xmlns:x=\"urn:x\">" ns="http://www.w3.org/1999/xhtml" xmlns:x="urn:x"
+1 Comment [bogus] "<?pi a>" text="?pi a"
+1 Text "b?>" text="b?>"
+1 EndTag x:y "</x:y>"
+1 StartTag p "<p>" ns="http://www.w3.org/1999/xhtml"
+1 Comment [incomplete] [bogus] [unsound] "<?php echo" text="?php echo"
+1 EndTag p [implied] ""
+-- HTMLRulesProlog universal --
+Without an XML declaration, the ones before the first tag also end at the
+first ">".
+-- in --
+<?xml-stylesheet href="a>b.css"?><?pi a?><p>x</p>
+-- tokens --
+0 Comment [bogus] "<?xml-stylesheet href=\"a>" text="?xml-stylesheet href=\"a"
+0 Text "b.css\"?>" text="b.css\"?>"
+0 ProcInst pi "<?pi a?>" data=" a"
+1 StartTag p "<p>" ns="http://www.w3.org/1999/xhtml"
+1 Text "x" text="x"
+1 EndTag p "</p>"
+-- PrologUnterminated universal --
+After an XML declaration, one before the first tag without "?>" up to the end
+of the input ends at the first ">" after all, as a bogus comment, and an
+incomplete bogus comment without a ">".
+-- in --
+<?xml version="1.0"?><?a><?b x>
+<?c
+-- tokens --
+0 ProcInst xml "<?xml version=\"1.0\"?>" data=" version=\"1.0\""
+0 Comment [bogus] "<?a>" text="?a"
+0 Comment [bogus] "<?b x>" text="?b x"
+0 Text "\n" text="\n"
+0 Comment [incomplete] [bogus] [unsound] "<?c" text="?c"
+-- XHTML universal --
+In documents following XML rules, processing instructions end at "?>".
+-- in --
+<?xml version="1.0"?><?pi a>b?><html xmlns="http://www.w3.org/1999/xhtml"><?pi a>b?></html><?pi a>b?>
+-- tokens --
+0 ProcInst xml "<?xml version=\"1.0\"?>" data=" version=\"1.0\""
+0 ProcInst pi "<?pi a>b?>" data=" a>b"
+1 StartTag html "<html xmlns=\"http://www.w3.org/1999/xhtml\">" ns="http://www.w3.org/1999/xhtml" xmlns="http://www.w3.org/1999/xhtml"
+1 ProcInst pi "<?pi a>b?>" data=" a>b"
+1 EndTag html "</html>"
+0 ProcInst pi "<?pi a>b?>" data=" a>b"

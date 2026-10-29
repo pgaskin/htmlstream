@@ -1,0 +1,75 @@
+Comments.
+-- CommentSimple --
+-- in --
+<a><!-- x --></a>
+-- tokens --
+1 StartTag a "<a>"
+1 Comment "<!-- x -->" text=" x "
+1 EndTag a "</a>"
+-- DoubleHyphen --
+-- in --
+<a><!-- a -- b --></a>
+-- tokens --
+1 StartTag a "<a>"
+1 Comment "<!-- a -- b -->" text=" a -- b "
+1 EndTag a "</a>"
+-- BangEnd --
+"--!>" doesn't end a comment in XML.
+-- in --
+<a><!-- x --!> y --></a>
+-- tokens --
+1 StartTag a "<a>"
+1 Comment "<!-- x --!> y -->" text=" x --!> y "
+1 EndTag a "</a>"
+-- ShortEnds --
+"<!-->" and "<!--->" don't end a comment in XML.
+-- in --
+<a><!-->x--><!--->y--></a>
+-- tokens --
+1 StartTag a "<a>"
+1 Comment "<!-->x-->" text=">x"
+1 Comment "<!--->y-->" text="->y"
+1 EndTag a "</a>"
+-- TrailingHyphens --
+-- in --
+<a><!-- x ---></a>
+-- tokens --
+1 StartTag a "<a>"
+1 Comment "<!-- x --->" text=" x -"
+1 EndTag a "</a>"
+-- CommentEmpty --
+-- in --
+<a><!----></a>
+-- tokens --
+1 StartTag a "<a>"
+1 Comment "<!---->" text=""
+1 EndTag a "</a>"
+-- CommentMarkup --
+-- in --
+<a><!-- <b> <![CDATA[ ]]> --></a>
+-- tokens --
+1 StartTag a "<a>"
+1 Comment "<!-- <b> <![CDATA[ ]]> -->" text=" <b> <![CDATA[ ]]> "
+1 EndTag a "</a>"
+-- CommentOutsideRoot --
+-- in --
+<!-- before --><a/><!-- after -->
+-- tokens --
+0 Comment "<!-- before -->" text=" before "
+0 StartTag a [self-closing] "<a/>"
+0 Comment "<!-- after -->" text=" after "
+-- CommentUnterminated --
+-- in --
+<a><!-- x</a>
+-- tokens --
+1 StartTag a "<a>"
+1 Comment [incomplete] [unsound] "<!-- x</a>" text=" x</a>"
+1 EndTag a [implied] [unsound] ""
+-- Bogus --
+Markup declarations outside a doctype are bogus comments.
+-- in --
+<!ELEMENT a ANY><a/><!>
+-- tokens --
+0 Comment [bogus] "<!ELEMENT a ANY>" text="ELEMENT a ANY"
+0 StartTag a [self-closing] "<a/>"
+0 Comment [bogus] "<!>" text=""

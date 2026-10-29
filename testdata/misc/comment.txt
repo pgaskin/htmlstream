@@ -1,0 +1,43 @@
+<!-->x
+<!--->x
+<!---->x
+<!-- a -- b -->x
+<!--a--!>x
+<!--a--!x-->y
+<!--a
+<!--a-
+<!--a--
+<!--a--!
+<!--<!-- a -->
+<!--&amp;-->
+<!--a\x00b-->
+<!---a--->
+<!foo>x
+<!>x
+<!x
+<!
+<!-
+<?xml version="1.0"?>x
+<?php echo "?>"; ?>x
+</ >x
+</>x
+</1>x
+</a b="c">x
+</a/>
+<![if !IE]>x<![endif]>
+<!--[if IE]><p>x</p><![endif]-->
+<![CDATA[a<b>]]>x
+<![CDATA[a]]]>x
+<![CDATA[a
+<![cdata[a]]>
+<![CDATA[&amp;\x00]]>
+<!DOCTYPE html>
+<!doctype HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<!DOCTYPE>
+<!DOCTYPEhtml>
+<!DOCTYPE
+<!DOCTY
+<!DOCTYPE x [<!ENTITY a "b>">]>y
+<!DOCTYPE x [<!-- > -->]>y
+<!DOCTYPE x "a>b">y
+<!DOCTYPE &amp;>

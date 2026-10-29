@@ -1,0 +1,91 @@
+XML 1.1 documents: NEL, U+2028 and CR NEL are line ends in decoded text,
+under XML rules (see TestXML11LineEnds for more cases).
+-- Version11 --
+Line ends are decoded as newlines in text, comments and CDATA sections, and
+as spaces in attribute values. Character references aren't line ends.
+-- in quoted --
+"<?xml version=\"1.1\"?>\n<a b=\"x\u0085y\r\u0085z\u2028&#x85;\">1\r\u00852\u00853\u20284\r\n5&#x85;&#x2028;<!--\u0085--><![CDATA[\u0085]]><?pi \u0085x\u0085?></a>"
+-- tokens --
+0 ProcInst xml "<?xml version=\"1.1\"?>" data=" version=\"1.1\""
+0 Text "\n" text="\n"
+1 StartTag a "<a b=\"x\u0085y\r\u0085z\u2028&#x85;\">" b="x y z \u0085"
+1 Text "1\r\u00852\u00853\u20284\r\n5&#x85;&#x2028;" text="1\n2\n3\n4\n5\u0085\u2028"
+1 Comment "<!--\u0085-->" text="\n"
+1 CDATA "<![CDATA[\u0085]]>" text="\n"
+1 ProcInst pi "<?pi \u0085x\u0085?>" data=" \u0085x\u0085"
+1 EndTag a "</a>"
+-- Version10 --
+NEL and U+2028 are ordinary characters in XML 1.0.
+-- in quoted --
+"<?xml version=\"1.0\"?>\n<a b=\"x\u0085y\r\u0085z\u2028&#x85;\">1\r\u00852\u00853\u20284\r\n5&#x85;&#x2028;<!--\u0085--><![CDATA[\u0085]]><?pi \u0085x\u0085?></a>"
+-- tokens --
+0 ProcInst xml "<?xml version=\"1.0\"?>" data=" version=\"1.0\""
+0 Text "\n" text="\n"
+1 StartTag a "<a b=\"x\u0085y\r\u0085z\u2028&#x85;\">" b="x\u0085y \u0085z\u2028\u0085"
+1 Text "1\r\u00852\u00853\u20284\r\n5&#x85;&#x2028;" text="1\n\u00852\u00853\u20284\n5\u0085\u2028"
+1 Comment "<!--\u0085-->" text="\u0085"
+1 CDATA "<![CDATA[\u0085]]>" text="\u0085"
+1 ProcInst pi "<?pi \u0085x\u0085?>" data=" \u0085x\u0085"
+1 EndTag a "</a>"
+-- XML11ByteOrderMark --
+-- in quoted --
+"\ufeff<?xml version='1.1' encoding='UTF-8'?><a>1\u00852</a>"
+-- tokens --
+0 Text "\ufeff" text="\ufeff"
+0 ProcInst xml "<?xml version='1.1' encoding='UTF-8'?>" data=" version='1.1' encoding='UTF-8'"
+1 StartTag a "<a>"
+1 Text "1\u00852" text="1\n2"
+1 EndTag a "</a>"
+-- NotAtStart --
+Not an XML declaration, so the document isn't declared as XML 1.1.
+-- in quoted --
+"<!----><?xml version=\"1.1\"?><a>1\u00852</a>"
+-- tokens --
+0 Comment "<!---->" text=""
+0 ProcInst xml "<?xml version=\"1.1\"?>" data=" version=\"1.1\""
+1 StartTag a "<a>"
+1 Text "1\u00852" text="1\u00852"
+1 EndTag a "</a>"
+-- NotDecl --
+"<?xml" followed by "?" and then a character other than ">" isn't an XML
+declaration.
+-- in quoted --
+"<?xml?x version=\"1.1\"?><a>1\u00852</a>"
+-- tokens --
+0 ProcInst xml "<?xml?x version=\"1.1\"?>" data="?x version=\"1.1\""
+1 StartTag a "<a>"
+1 Text "1\u00852" text="1\u00852"
+1 EndTag a "</a>"
+-- Universal universal --
+In documents following XML rules, and in the processing instructions before
+the first tag.
+-- in quoted --
+"<?xml version=\"1.1\"?><?pi \u0085?><!--\u0085--><r xmlns=\"http://www.w3.org/1999/xhtml\" b=\"\u0085\">\u0085<!--\u0085--><x xmlns=\"urn:x\" b=\"\u0085\">\u0085<!--\u0085--><p xmlns=\"\">\u0085</p></x></r>"
+-- tokens --
+0 ProcInst xml "<?xml version=\"1.1\"?>" data=" version=\"1.1\""
+0 ProcInst pi "<?pi \u0085?>" data=" \u0085"
+0 Comment "<!--\u0085-->" text="\u0085"
+1 StartTag r "<r xmlns=\"http://www.w3.org/1999/xhtml\" b=\"\u0085\">" ns="http://www.w3.org/1999/xhtml" xmlns="http://www.w3.org/1999/xhtml" b=" "
+1 Text "\u0085" text="\n"
+1 Comment "<!--\u0085-->" text="\n"
+2 StartTag x "<x xmlns=\"urn:x\" b=\"\u0085\">" ns="urn:x" xmlns="urn:x" b=" "
+2 Text "\u0085" text="\n"
+2 Comment "<!--\u0085-->" text="\n"
+3 StartTag p "<p xmlns=\"\">" xmlns=""
+3 Text "\u0085" text="\n"
+3 EndTag p "</p>"
+2 EndTag x "</x>"
+1 EndTag r "</r>"
+-- UniversalHTML universal --
+Not in documents read as HTML.
+-- in quoted --
+"<?xml version=\"1.1\"?><r b=\"\u0085\">\u0085<!--\u0085--><x xmlns=\"urn:x\" b=\"\u0085\">\u0085</x></r>"
+-- tokens --
+0 ProcInst xml "<?xml version=\"1.1\"?>" data=" version=\"1.1\""
+1 StartTag r "<r b=\"\u0085\">" ns="http://www.w3.org/1999/xhtml" b="\u0085"
+1 Text "\u0085" text="\u0085"
+1 Comment "<!--\u0085-->" text="\u0085"
+2 StartTag x "<x xmlns=\"urn:x\" b=\"\u0085\">" ns="http://www.w3.org/1999/xhtml" xmlns="urn:x" b="\u0085"
+2 Text "\u0085" text="\u0085"
+2 EndTag x "</x>"
+1 EndTag r "</r>"

@@ -1,0 +1,5 @@
+<a b="x\r\ny\tz\x00&notit;&notin;&not &amp=1&amp;=1">
+<a b="x\r\ny\tz"/>
+<a>x\r\ny\rz</a>
+<a><![CDATA[x\r\ny]]></a>
+<!--a\r\nb-->

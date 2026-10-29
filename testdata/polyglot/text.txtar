@@ -1,0 +1,315 @@
+Script and style contents, other raw text elements, and leading newlines
+in pre, textarea and listing.
+-- ScriptStyle --
+-- in --
+<script>if (a < b && c) {}</script><style>a > b { }</style><script type="application/ld+json">{"u":"a<b&c"}</script><script>var x = 1;</script><style>p::before{content:"&"}</style>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><script>//<![CDATA[
+if (a < b && c) {}
+//]]></script><style>a > b { }</style><script type="application/ld+json">{"u":"a\u003cb\u0026c"}</script><script>var x = 1;</script><style>/*<![CDATA[*/
+p::before{content:"&"}
+/*]]>*/</style></head><body></body></html>
+-- ScriptTypeSpace --
+The type string is the type attribute without leading and trailing
+whitespace.
+-- in --
+<script type=" module ">if (a < b) x();</script><script type="importmap ">{"imports":{"a&b":"./x.js"}}</script><script type=" ">a<b</script>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><script type=" module ">//<![CDATA[
+if (a < b) x();
+//]]></script><script type="importmap ">{"imports":{"a\u0026b":"./x.js"}}</script><script type=" ">a<b</script></head><body></body></html>
+-- warn --
+128: script of type "" containing <, & or ]]> can't be represented in XML
+-- ScriptStyleCDATAWrapper --
+-- in --
+<script>//<![CDATA[
+if (a < b) x();
+//]]></script><script>
+  // <![CDATA[
+  if (a < b) x();
+  // ]]>
+</script><script>/* <![CDATA[ */
+var s = "&";
+/* ]]> */</script><script>//<![CDATA[
+var x = 1;
+//]]></script><style>/*<![CDATA[*/
+p::before{content:"&"}
+/*]]>*/</style>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><script>//<![CDATA[
+if (a < b) x();
+//]]></script><script>//<![CDATA[
+  if (a < b) x();
+//]]></script><script>//<![CDATA[
+var s = "&";
+//]]></script><script>var x = 1;</script><style>/*<![CDATA[*/
+p::before{content:"&"}
+/*]]>*/</style></head><body></body></html>
+-- ScriptStyleCDATAWrapperKept htmldiff --
+A line comment start followed by code, and line comments in a style, aren't
+removed.
+-- in --
+<script>//<![CDATA[ x();
+y < z
+//]]></script><style>//<![CDATA[
+p{color:red}
+//]]></style>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><script>//<![CDATA[
+//<![CDATA[ x();
+y < z
+//]]]]><![CDATA[>
+//]]></script><style>/*<![CDATA[*/
+//<![CDATA[
+p{color:red}
+//]]]]><![CDATA[>
+/*]]>*/</style></head><body></body></html>
+-- warn --
+8: script containing ]]> can't be represented in XML
+52: style containing ]]> can't be represented in XML
+-- ScriptStyleCDATAWrapperSplitEnd --
+"]]]]><![CDATA[>", "]]>" written in a CDATA section, is kept as it is.
+-- in --
+<script>//<![CDATA[
+var s = "]]]]><![CDATA[>";
+//]]></script><style>/*<![CDATA[*/
+p::before{content:"]]]]><![CDATA[>"}
+/*]]>*/</style>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><script>//<![CDATA[
+var s = "]]]]><![CDATA[>";
+//]]></script><style>/*<![CDATA[*/
+p::before{content:"]]]]><![CDATA[>"}
+/*]]>*/</style></head><body></body></html>
+-- warn --
+8: script containing ]]> can't be represented in XML
+68: style containing ]]> can't be represented in XML
+-- ScriptStyleCDATAWrapperHTMLComment --
+The forms with HTML comment markers Drupal 7 writes.
+-- in --
+<script>
+<!--//--><![CDATA[//><!--
+if (a < b) x();
+//--><!]]>
+</script><style>
+<!--/*--><![CDATA[/*><!--*/
+p::before{content:"&"}
+/*]]>*/-->
+</style>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><script>//<![CDATA[
+if (a < b) x();
+//]]></script><style>/*<![CDATA[*/
+p::before{content:"&"}
+/*]]>*/</style></head><body></body></html>
+-- ScriptStyleCDATAWrapperHTMLCommentKept htmldiff --
+The forms with HTML comment markers aren't removed from modules, which
+don't allow HTML-like comments, and from contents containing <script, which
+starts a nested script after <!--.
+-- in --
+<script type="module">
+<!--//--><![CDATA[//><!--
+if (a < b) x();
+//--><!]]>
+</script><script>
+<!--//--><![CDATA[//><!--
+document.write("<script>x<\/script>");
+//--><!]]>
+</script>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><script type="module">//<![CDATA[
+
+<!--//--><![CDATA[//><!--
+if (a < b) x();
+//--><!]]]]><![CDATA[>
+
+//]]></script><script>//<![CDATA[
+
+<!--//--><![CDATA[//><!--
+document.write("<script>x<\/script>");
+//--><!]]]]><![CDATA[>
+
+//]]></script></head><body></body></html>
+-- warn --
+22: script containing ]]> can't be represented in XML
+93: script containing ]]> can't be represented in XML
+-- SelfClosingRawText --
+XHTML read without XML syntax: HTML parsers ignore the slash of self-closing
+tags of raw text and RCDATA elements, so title takes the rest of the input
+as its contents.
+-- in --
+<?xml version="1.0" encoding="UTF-8"?><html xmlns="http://www.w3.org/1999/xhtml"><head><title/><script src="a.js"/><style/></head><body><textarea/>
+</textarea><p>x</p></body></html>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><title>&lt;script src="a.js"/&gt;&lt;style/&gt;&lt;/head&gt;&lt;body&gt;&lt;textarea/&gt;
+&lt;/textarea&gt;&lt;p&gt;x&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</title></head><body></body></html>
+-- warn --
+87: read self-closing <title/> as a start tag, with the input up to </title> or the end of the input as its contents (to match HTML parsers, which ignore the slash)
+-- ScriptEndTagCutOff htmldiff --
+-- in --
+<script>a</SCRIPT
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><script>a</script></head><body></body></html>
+-- warn --
+8: dropped incomplete end tag at the end of the script contents (HTML parsers would have kept it as text)
+-- ScriptIncompleteEndTag htmldiff --
+-- in --
+<script>a</sCript</script><style>b</style</style>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><script>a</script><style>b</style></head><body></body></html>
+-- warn --
+8: dropped incomplete end tag at the end of the script contents (HTML parsers would have kept it as text)
+33: dropped incomplete end tag at the end of the style contents (HTML parsers would have kept it as text)
+-- ScriptEscapedStartTagAtEnd htmldiff --
+-- in --
+<script><!--<SCRIPT</script>x
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><script>//<![CDATA[
+<!--
+//]]></script></head><body>x</body></html>
+-- warn --
+8: dropped incomplete <script> at the end of the script contents (HTML parsers would have kept it as text)
+-- StyleEndTagCutOff htmldiff --
+-- in --
+<style>a</style
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><style>a</style></head><body></body></html>
+-- warn --
+7: dropped incomplete end tag at the end of the style contents (HTML parsers would have kept it as text)
+-- ScriptDoubleEscapedEndTagCutOff --
+the cut off end tag ends the double escape
+-- in --
+<script><!--<script></script
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><script>//<![CDATA[
+<!--<script></script
+//]]></script></head><body></body></html>
+-- ScriptDoubleEscapedCutOff htmldiff nonidempotent --
+-- in --
+<script><!--<script>x
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><script>//<![CDATA[
+<!--<script>x
+//]]></script></head><body></body></html>
+-- warn --
+8: script cut off by the end of the input after <!--<script (HTML parsers will leave it open when parsing the output)
+-- ScriptEscapedEndTagCutOff htmldiff --
+-- in --
+<script><!--<script></script>x</script
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><script>//<![CDATA[
+<!--<script></script>x
+//]]></script></head><body></body></html>
+-- warn --
+8: dropped incomplete end tag at the end of the script contents (HTML parsers would have kept it as text)
+-- Xmp htmldiff --
+-- in --
+<xmp><b>&amp;</b></xmp>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><pre>&lt;b&gt;&amp;amp;&lt;/b&gt;</pre></body></html>
+-- warn --
+0: converted xmp to pre
+-- Iframe htmldiff --
+-- in --
+<iframe src=x>fallback</iframe><iframe src=y></iframe>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><iframe src="x"></iframe><iframe src="y"></iframe></body></html>
+-- warn --
+14: dropped contents of iframe
+-- XmpPlaintextNewline htmldiff --
+HTML parsers keep a leading newline in xmp and plaintext, which pre can't
+represent.
+-- in --
+<xmp>
+foo</xmp><plaintext>
+bar
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><pre>foo</pre><pre>bar</pre></body></html>
+-- warn --
+0: converted xmp to pre
+5: leading newline in pre, textarea or listing can't be represented
+15: converted plaintext to pre
+26: leading newline in pre, textarea or listing can't be represented
+-- PreNewline --
+-- in --
+<pre>
+line
+</pre><textarea>
+x</textarea><listing>
+</listing>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><pre>line
+</pre><textarea>x</textarea><listing></listing></body></html>
+-- PreNewlineAfterElement --
+the newline isn't directly after the start tag
+-- in --
+<pre><a>
+x</a></pre><pre><!--c-->
+y</pre>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><pre><a>
+x</a></pre><pre><!--c-->
+y</pre></body></html>
+-- PreDoubleNewlineReopened --
+the second newline follows the reopened b
+-- in --
+<p><b>x</p><pre>
+
+y</pre>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p><b>x</b></p><pre><b>
+y</b></pre></body></html>
+-- PreOnlyNewline --
+the dropped newline doesn't reopen the a
+-- in quoted --
+"<p><a></p><pre>\r\n</pre>"
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p><a></a></p><pre></pre></body></html>
+-- PreNewlineAfterStray htmldiff nonidempotent --
+nothing is written for the stray end tag, so the newline would
+follow the start tag
+-- in --
+<pre></a>
+x</pre>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><pre>
+x</pre></body></html>
+-- warn --
+9: leading newline in pre, textarea or listing can't be represented
+-- PreDoubleNewline htmldiff nonidempotent --
+-- in --
+<pre>
+
+line</pre>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><pre>
+line</pre></body></html>
+-- warn --
+5: leading newline in pre, textarea or listing can't be represented
+-- PreNewlineAfterNUL htmldiff nonidempotent --
+HTML parsers ignore a NUL directly after the start tag, and the HTML
+Standard keeps the newline after it (browsers drop it).
+-- in quoted --
+"<pre>\x00\nx</pre><listing>\x00x</listing>"
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><pre>
+x</pre><listing>x</listing></body></html>
+-- warn --
+5: leading newline in pre, textarea or listing can't be represented
+-- PreNewlineAfterIgnoredEndTag --
+the newline isn't directly after the pre start tag, so HTML
+parsers keep it, reopening the a
+-- in --
+<p><a>x<pre></b>
+y
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p><a>x</a></p><pre><a>
+y</a></pre></body></html>
+-- PreCarriageReturn --
+a carriage return from a reference isn't dropped
+-- in --
+<pre>&#13;x</pre><pre>&#13;
+y</pre>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><pre>&#13;x</pre><pre>&#13;
+y</pre></body></html>

@@ -1,0 +1,239 @@
+Formatting elements: reopening, misnested end tags (the adoption agency
+algorithm), nested links and the Noah's Ark clause.
+-- TagSoup --
+-- in --
+<p>a<p>b<ul><li>x<li>y</ul><b><i>bold-italic</b>italic</i> text
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p>a</p><p>b</p><ul><li>x</li><li>y</li></ul><b><i>bold-italic</i></b><i>italic</i> text</body></html>
+-- ReopenAcrossParagraphs --
+-- in --
+<p><b>x</p><p>y</p>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p><b>x</b></p><p><b>y</b></p></body></html>
+-- NestedLinks --
+-- in --
+<a href=1>x<a href=2>y</a>z
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><a href="1">x</a><a href="2">y</a>z</body></html>
+-- ButtonReopen --
+button isn't a marker: formatting elements closed in it are
+reopened after it
+-- in --
+<button><b>x</button>y
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><button><b>x</b></button><b>y</b></body></html>
+-- NestedLinksInButton --
+-- in --
+<a><button><a>x
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><a><button><a>x</a></button></a></body></html>
+-- warn --
+11: wrote a inside an open a (HTML parsers would have closed the open one first)
+-- NoReconstruct --
+start tags which don't reopen formatting elements, and noscript
+(with scripting disabled), which does
+-- in --
+<div><b>1</div><rb></rb><rtc></rtc><rp></rp><rt></rt><param><source><track><div><i>2</div><noscript>3</noscript>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><div><b>1</b></div><rb></rb><rtc></rtc><rp></rp><rt></rt><param /><source /><track /><div><b><i>2</i></b></div><b><i><noscript>3</noscript></i></b></body></html>
+-- NoReconstructInText htmldiff --
+title and textarea don't reopen them, and neither does their text;
+plaintext doesn't, but its text does (it is parsed in the body)
+plaintext converted to pre
+-- in --
+<div><b>1</div><title>2</title><textarea>3</textarea><div><i>4</div><plaintext>5
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><div><b>1</b></div><title>2</title><textarea>3</textarea><div><b><i>4</i></b></div><pre><b><i>5</i></b></pre></body></html>
+-- warn --
+68: converted plaintext to pre
+-- ReopenRepeatedly --
+-- in --
+<p><b>x</p><p>y</p><p>z</p>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p><b>x</b></p><p><b>y</b></p><p><b>z</b></p></body></html>
+-- ReopenNested --
+-- in --
+<p><b><i>x</p><p>y</p>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p><b><i>x</i></b></p><p><b><i>y</i></b></p></body></html>
+-- NoahsArk --
+at most three formatting elements with the same name and attributes
+are reopened (Noah's Ark clause)
+-- in --
+<p><b><b><b><b>x<p>y</p><p><font size=4><font color=red><font size=4><font size=4><font size=4><font SIZE=4 size=5><font size=4><font color=red><p>z
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p><b><b><b><b>x</b></b></b></b></p><p><b><b><b>y</b></b></b></p><p><b><b><b><font size="4"><font color="red"><font size="4"><font size="4"><font size="4"><font size="4"><font size="4"><font color="red"></font></font></font></font></font></font></font></font></b></b></b></p><p><b><b><b><font color="red"><font size="4"><font size="4"><font size="4"><font color="red">z</font></font></font></font></font></b></b></b></p></body></html>
+-- NoahsArkAttrOrder --
+the attributes are compared in any order
+-- in --
+<p><b class=a id=b><b id=b class=a><b class=a id=b><b id=b class=a>x<p>y<p><i class=a><i class=a id=b><i class=a><i class=a>z<p>w
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p><b class="a" id="b"><b id="b" class="a"><b class="a" id="b"><b id="b" class="a">x</b></b></b></b></p><p><b id="b" class="a"><b class="a" id="b"><b id="b" class="a">y</b></b></b></p><p><b id="b" class="a"><b class="a" id="b"><b id="b" class="a"><i class="a"><i class="a" id="b"><i class="a"><i class="a">z</i></i></i></i></b></b></b></p><p><b id="b" class="a"><b class="a" id="b"><b id="b" class="a"><i class="a"><i class="a" id="b"><i class="a"><i class="a">w</i></i></i></i></b></b></b></p></body></html>
+-- ReopenAfterStrayEnd --
+-- in --
+<p><b><i>x</p><p>y</b>z
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p><b><i>x</i></b></p><p><b><i>y</i></b><i>z</i></p></body></html>
+-- FormattingEndThroughBlock htmldiff --
+The adoption agency algorithm keeps the p open and clones the b.
+-- in --
+<b>1<p>2</b>3</p>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><b>1<p>2</p></b>3<p></p></body></html>
+-- warn --
+8: closed p at </b> (HTML parsers would have kept p open and cloned b into it)
+-- LinkEndThroughBlock htmldiff --
+-- in --
+<a>x<p>y</a>z
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><a>x<p>y</p></a>z</body></html>
+-- warn --
+8: closed p at </a> (HTML parsers would have kept p open and cloned a into it)
+-- LinkEndThroughNestedBlock htmldiff --
+-- in --
+<div><a>x<div>y</a>z</div></div>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><div><a>x<div>y</div></a>z</div></body></html>
+-- warn --
+15: closed div at </a> (HTML parsers would have kept div open and cloned a into it)
+-- FormattingEndThroughParagraph htmldiff --
+-- in --
+<i><p>a</i>b</p>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><i><p>a</p></i>b<p></p></body></html>
+-- warn --
+7: closed p at </i> (HTML parsers would have kept p open and cloned i into it)
+-- OtherEndThroughBlock htmldiff --
+HTML parsers ignore the end tag.
+-- in --
+<span><p>x</span>y
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><span><p>x</p></span>y</body></html>
+-- warn --
+10: closed p at </span> (HTML parsers would have ignored the end tag)
+-- FormEndThroughBlock htmldiff --
+HTML parsers remove only the form from the stack.
+-- in --
+<form><div>x</form>y</div>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><form><div>x</div></form>y</body></html>
+-- warn --
+12: closed div at </form> (HTML parsers would have kept it open)
+-- FormattingEndThroughInline --
+-- in --
+<b><span>x</b>y</span>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><b><span>x</span></b>y</body></html>
+-- OtherEndThroughFormatting --
+-- in --
+<span><b>x</span>y</b>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><span><b>x</b></span><b>y</b></body></html>
+-- FormattingEndAfterImpliedEnd --
+-- in --
+<p><b>x<p>y</b>z<li><i>a<li>b</i>c
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p><b>x</b></p><p><b>y</b>z</p><li><i>a</i></li><li><i>b</i>c</li></body></html>
+-- FormEndThroughParagraph --
+-- in --
+<form><p>x</form>y
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><form><p>x</p></form>y</body></html>
+-- FormattingEndWithClosedSame htmldiff --
+HTML parsers drop the closed b and keep the open one
+-- in --
+<b id=a><p><b id=b></p></b>c
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><b id="a"><p><b id="b"></b></p></b>c</body></html>
+-- warn --
+23: closed an open b at </b> (HTML parsers would have stopped reopening a closed b and kept the open one)
+-- StrayEndOfInnerClosed --
+a stray end tag applies to the last closed element with its name
+(the inner u), which isn't reopened; the outer one is
+-- in --
+<b><u a><u></b></u>x
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><b><u a=""><u></u></u></b><u a="">x</u></body></html>
+-- StrayEndOfClosedInsideReopened --
+the closed inner u is later in the list of active formatting
+elements than the reopened outer one, so the end tag applies to it
+-- in --
+<p><u a></p><b><u>x</b></u>y
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p><u a=""></u></p><u a=""><b><u>x</u></b>y</u></body></html>
+-- StrayEndInCellOfClosedOutside --
+a stray end tag in a cell doesn't apply to an element closed
+outside the table (before the cell's marker)
+-- in --
+<p><b></p><table><td></b></table>x
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p><b></b></p><table><tbody><tr><td></td></tr></tbody></table><b>x</b></body></html>
+-- FormattingEndWithReopenedSame htmldiff --
+HTML parsers close the reopened inner i, and keep the outer one
+-- in --
+<i><b><i></b>x</i>y
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><i><b><i></i></b><i>x</i></i><i>y</i></body></html>
+-- warn --
+14: closed an open i with a reopened i inside it at </i> (HTML parsers would have closed only the reopened one)
+-- ReopenedEndThroughInput htmldiff --
+HTML parsers close the reopened i and the b inside it
+-- in --
+<p><i>x</p><b>y</i>z
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p><i>x</i></p><i><b>yz</b></i></body></html>
+-- warn --
+15: ignored </i> of a reopened element with b open inside it (HTML parsers would have closed i)
+-- NestedLinkThroughInline --
+-- in --
+<a>x<b><a>y
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><a>x<b></b></a><b><a>y</a></b></body></html>
+-- NestedLinkThroughBlock --
+HTML parsers close the open a first (adoption agency algorithm).
+-- in --
+<a>x<p>y<a>z
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><a>x<p>y<a>z</a></p></a></body></html>
+-- warn --
+8: wrote a inside an open a (HTML parsers would have closed the open one first)
+-- NestedLinkInReopened --
+-- in --
+<p><a>x</p><p>y<a>z
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p><a>x</a></p><p><a>y</a><a>z</a></p></body></html>
+-- ReopenOrder --
+a reopened a is reopened again before the b opened in it
+-- in --
+<p><a>x<p><b>y</p>z
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p><a>x</a></p><p><a><b>y</b></a></p><a><b>z</b></a></body></html>
+-- ReopenBeforeSameElement --
+i reopened in ul and closed with it is reopened again before the new i
+-- in --
+<p>a<i>b<ul>c</ul><i>d<p><nobr>e<ul>f</ul><nobr>g
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p>a<i>b</i></p><ul><i>c</i></ul><i><i>d<p><nobr>e</nobr></p><ul><nobr>f</nobr></ul><nobr></nobr><nobr>g</nobr></i></i></body></html>
+-- NestedLinkAfterImpliedEnd --
+the closed a isn't reopened before the new one
+-- in --
+<p><a>x<p><A>y<p><nobr>z<p><nobr>w
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p><a>x</a></p><p><a>y</a></p><p><a><nobr>z</nobr></a></p><p><a><nobr></nobr><nobr>w</nobr></a></p></body></html>
+-- NestedLinkInReopenedNested --
+-- in --
+<p><a><b>x</p><p>y<a>z
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p><a><b>x</b></a></p><p><a><b>y</b></a><b><a>z</a></b></p></body></html>
+-- NestedLinkInReopenedThroughInline nonidempotent --
+-- in --
+<p><a>x</p><p>y<span><a>z
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p><a>x</a></p><p><a>y<span><a>z</a></span></a></p></body></html>
+-- warn --
+21: wrote a inside an open a (HTML parsers would have closed the open one first)
+-- NestedNobrInReopened --
+-- in --
+<p><nobr>a<p>b<nobr>c
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p><nobr>a</nobr></p><p><nobr>b</nobr><nobr>c</nobr></p></body></html>

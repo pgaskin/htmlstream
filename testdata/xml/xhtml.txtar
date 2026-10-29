@@ -1,0 +1,352 @@
+XHTML documents in Universal mode: a document starting with an XML
+declaration whose first start tag declares the XHTML namespace follows XML
+rules. Void elements without an end tag are closed before the next token.
+-- Document universal --
+-- in --
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><title>x</title><script>a&amp;&lt;b</script><style><![CDATA[a<b]]></style></head><body><p>a<p>b</p></p><br><img src="x"/></body></html>
+-- tokens --
+0 ProcInst xml "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" data=" version=\"1.0\" encoding=\"UTF-8\""
+0 Text "\n" text="\n"
+0 Doctype "<!DOCTYPE html>"
+0 Text "\n" text="\n"
+1 StartTag html "<html xmlns=\"http://www.w3.org/1999/xhtml\">" ns="http://www.w3.org/1999/xhtml" xmlns="http://www.w3.org/1999/xhtml"
+2 StartTag head "<head>" ns="http://www.w3.org/1999/xhtml"
+3 StartTag title "<title>" ns="http://www.w3.org/1999/xhtml"
+3 Text "x" text="x"
+3 EndTag title "</title>"
+3 StartTag script "<script>" ns="http://www.w3.org/1999/xhtml"
+3 Text "a&amp;&lt;b" text="a&<b"
+3 EndTag script "</script>"
+3 StartTag style "<style>" ns="http://www.w3.org/1999/xhtml"
+3 CDATA "<![CDATA[a<b]]>" text="a<b"
+3 EndTag style "</style>"
+2 EndTag head "</head>"
+2 StartTag body "<body>" ns="http://www.w3.org/1999/xhtml"
+3 StartTag p "<p>" ns="http://www.w3.org/1999/xhtml"
+3 Text "a" text="a"
+4 StartTag p "<p>" ns="http://www.w3.org/1999/xhtml"
+4 Text "b" text="b"
+4 EndTag p "</p>"
+3 EndTag p "</p>"
+3 StartTag br "<br>" ns="http://www.w3.org/1999/xhtml"
+3 EndTag br [implied] ""
+2 StartTag img [self-closing] "<img src=\"x\"/>" ns="http://www.w3.org/1999/xhtml" src="x"
+2 EndTag body "</body>"
+1 EndTag html "</html>"
+-- NoNamespace universal --
+Without a namespace declaration, elements follow HTML rules.
+-- in --
+<html><head><title>x<b/></title></head><body><p>a<p>b</body></html>
+-- tokens --
+1 StartTag html "<html>" ns="http://www.w3.org/1999/xhtml"
+2 StartTag head "<head>" ns="http://www.w3.org/1999/xhtml"
+3 StartTag title "<title>" ns="http://www.w3.org/1999/xhtml"
+3 Text "x<b/>" text="x<b/>"
+3 EndTag title "</title>"
+2 EndTag head "</head>"
+2 StartTag body "<body>" ns="http://www.w3.org/1999/xhtml"
+3 StartTag p "<p>" ns="http://www.w3.org/1999/xhtml"
+3 Text "a" text="a"
+3 EndTag p [implied] ""
+3 StartTag p "<p>" ns="http://www.w3.org/1999/xhtml"
+3 Text "b" text="b"
+3 EndTag p [implied] ""
+2 EndTag body "</body>"
+1 EndTag html "</html>"
+-- VoidElements universal --
+Void elements under XML rules open an element. Their end tag closes it if it
+comes next, and otherwise an implied end tag closes it before the next token,
+which is then read without it. Self-closed ones don't open an element. After
+the html element, the document still follows XML rules, and the br there is
+in no namespace.
+-- in --
+<?xml version="1.0"?>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="utf-8"></meta><link rel="x">
+<title>t</title></head><body><p>a<br></br>b<br/>c<br>d<br><!--x--><br><i>e</i><br></p><hr><?pi x?><br><![CDATA[x]]><img src="y"></BR><input></body></html><br>
+-- tokens --
+0 ProcInst xml "<?xml version=\"1.0\"?>" data=" version=\"1.0\""
+0 Text "\n" text="\n"
+1 StartTag html "<html xmlns=\"http://www.w3.org/1999/xhtml\">" ns="http://www.w3.org/1999/xhtml" xmlns="http://www.w3.org/1999/xhtml"
+2 StartTag head "<head>" ns="http://www.w3.org/1999/xhtml"
+3 StartTag meta "<meta charset=\"utf-8\">" ns="http://www.w3.org/1999/xhtml" charset="utf-8"
+3 EndTag meta "</meta>"
+3 StartTag link "<link rel=\"x\">" ns="http://www.w3.org/1999/xhtml" rel="x"
+3 EndTag link [implied] ""
+2 Text "\n" text="\n"
+3 StartTag title "<title>" ns="http://www.w3.org/1999/xhtml"
+3 Text "t" text="t"
+3 EndTag title "</title>"
+2 EndTag head "</head>"
+2 StartTag body "<body>" ns="http://www.w3.org/1999/xhtml"
+3 StartTag p "<p>" ns="http://www.w3.org/1999/xhtml"
+3 Text "a" text="a"
+4 StartTag br "<br>" ns="http://www.w3.org/1999/xhtml"
+4 EndTag br "</br>"
+3 Text "b" text="b"
+3 StartTag br [self-closing] "<br/>" ns="http://www.w3.org/1999/xhtml"
+3 Text "c" text="c"
+4 StartTag br "<br>" ns="http://www.w3.org/1999/xhtml"
+4 EndTag br [implied] ""
+3 Text "d" text="d"
+4 StartTag br "<br>" ns="http://www.w3.org/1999/xhtml"
+4 EndTag br [implied] ""
+3 Comment "<!--x-->" text="x"
+4 StartTag br "<br>" ns="http://www.w3.org/1999/xhtml"
+4 EndTag br [implied] ""
+4 StartTag i "<i>" ns="http://www.w3.org/1999/xhtml"
+4 Text "e" text="e"
+4 EndTag i "</i>"
+4 StartTag br "<br>" ns="http://www.w3.org/1999/xhtml"
+4 EndTag br [implied] ""
+3 EndTag p "</p>"
+3 StartTag hr "<hr>" ns="http://www.w3.org/1999/xhtml"
+3 EndTag hr [implied] ""
+2 ProcInst pi "<?pi x?>" data=" x"
+3 StartTag br "<br>" ns="http://www.w3.org/1999/xhtml"
+3 EndTag br [implied] ""
+2 CDATA "<![CDATA[x]]>" text="x"
+3 StartTag img "<img src=\"y\">" ns="http://www.w3.org/1999/xhtml" src="y"
+3 EndTag img [implied] ""
+2 EndTag BR [stray] "</BR>"
+3 StartTag input "<input>" ns="http://www.w3.org/1999/xhtml"
+3 EndTag input [implied] ""
+2 EndTag body "</body>"
+1 EndTag html "</html>"
+1 StartTag br "<br>"
+1 EndTag br [implied] [unsound] ""
+-- ImageUnderXMLRules universal --
+image isn't an XHTML element: only HTML parsers turn it into img, so under
+XML rules it is an ordinary element.
+-- in --
+<?xml version="1.0"?>
+<html xmlns="http://www.w3.org/1999/xhtml"><image src="a">x</image></html>
+-- tokens --
+0 ProcInst xml "<?xml version=\"1.0\"?>" data=" version=\"1.0\""
+0 Text "\n" text="\n"
+1 StartTag html "<html xmlns=\"http://www.w3.org/1999/xhtml\">" ns="http://www.w3.org/1999/xhtml" xmlns="http://www.w3.org/1999/xhtml"
+2 StartTag image "<image src=\"a\">" ns="http://www.w3.org/1999/xhtml" src="a"
+2 Text "x" text="x"
+2 EndTag image "</image>"
+1 EndTag html "</html>"
+-- VoidElementAtEOF universal --
+-- in --
+<?xml version="1.0"?>
+<html xmlns="http://www.w3.org/1999/xhtml"><br>
+-- tokens --
+0 ProcInst xml "<?xml version=\"1.0\"?>" data=" version=\"1.0\""
+0 Text "\n" text="\n"
+1 StartTag html "<html xmlns=\"http://www.w3.org/1999/xhtml\">" ns="http://www.w3.org/1999/xhtml" xmlns="http://www.w3.org/1999/xhtml"
+2 StartTag br "<br>" ns="http://www.w3.org/1999/xhtml"
+2 EndTag br [implied] ""
+1 EndTag html [implied] [unsound] ""
+-- VoidElementsXML11 universal --
+The XML 1.1 line ends apply to the text after a void element.
+-- in quoted --
+"<?xml version=\"1.1\"?><html xmlns=\"http://www.w3.org/1999/xhtml\"><br>c\u0085d</html>"
+-- tokens --
+0 ProcInst xml "<?xml version=\"1.1\"?>" data=" version=\"1.1\""
+1 StartTag html "<html xmlns=\"http://www.w3.org/1999/xhtml\">" ns="http://www.w3.org/1999/xhtml" xmlns="http://www.w3.org/1999/xhtml"
+2 StartTag br "<br>" ns="http://www.w3.org/1999/xhtml"
+2 EndTag br [implied] ""
+1 Text "c\u0085d" text="c\nd"
+1 EndTag html "</html>"
+-- VoidElementsCase universal --
+Under XML rules, names are case-sensitive: BR isn't a void element.
+-- in --
+<?xml version="1.0"?>
+<html xmlns="http://www.w3.org/1999/xhtml"><BR>x</BR><x:br xmlns:x="http://www.w3.org/1999/xhtml">y</html>
+-- tokens --
+0 ProcInst xml "<?xml version=\"1.0\"?>" data=" version=\"1.0\""
+0 Text "\n" text="\n"
+1 StartTag html "<html xmlns=\"http://www.w3.org/1999/xhtml\">" ns="http://www.w3.org/1999/xhtml" xmlns="http://www.w3.org/1999/xhtml"
+2 StartTag BR "<BR>" ns="http://www.w3.org/1999/xhtml"
+2 Text "x" text="x"
+2 EndTag BR "</BR>"
+2 StartTag x:br "<x:br xmlns:x=\"http://www.w3.org/1999/xhtml\">" ns="http://www.w3.org/1999/xhtml" xmlns:x="http://www.w3.org/1999/xhtml"
+2 EndTag x:br [implied] ""
+1 Text "y" text="y"
+1 EndTag html "</html>"
+-- VoidElementsSpace universal --
+Whitespace between a void element under XML rules and its end tag is in the
+element. Other content, including a character reference to a space, closes
+it first.
+-- in --
+<?xml version="1.0"?>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="utf-8">
+  </meta><link rel="x">
+<title>t</title></head><body><p>a<br> </br>b<br>  </br >c<br> d</br><br> <!--x--></br><img src="y">	
+</img><br>&#32;</br><br> </b></p></body></html>
+-- tokens --
+0 ProcInst xml "<?xml version=\"1.0\"?>" data=" version=\"1.0\""
+0 Text "\n" text="\n"
+1 StartTag html "<html xmlns=\"http://www.w3.org/1999/xhtml\">" ns="http://www.w3.org/1999/xhtml" xmlns="http://www.w3.org/1999/xhtml"
+2 StartTag head "<head>" ns="http://www.w3.org/1999/xhtml"
+3 StartTag meta "<meta charset=\"utf-8\">" ns="http://www.w3.org/1999/xhtml" charset="utf-8"
+3 Text "\n  " text="\n  "
+3 EndTag meta "</meta>"
+3 StartTag link "<link rel=\"x\">" ns="http://www.w3.org/1999/xhtml" rel="x"
+3 EndTag link [implied] ""
+2 Text "\n" text="\n"
+3 StartTag title "<title>" ns="http://www.w3.org/1999/xhtml"
+3 Text "t" text="t"
+3 EndTag title "</title>"
+2 EndTag head "</head>"
+2 StartTag body "<body>" ns="http://www.w3.org/1999/xhtml"
+3 StartTag p "<p>" ns="http://www.w3.org/1999/xhtml"
+3 Text "a" text="a"
+4 StartTag br "<br>" ns="http://www.w3.org/1999/xhtml"
+4 Text " " text=" "
+4 EndTag br "</br>"
+3 Text "b" text="b"
+4 StartTag br "<br>" ns="http://www.w3.org/1999/xhtml"
+4 Text "  " text="  "
+4 EndTag br "</br >"
+3 Text "c" text="c"
+4 StartTag br "<br>" ns="http://www.w3.org/1999/xhtml"
+4 EndTag br [implied] ""
+3 Text " d" text=" d"
+3 EndTag br [stray] "</br>"
+4 StartTag br "<br>" ns="http://www.w3.org/1999/xhtml"
+4 EndTag br [implied] ""
+3 Text " " text=" "
+3 Comment "<!--x-->" text="x"
+3 EndTag br [stray] "</br>"
+4 StartTag img "<img src=\"y\">" ns="http://www.w3.org/1999/xhtml" src="y"
+4 Text "\t\n" text="\t\n"
+4 EndTag img "</img>"
+4 StartTag br "<br>" ns="http://www.w3.org/1999/xhtml"
+4 EndTag br [implied] ""
+3 Text "&#32;" text=" "
+3 EndTag br [stray] "</br>"
+4 StartTag br "<br>" ns="http://www.w3.org/1999/xhtml"
+4 EndTag br [implied] ""
+3 Text " " text=" "
+3 EndTag b [stray] "</b>"
+3 EndTag p "</p>"
+2 EndTag body "</body>"
+1 EndTag html "</html>"
+-- WithoutDeclaration universal --
+Without an XML declaration, the document is read like in HTML mode with XML
+syntax, also with the XHTML namespace declared on its root: script contents
+are raw text, p elements don't nest, image is void, and void elements are
+closed by their end tag.
+-- in --
+<html xmlns="http://www.w3.org/1999/xhtml"><script>a<b</script><p>a<p>b<br></br><image src="a">x</image><x:br/><svg><p>c</svg></html>
+-- tokens --
+1 StartTag html "<html xmlns=\"http://www.w3.org/1999/xhtml\">" ns="http://www.w3.org/1999/xhtml" xmlns="http://www.w3.org/1999/xhtml"
+2 StartTag script "<script>" ns="http://www.w3.org/1999/xhtml"
+2 Text "a<b" text="a<b"
+2 EndTag script "</script>"
+2 StartTag p "<p>" ns="http://www.w3.org/1999/xhtml"
+2 Text "a" text="a"
+2 EndTag p [implied] ""
+2 StartTag p "<p>" ns="http://www.w3.org/1999/xhtml"
+2 Text "b" text="b"
+3 StartTag br "<br>" ns="http://www.w3.org/1999/xhtml"
+3 EndTag br "</br>"
+3 StartTag image "<image src=\"a\">" ns="http://www.w3.org/1999/xhtml" src="a"
+3 EndTag image [implied] ""
+2 Text "x" text="x"
+2 EndTag image [stray] "</image>"
+2 StartTag x:br [self-closing] "<x:br/>" ns="http://www.w3.org/1999/xhtml"
+3 StartTag svg "<svg>" ns="http://www.w3.org/2000/svg"
+3 EndTag svg [implied] [unsound] ""
+2 EndTag p [implied] ""
+2 StartTag p "<p>" ns="http://www.w3.org/1999/xhtml"
+2 Text "c" text="c"
+2 EndTag svg [stray] "</svg>"
+2 EndTag p [implied] ""
+1 EndTag html "</html>"
+-- PrefixedRoot universal --
+A root with a prefix bound to XHTML: elements without a prefix are in no
+namespace, the p elements nest, script contents are markup, and h:br is a
+void element.
+-- in --
+<?xml version="1.0"?>
+<h:html xmlns:h="http://www.w3.org/1999/xhtml"><h:body><p>a<p>b</p></p><script><b>x</b></script><h:br>c</h:body></h:html>
+-- tokens --
+0 ProcInst xml "<?xml version=\"1.0\"?>" data=" version=\"1.0\""
+0 Text "\n" text="\n"
+1 StartTag h:html "<h:html xmlns:h=\"http://www.w3.org/1999/xhtml\">" ns="http://www.w3.org/1999/xhtml" xmlns:h="http://www.w3.org/1999/xhtml"
+2 StartTag h:body "<h:body>" ns="http://www.w3.org/1999/xhtml"
+3 StartTag p "<p>"
+3 Text "a" text="a"
+4 StartTag p "<p>"
+4 Text "b" text="b"
+4 EndTag p "</p>"
+3 EndTag p "</p>"
+3 StartTag script "<script>"
+4 StartTag b "<b>"
+4 Text "x" text="x"
+4 EndTag b "</b>"
+3 EndTag script "</script>"
+3 StartTag h:br "<h:br>" ns="http://www.w3.org/1999/xhtml"
+3 EndTag h:br [implied] ""
+2 Text "c" text="c"
+2 EndTag h:body "</h:body>"
+1 EndTag h:html "</h:html>"
+-- OtherRoot universal --
+After an XML declaration, a first start tag which doesn't declare the XHTML
+namespace for its own name makes the document read as HTML, even where an
+element in it declares it. Universal mode isn't for other XML: the link
+element of RSS is void.
+-- in --
+<?xml version="1.0"?>
+<rss version="2.0"><channel><link>http://example.com/</link><item xmlns="http://www.w3.org/1999/xhtml"><p>a<p>b<br></item></channel></rss>
+-- tokens --
+0 ProcInst xml "<?xml version=\"1.0\"?>" data=" version=\"1.0\""
+0 Text "\n" text="\n"
+1 StartTag rss "<rss version=\"2.0\">" ns="http://www.w3.org/1999/xhtml" version="2.0"
+2 StartTag channel "<channel>" ns="http://www.w3.org/1999/xhtml"
+3 StartTag link "<link>" ns="http://www.w3.org/1999/xhtml"
+3 EndTag link [implied] ""
+2 Text "http://example.com/" text="http://example.com/"
+2 EndTag link [stray] "</link>"
+3 StartTag item "<item xmlns=\"http://www.w3.org/1999/xhtml\">" ns="http://www.w3.org/1999/xhtml" xmlns="http://www.w3.org/1999/xhtml"
+4 StartTag p "<p>" ns="http://www.w3.org/1999/xhtml"
+4 Text "a" text="a"
+4 EndTag p [implied] ""
+4 StartTag p "<p>" ns="http://www.w3.org/1999/xhtml"
+4 Text "b" text="b"
+5 StartTag br "<br>" ns="http://www.w3.org/1999/xhtml"
+5 EndTag br [implied] ""
+4 EndTag p [implied] ""
+3 EndTag item "</item>"
+2 EndTag channel "</channel>"
+1 EndTag rss "</rss>"
+-- TextBeforeRoot universal --
+After an XML declaration, text other than whitespace before the first tag
+makes the document read as HTML.
+-- in --
+<?xml version="1.0"?>
+
+&#32;<!--c-->x<html xmlns="http://www.w3.org/1999/xhtml"><p>a<p>b</html>
+-- tokens --
+0 ProcInst xml "<?xml version=\"1.0\"?>" data=" version=\"1.0\""
+0 Text "\n\n&#32;" text="\n\n "
+0 Comment "<!--c-->" text="c"
+0 Text "x" text="x"
+1 StartTag html "<html xmlns=\"http://www.w3.org/1999/xhtml\">" ns="http://www.w3.org/1999/xhtml" xmlns="http://www.w3.org/1999/xhtml"
+2 StartTag p "<p>" ns="http://www.w3.org/1999/xhtml"
+2 Text "a" text="a"
+2 EndTag p [implied] ""
+2 StartTag p "<p>" ns="http://www.w3.org/1999/xhtml"
+2 Text "b" text="b"
+2 EndTag p [implied] ""
+1 EndTag html "</html>"
+-- PrologComments universal --
+Comments before the first tag end like in HTML parsers, also at "--!>", and
+<!--> is an empty comment. In the document, they follow XML rules.
+-- in --
+<?xml version="1.0"?>
+<!--a--!><!--><html xmlns="http://www.w3.org/1999/xhtml"><!--b--!>c--></html>
+-- tokens --
+0 ProcInst xml "<?xml version=\"1.0\"?>" data=" version=\"1.0\""
+0 Text "\n" text="\n"
+0 Comment "<!--a--!>" text="a"
+0 Comment "<!-->" text=""
+1 StartTag html "<html xmlns=\"http://www.w3.org/1999/xhtml\">" ns="http://www.w3.org/1999/xhtml" xmlns="http://www.w3.org/1999/xhtml"
+1 Comment "<!--b--!>c-->" text="b--!>c"
+1 EndTag html "</html>"

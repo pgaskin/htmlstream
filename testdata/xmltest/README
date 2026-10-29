@@ -1,0 +1,4 @@
+xmltest.zip is James Clark's XML test cases, version 1998-11-18, from
+ftp://ftp.jclark.com/pub/xml/xmltest.zip. Its license (xmltest/readme.html in
+the zip) only allows redistributing the zip unmodified, so xmltest.go reads it
+directly. See xmltest_test.go.

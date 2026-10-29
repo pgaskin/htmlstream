@@ -1,0 +1,147 @@
+Prefixed names which XML and HTML parsers put in different namespaces
+(with warnings) or in the same namespaces, namespace declarations, and
+lang and xml:lang.
+-- ElementNamedXmlns --
+-- in --
+<xmlns>x</xmlns><svg><xmlns/></svg>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><xmlns>x</xmlns><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><xmlns></xmlns></svg></body></html>
+-- UndeclaredPrefix htmldiff --
+-- in --
+<p>a<o:p>b</o:p>c
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p>abc</p></body></html>
+-- warn --
+4: dropped element "o:p" (can't be represented in XML)
+-- ReopenedPrefixedAttr htmldiff --
+A formatting element reopened outside the element declaring the
+prefix of its attribute declares the prefix itself (once, also
+when the prefix is bound to another namespace there).
+-- in --
+<a xmlns:x=0><b x:a=""></a>c<div xmlns:x=1>d</div>e<p xmlns:y=2><i y:b=""><u>f</p>g
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><a xmlns:x="0"><b x:a=""></b></a><b x:a="" xmlns:x="0">c<div xmlns:x="1">d</div>e<p xmlns:y="2"><i y:b=""><u>f</u></i></p><i y:b="" xmlns:y="2"><u>g</u></i></b></body></html>
+-- warn --
+13: attribute "x:a" is in namespace "0" for XML parsers and in no namespace for HTML parsers (will not warn again for this prefix and namespace)
+27: reopened b declares the prefix "x" of its attributes (the prefix isn't bound to namespace "0" where it's reopened, and HTML parsers will see an extra xmlns:x attribute when parsing the output)
+64: attribute "y:b" is in namespace "2" for XML parsers and in no namespace for HTML parsers (will not warn again for this prefix and namespace)
+82: reopened i declares the prefix "y" of its attributes (the prefix isn't bound to namespace "2" where it's reopened, and HTML parsers will see an extra xmlns:y attribute when parsing the output)
+-- Lang --
+-- in --
+<html lang=fr><p lang=de>x
+-- out --
+<!DOCTYPE html><html lang="fr" xmlns="http://www.w3.org/1999/xhtml" xml:lang="fr"><head><meta charset="UTF-8" /></head><body><p lang="de" xml:lang="de">x</p></body></html>
+-- DeclaredPrefixAttr --
+-- in --
+<p xmlns:x="u" x:a="1">x<span x:b="2">y</span></p>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p xmlns:x="u" x:a="1">x<span x:b="2">y</span></p></body></html>
+-- warn --
+0: attribute "x:a" is in namespace "u" for XML parsers and in no namespace for HTML parsers (will not warn again for this prefix and namespace)
+-- EPUBType --
+-- in --
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops"><head><title>t</title></head><body><nav epub:type="toc"><ol><li><a href="#a">a</a></li></ol></nav><section epub:type="chapter" id="a"><p>x</p></section></body></html>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops"><head><meta charset="UTF-8" /><title>t</title></head><body><nav epub:type="toc"><ol><li><a href="#a">a</a></li></ol></nav><section epub:type="chapter" id="a"><p>x</p></section></body></html>
+-- warn --
+120: attribute "epub:type" is in namespace "http://www.idpf.org/2007/ops" for XML parsers and in no namespace for HTML parsers (will not warn again for this prefix and namespace)
+-- XLinkOnHTML --
+-- in --
+<p xlink:href="#a">x</p>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p xlink:href="#a" xmlns:xlink="http://www.w3.org/1999/xlink">x</p></body></html>
+-- warn --
+0: attribute "xlink:href" is in namespace "http://www.w3.org/1999/xlink" for XML parsers and in no namespace for HTML parsers (will not warn again for this prefix and namespace)
+-- XMLLangOnly --
+mirrored to lang
+-- in --
+<p xml:lang="fr">x</p>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p xml:lang="fr" lang="fr">x</p></body></html>
+-- LangXMLLangDiffer --
+HTML parsers use lang, so xml:lang gets its value
+-- in --
+<p xml:lang="fr" LANG="en">x</p>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p xml:lang="en" lang="en">x</p></body></html>
+-- warn --
+0: wrote xml:lang differing from lang with the value of lang (to match the lang HTML parsers use) (will not warn again)
+-- DeclaredPrefixElement --
+-- in --
+<div xmlns:o="urn:o"><p>a<o:p></o:p></p></div>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><div xmlns:o="urn:o"><p>a<o:p></o:p></p></div></body></html>
+-- warn --
+25: element "o:p" is in namespace "urn:o" for XML parsers and in namespace "http://www.w3.org/1999/xhtml" for HTML parsers (will not warn again for this prefix and namespace)
+-- PrefixedSVG --
+-- in --
+<svg:svg xmlns:svg="http://www.w3.org/2000/svg"><svg:rect/></svg:svg>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><svg:svg xmlns:svg="http://www.w3.org/2000/svg"><svg:rect></svg:rect></svg:svg></body></html>
+-- warn --
+0: element "svg:svg" is in namespace "http://www.w3.org/2000/svg" for XML parsers and in namespace "http://www.w3.org/1999/xhtml" for HTML parsers (will not warn again for this prefix and namespace)
+-- PrefixedSVGInSVG --
+the same tree for HTML parsers, but not for XML parsers
+-- in --
+<svg xmlns:svg="http://www.w3.org/2000/svg"><svg:a></svg:a></svg>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><svg xmlns:svg="http://www.w3.org/2000/svg" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><svg:a></svg:a></svg></body></html>
+-- warn --
+44: element "svg:a" is named "a" for XML parsers and "svg:a" for HTML parsers (will not warn again for this prefix and namespace)
+-- DeclaredPrefixInSVG --
+-- in --
+<svg xmlns:x="u"><x:g/></svg>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><svg xmlns:x="u" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><x:g></x:g></svg></body></html>
+-- warn --
+17: element "x:g" is in namespace "u" for XML parsers and in namespace "http://www.w3.org/2000/svg" for HTML parsers (will not warn again for this prefix and namespace)
+-- ForeignXLinkXML --
+-- in --
+<svg xml:lang="en" xml:space="preserve"><use xlink:href="#a" xlink:title="t"/></svg><math xml:lang="en"><mi xlink:href="#b">x</mi></math>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><svg xml:lang="en" xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><use xlink:href="#a" xlink:title="t"></use></svg><math xml:lang="en" xmlns="http://www.w3.org/1998/Math/MathML"><mi xlink:href="#b" xmlns:xlink="http://www.w3.org/1999/xlink">x</mi></math></body></html>
+-- LangAndXMLLang --
+-- in --
+<p lang="en" xml:lang="en">x</p>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p lang="en" xml:lang="en">x</p></body></html>
+-- InvalidDeclarations htmldiff --
+dropped, leaving the prefixes unbound
+-- in --
+<div xmlns:x="u"><p xmlns:x="" x:a="1" xmlns:xml="z" xmlns:xmlns="z" xmlns:y="http://www.w3.org/XML/1998/namespace" y:b="2" xmlns:z="http://www.w3.org/2000/xmlns/">a<xmlns:q>b</xmlns:q><a xmlns:epub epub:type="c">d</a></p></div>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><div xmlns:x="u"><p>ab<a>d</a></p></div></body></html>
+-- warn --
+17: dropped namespace declaration "xmlns:x" (invalid in XML: a prefix can't be undeclared with an empty namespace name)
+17: dropped attribute "x:a" (can't be represented in XML)
+17: dropped namespace declaration "xmlns:xml" (invalid in XML: the xml prefix can't be bound to another namespace)
+17: dropped namespace declaration "xmlns:xmlns" (invalid in XML: the xmlns prefix can't be declared)
+17: dropped namespace declaration "xmlns:y" (invalid in XML: only the xml prefix can be bound to the XML namespace)
+17: dropped attribute "y:b" (can't be represented in XML)
+17: dropped namespace declaration "xmlns:z" (invalid in XML: no prefix can be bound to the xmlns namespace)
+165: dropped element "xmlns:q" (can't be represented in XML)
+185: dropped namespace declaration "xmlns:epub" (invalid in XML: a prefix can't be undeclared with an empty namespace name)
+185: dropped attribute "epub:type" (can't be represented in XML)
+-- DroppedElementDeclaration htmldiff --
+-- in --
+<y:b xmlns:x="u"><p x:a="1">t</p></y:b>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p>t</p></body></html>
+-- warn --
+0: dropped element "y:b" (can't be represented in XML)
+17: dropped attribute "x:a" (can't be represented in XML)
+-- RepeatedExpandedName htmldiff --
+-- in --
+<div xmlns:x="u" xmlns:y="u" x:a="1" y:a="2"></div>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><div xmlns:x="u" xmlns:y="u" x:a="1"></div></body></html>
+-- warn --
+0: attribute "x:a" is in namespace "u" for XML parsers and in no namespace for HTML parsers (will not warn again for this prefix and namespace)
+0: dropped attribute "y:a" (same namespace and local name as another attribute for XML parsers)
+-- UndeclaredXLink --
+-- in --
+<svg xmlns:xlink=""><use xlink:href="#a"/></svg>
+-- out --
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><use xlink:href="#a"></use></svg></body></html>
+-- warn --
+0: dropped namespace declaration "xmlns:xlink" (invalid in XML: a prefix can't be undeclared with an empty namespace name)

@@ -1,0 +1,63 @@
+Character and entity references.
+-- Predefined --
+-- in --
+<a b="&lt;&amp;">&amp;&lt;&gt;&quot;&apos;&#38;&#x26;</a>
+-- tokens --
+1 StartTag a "<a b=\"&lt;&amp;\">" b="<&"
+1 Text "&amp;&lt;&gt;&quot;&apos;&#38;&#x26;" text="&<>\"'&&"
+1 EndTag a "</a>"
+-- HTMLNamed --
+-- in --
+<a b="&nbsp;">&nbsp;&copy;&AMP;</a>
+-- tokens --
+1 StartTag a "<a b=\"&nbsp;\">" b="\u00a0"
+1 Text "&nbsp;&copy;&AMP;" text="\u00a0©&"
+1 EndTag a "</a>"
+-- Undeclared --
+-- in --
+<a b="&foo;">&foo;&bar &#65</a>
+-- tokens --
+1 StartTag a "<a b=\"&foo;\">" b="&foo;"
+1 Text "&foo;&bar &#65" text="&foo;&bar &#65"
+1 EndTag a "</a>"
+-- Invalid --
+-- in --
+<a>&#0;&#xD800;&#x110000;&#x85;&#1;</a>
+-- tokens --
+1 StartTag a "<a>"
+1 Text "&#0;&#xD800;&#x110000;&#x85;&#1;" text="���\u0085\x01"
+1 EndTag a "</a>"
+-- Whitespace --
+-- in quoted --
+"<a b=\"&#10;&#9;x&#13;\" c=\"\tx\r\ny\n\"/>"
+-- tokens --
+0 StartTag a [self-closing] "<a b=\"&#10;&#9;x&#13;\" c=\"\tx\r\ny\n\"/>" b="\n\tx\r" c=" x y "
+-- PrefixUniversal universal --
+In documents read as HTML, elements with a prefix are read like in HTML mode,
+declared or not: references don't need a semicolon, and attribute values
+aren't normalized. In documents following XML rules, they do and are.
+-- in --
+<x:y a="&copy x	y">&copy x &copy;</x:y><p a="&copy x	y">&copy x</p><x:z xmlns:x="urn:x" a="&copy x	y">&copy x</x:z>
+-- tokens --
+1 StartTag x:y "<x:y a=\"&copy x\ty\">" ns="http://www.w3.org/1999/xhtml" a="© x\ty"
+1 Text "&copy x &copy;" text="© x ©"
+1 EndTag x:y "</x:y>"
+1 StartTag p "<p a=\"&copy x\ty\">" ns="http://www.w3.org/1999/xhtml" a="© x\ty"
+1 Text "&copy x" text="© x"
+1 EndTag p "</p>"
+1 StartTag x:z "<x:z xmlns:x=\"urn:x\" a=\"&copy x\ty\">" ns="http://www.w3.org/1999/xhtml" xmlns:x="urn:x" a="© x\ty"
+1 Text "&copy x" text="© x"
+1 EndTag x:z "</x:z>"
+-- PrefixUniversalXHTML universal --
+-- in --
+<?xml version="1.0"?><html xmlns="http://www.w3.org/1999/xhtml"><x:y a="&copy x	y">&copy x &copy;</x:y><p a="&copy x	y">&copy x</p></html>
+-- tokens --
+0 ProcInst xml "<?xml version=\"1.0\"?>" data=" version=\"1.0\""
+1 StartTag html "<html xmlns=\"http://www.w3.org/1999/xhtml\">" ns="http://www.w3.org/1999/xhtml" xmlns="http://www.w3.org/1999/xhtml"
+2 StartTag x:y "<x:y a=\"&copy x\ty\">" a="&copy x y"
+2 Text "&copy x &copy;" text="&copy x ©"
+2 EndTag x:y "</x:y>"
+2 StartTag p "<p a=\"&copy x\ty\">" ns="http://www.w3.org/1999/xhtml" a="&copy x y"
+2 Text "&copy x" text="&copy x"
+2 EndTag p "</p>"
+1 EndTag html "</html>"

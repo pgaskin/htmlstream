@@ -1,0 +1,38 @@
+<a b c=d e='f'g>
+<a b=c/>
+<a b='c'/>
+<a/b>
+<a / b>
+<br/ >
+<br/>
+<a b=c/ b=c/>
+<a b="1" B="2">
+<a =b>
+<a ==b>
+<a b==c>
+<a b= >
+<a b=>x
+<a b="c"d="e">
+<a b<c=d>
+<a b"c=d'e>
+<a b=`c`>
+<a b='c>d'>
+<a\x00b c\x00=d\x00>
+<1>x
+< a>x
+<a
+<a b="c
+<a b
+<A HREF=X>
+<a\tb\nc\fd\re>
+<a/>
+<a///>
+<a b=/>
+<svg viewBox="0 0 1 1"><foreignObject></foreignObject></svg>
+<a b=c d>
+<a b='c' / d>
+<p a=b
+<x:y z:w="1">
+<a b="&amp=&amp;=&lt">
+<\x80>
+<a\x80>

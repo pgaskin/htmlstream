@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?><a/>
+<?xml version="1.1"?><a/>
+<?xml version='1.0' encoding='ISO-8859-1'?><a/>
+\xef\xbb\xbf<a/>
+<!DOCTYPE x [<!ENTITY a "b>"><!-- > -->]><x>&a;</x>
+<!DOCTYPE x "a>b"><x/>
+<a><![CDATA[x<y]]>&amp;</a>
+<a><![CDATA[x</a>
+<a>]]></a>
+<a>&#0;</a>
+<a>&#xD800;&#x41;&#X41;&#65</a>
+<a>&nbsp;&foo;&amp</a>
+<a b="x<y"/>
+<a b="x\r\ny\tz"/>
+<a b=c d/>
+<a href=/foo>x</a>
+<a b='1' b='2'/>
+<a><!-- a -- b --></a>
+<a><!--->--></a>
+<a></b>
+</a>
+<a:b:c/>
+<?>
+<? x?>
+<?pi a?>?>
+<A></a>
+<br><p>x</p>
+<script>if (a<b) x();</script>
+<a>&lt;</a >
+<a/ >
+<1/>
+<a>\f</a>
+<a\f/>
+<![if x]>

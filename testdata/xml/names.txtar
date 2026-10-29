@@ -1,0 +1,80 @@
+Element and attribute names, namespaces and attribute syntax.
+-- Namespaces --
+-- in --
+<x:a xmlns:x="urn:x" xmlns="urn:d" x:b='1'  c = "2"
+	d="3"><b/><y:c xmlns:y="urn:y"/></x:a>
+-- tokens --
+1 StartTag x:a "<x:a xmlns:x=\"urn:x\" xmlns=\"urn:d\" x:b='1'  c = \"2\"\n\td=\"3\">" ns="urn:x" xmlns:x="urn:x" xmlns="urn:d" x:b="1" c="2" d="3"
+1 StartTag b [self-closing] "<b/>" ns="urn:d"
+1 StartTag y:c [self-closing] "<y:c xmlns:y=\"urn:y\"/>" ns="urn:y" xmlns:y="urn:y"
+1 EndTag x:a "</x:a>"
+-- Case --
+-- in --
+<A><a>x</a><B>y</b></B></A>
+-- tokens --
+1 StartTag A "<A>"
+2 StartTag a "<a>"
+2 Text "x" text="x"
+2 EndTag a "</a>"
+2 StartTag B "<B>"
+2 Text "y" text="y"
+2 EndTag b [stray] "</b>"
+2 EndTag B "</B>"
+1 EndTag A "</A>"
+-- UndeclaredPrefix --
+-- in --
+<p:a q:b="1"/>
+-- tokens --
+0 StartTag p:a [self-closing] "<p:a q:b=\"1\"/>" q:b="1"
+-- DuplicateAttributes --
+-- in --
+<a b="1" b='2' B="3"/>
+-- tokens --
+0 StartTag a [self-closing] "<a b=\"1\" b='2' B=\"3\"/>" b="1" b="2" B="3"
+-- NoSpaceBetweenAttributes --
+-- in --
+<a b="1"c='2'/>
+-- tokens --
+0 StartTag a [self-closing] "<a b=\"1\"c='2'/>" b="1" c="2"
+-- WhitespaceInTags --
+-- in --
+<a
+  b="1"
+/><c	></c
+>
+-- tokens --
+0 StartTag a [self-closing] "<a\n  b=\"1\"\n/>" b="1"
+1 StartTag c "<c\t>"
+1 EndTag c "</c\n>"
+-- NonASCII --
+-- in --
+<été ñ="1">x</été>
+-- tokens --
+1 StartTag été "<été ñ=\"1\">" ñ="1"
+1 Text "x" text="x"
+1 EndTag été "</été>"
+-- NameCharacters --
+-- in --
+<_a :b="1" c-d.e="2"><a:b:c/></_a>
+-- tokens --
+1 StartTag _a "<_a :b=\"1\" c-d.e=\"2\">" :b="1" c-d.e="2"
+1 StartTag a:b:c [self-closing] "<a:b:c/>"
+1 EndTag _a "</_a>"
+-- Unquoted --
+-- in --
+<a b=1 c d= e/>
+-- tokens --
+1 StartTag a "<a b=1 c d= e/>" b="1" c="" d="e/"
+1 EndTag a [implied] [unsound] ""
+-- Values --
+-- in --
+<a b="x>y" c='"' d="'"/>
+-- tokens --
+0 StartTag a [self-closing] "<a b=\"x>y\" c='\"' d=\"'\"/>" b="x>y" c="\"" d="'"
+-- NotNames --
+-- in --
+<a><1/>< b/><-c/></a>
+-- tokens --
+1 StartTag a "<a>"
+1 Text "<1/>< b/><-c/>" text="<1/>< b/><-c/>"
+1 EndTag a "</a>"

@@ -1,0 +1,145 @@
+Inputs found by fuzzing, without expected outputs, named by their corpus
+files.
+-- 00fd0f5eac4642f5 --
+-- in --
+<Xmlns>
+-- 06ba873dea8d9aa2 --
+-- in --
+<p><A></p><tABle>0
+-- 0fa727d68c5f862c --
+-- in --
+<nosCript><A></nosCript>00
+-- 11f9af12b4f2a82e --
+-- in --
+0<BodY><A></BodY>0
+-- 1d15856760955909 --
+-- in --
+<sCript><!--<sCript</sCript>0
+-- 2997821412e39e10 --
+-- in --
+<B><u A><u></B></u>00
+-- 2b0700351a454c89 --
+-- in --
+<svg><foreignOBjeCt><p><A></p>0</svg>0
+-- 2fa58569d4998e0e --
+-- in quoted --
+"<metA http-equiv=Content-tYpe\v>"
+-- 33369fe1b003f9aa --
+-- in --
+<pre></A>
+00
+-- 3de6560cae232741 --
+-- in quoted --
+"<html>0<A></html> "
+-- 40f4c08118ecaf1c --
+-- in quoted --
+"<templAte><Colgroup>0<!0> "
+-- 42dd8cc0e09e2c00 --
+-- in --
+<A Xmlns:X=0><B 000=""X:A 000000000000000000000000000000><A 00000000>
+-- 536668a3e9d3f8b1 --
+-- in --
+<pre><A>
+00
+-- 54092db52a640dde --
+-- in quoted --
+"<BodY></BodY> <html>0<A>0</html> "
+-- 5c11187460e2c92b --
+-- in quoted --
+"<BodY><A>0</BodY> \x00"
+-- 6395db35c6dd31c9 --
+-- in quoted --
+"<html><BodY></BodY> 0<A>0</html> "
+-- 66b65e1872a0f667 --
+-- in --
+<p><A>0<p><A>00000
+-- 76e21037706ad01f --
+-- in --
+<seleCt>000000000000000000000000000000000000000000000<p><A A>000000000000000<p>0<optgroup>
+-- 7e686d58887c5ab8 --
+-- in --
+<nosCript>00
+-- 7f3f82c1f3c8d0f2 --
+-- in --
+<sCript>0</sCript</sCript>
+-- 80bb2b8951d30c78 --
+-- in --
+<A0ܓ0>
+-- 815bf9c4196af09f --
+-- in --
+<AЋ>0
+-- 885d0794ca81c765 --
+-- in quoted --
+"<templAte><tr></tr><A><tr></tr> "
+-- 8f3954c3a87dbb59 --
+-- in --
+<sCript><!--0<<sCript </sCript
+-- 8f691fb6402ddb7b --
+-- in --
+0<p>0<i>0<ul>0</ul><i>0
+-- 9c49bd6931078554 --
+-- in --
+<templAte><td></td><tt><td></templAte>0
+-- ad09b5dd3a562a14 --
+-- in quoted --
+"<A lAng=\x1e>"
+-- b02978b14715fb78 --
+-- in quoted --
+"<p><A>0000<pre>\n</B>\r"
+-- c271f3217314626b --
+-- in --
+<nosCript></html> 0000000
+-- c47d2b6d020ad3ea --
+-- in --
+<i><B><i></B>0</i>0
+-- c4b4d3f476f0b264 --
+-- in --
+<tABle><CAption><th>
+-- ce610dd8bcffbbb0 --
+-- in --
+&#00000000000000000000000000000010A
+-- d8430350ddb285a1 --
+-- in quoted --
+"<templAte><r><A></r> "
+-- df05a08dee4c857b --
+-- in quoted --
+"<p><A><pre>\r"
+-- f42f0dd5fc7d7e6b --
+-- in --
+<pre>&#XDX
+-- ff9ae943c0cd2af8 --
+-- in --
+<html><A ></html>0
+-- fff3249205588ae1 --
+-- in --
+00000000000000000000<p><A><p><B></p>0
+-- foreign-template --
+-- in --
+<svg><foreignObject><div><template>a</template>b</div></foreignObject></svg>c
+-- textarea-cr --
+-- in --
+<textarea>&#13;x
+-- dropped-slash --
+-- in --
+<svg dX dX=/>00
+-- 27ffd7396a7a3ef5 --
+-- in --
+0<nosCript>>
+-- 41aa781c3f3bee51 --
+-- in --
+<mAth><ms><A!><mAlignmArk>
+-- 8bd493b2030c6a41 --
+-- in --
+<seleCt><A><p><C><option>
+-- b1b6e44f7f8e5bfa --
+-- in --
+<A><option><B><option>
+-- c4db2a0ab46d0eb1 --
+-- in --
+<mAth><A><AnnotAtion-Xml><svg >
+-- f26b48b68c82ca33 --
+-- in --
+<mAth><ms><C><mAlignmArk>
+-- 36a5dc522bb7e226 --
+-- in --
+0000<templAte><td></td><A00000><td A00>

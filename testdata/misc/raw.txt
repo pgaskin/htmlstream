@@ -1,0 +1,20 @@
+<script>a<b>c</SCRIPT>d
+<script>x</script >y
+<script>x</script/>y
+<script>x</scriptx>y</script>
+<script>x</script
+<script><!--<script></script>--></script>z
+<script><!--<script>x</script>y--></script>z
+<script><!-- </script> --></script>
+<style><!--</style>-->
+<title>a&amp;b<i>c</i></title>
+<textarea>&lt;</textarea>
+<xmp>&amp;<b></xmp>
+<plaintext>a</plaintext><b>
+<script/>x</script>
+<noscript><b></noscript>
+<iframe><b></iframe>
+<script></script>
+<svg><title><b></title></svg>
+<SCRIPT>a</sCrIpT>
+<scriptx>a<b>

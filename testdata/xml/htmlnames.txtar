@@ -1,0 +1,132 @@
+Elements named like HTML elements with special parsing rules are ordinary
+elements in XML mode.
+-- RawText --
+-- in --
+<r><script>a<b/>&amp;</script><style>&lt;</style><xmp><x/></xmp><iframe><i/></iframe><noscript><n/></noscript><plaintext><p/></plaintext></r>
+-- tokens --
+1 StartTag r "<r>"
+2 StartTag script "<script>"
+2 Text "a" text="a"
+2 StartTag b [self-closing] "<b/>"
+2 Text "&amp;" text="&"
+2 EndTag script "</script>"
+2 StartTag style "<style>"
+2 Text "&lt;" text="<"
+2 EndTag style "</style>"
+2 StartTag xmp "<xmp>"
+2 StartTag x [self-closing] "<x/>"
+2 EndTag xmp "</xmp>"
+2 StartTag iframe "<iframe>"
+2 StartTag i [self-closing] "<i/>"
+2 EndTag iframe "</iframe>"
+2 StartTag noscript "<noscript>"
+2 StartTag n [self-closing] "<n/>"
+2 EndTag noscript "</noscript>"
+2 StartTag plaintext "<plaintext>"
+2 StartTag p [self-closing] "<p/>"
+2 EndTag plaintext "</plaintext>"
+1 EndTag r "</r>"
+-- RCDATA --
+-- in --
+<r><title><t/>&amp;</title><textarea>&amp;</textarea></r>
+-- tokens --
+1 StartTag r "<r>"
+2 StartTag title "<title>"
+2 StartTag t [self-closing] "<t/>"
+2 Text "&amp;" text="&"
+2 EndTag title "</title>"
+2 StartTag textarea "<textarea>"
+2 Text "&amp;" text="&"
+2 EndTag textarea "</textarea>"
+1 EndTag r "</r>"
+-- Void --
+-- in --
+<r><br>x</br><img>y</img><input/></r>
+-- tokens --
+1 StartTag r "<r>"
+2 StartTag br "<br>"
+2 Text "x" text="x"
+2 EndTag br "</br>"
+2 StartTag img "<img>"
+2 Text "y" text="y"
+2 EndTag img "</img>"
+1 StartTag input [self-closing] "<input/>"
+1 EndTag r "</r>"
+-- ImpliedEndTags --
+-- in --
+<r><p>a<p>b</p></p><li>x<li>y</li></li><td>c<td>d</td></td><option>e<option>f</option></option><h1><h2></h2></h1></r>
+-- tokens --
+1 StartTag r "<r>"
+2 StartTag p "<p>"
+2 Text "a" text="a"
+3 StartTag p "<p>"
+3 Text "b" text="b"
+3 EndTag p "</p>"
+2 EndTag p "</p>"
+2 StartTag li "<li>"
+2 Text "x" text="x"
+3 StartTag li "<li>"
+3 Text "y" text="y"
+3 EndTag li "</li>"
+2 EndTag li "</li>"
+2 StartTag td "<td>"
+2 Text "c" text="c"
+3 StartTag td "<td>"
+3 Text "d" text="d"
+3 EndTag td "</td>"
+2 EndTag td "</td>"
+2 StartTag option "<option>"
+2 Text "e" text="e"
+3 StartTag option "<option>"
+3 Text "f" text="f"
+3 EndTag option "</option>"
+2 EndTag option "</option>"
+2 StartTag h1 "<h1>"
+3 StartTag h2 "<h2>"
+3 EndTag h2 "</h2>"
+2 EndTag h1 "</h1>"
+1 EndTag r "</r>"
+-- DocumentElements --
+-- in --
+<html><head> <title>x</title></head><body><head/>y</body><body/></html>
+-- tokens --
+1 StartTag html "<html>"
+2 StartTag head "<head>"
+2 Text " " text=" "
+3 StartTag title "<title>"
+3 Text "x" text="x"
+3 EndTag title "</title>"
+2 EndTag head "</head>"
+2 StartTag body "<body>"
+2 StartTag head [self-closing] "<head/>"
+2 Text "y" text="y"
+2 EndTag body "</body>"
+1 StartTag body [self-closing] "<body/>"
+1 EndTag html "</html>"
+-- Tables --
+-- in --
+<table><tr>x</tr><div/></table>
+-- tokens --
+1 StartTag table "<table>"
+2 StartTag tr "<tr>"
+2 Text "x" text="x"
+2 EndTag tr "</tr>"
+1 StartTag div [self-closing] "<div/>"
+1 EndTag table "</table>"
+-- Foreign --
+-- in --
+<r><svg><p>x</p><![CDATA[y]]></svg><math><mi><div/></mi></math></r>
+-- tokens --
+1 StartTag r "<r>"
+2 StartTag svg "<svg>"
+3 StartTag p "<p>"
+3 Text "x" text="x"
+3 EndTag p "</p>"
+2 CDATA "<![CDATA[y]]>" text="y"
+2 EndTag svg "</svg>"
+2 StartTag math "<math>"
+3 StartTag mi "<mi>"
+3 StartTag div [self-closing] "<div/>"
+3 EndTag mi "</mi>"
+2 EndTag math "</math>"
+1 EndTag r "</r>"

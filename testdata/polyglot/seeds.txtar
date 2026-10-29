@@ -1,0 +1,163 @@
+Hand-written fuzz seeds, without expected outputs.
+-- Foreign1 --
+-- in --
+<svg><g><rect/><foreignObject><p>x</p><svg><circle/></svg></foreignObject></g></svg>
+-- Foreign2 --
+-- in --
+<math><mi>x</mi><mo>+</mo><mtext><b>y</b></mtext><annotation-xml encoding="application/xhtml+xml"><div>z</div></annotation-xml></math>
+-- Foreign3 --
+-- in --
+<svg><desc><i>a</svg>b<svg><title>t</title><textPath/></svg>
+-- Foreign4 --
+-- in --
+<math><ms><mglyph/><malignmark/></ms><annotation-xml><svg><g/></svg></annotation-xml></math>
+-- Foreign5 --
+-- in --
+<svg><font color=red>x</font><g><font>y</font></g></svg>
+-- Foreign6 --
+-- in --
+<p><svg><g><div>x</div></g></svg>
+-- Foreign7 --
+-- in --
+<svg><![CDATA[a<b]]><g>c</g></svg>
+-- Foreign8 --
+-- in --
+<svg viewBox="0 0 1 1" xml:space=preserve><a xlink:href=#x>l</a></svg>
+-- Foreign9 --
+-- in --
+<svg><filter><feDropShadow dx=1 /><fedropshadow>x</fedropshadow></filter></svg>
+-- Tables1 --
+-- in --
+<table><caption>c<table><tr><td>x</table>y</caption><colgroup><col></colgroup><thead><tr><th>h<tbody><tr><td>d<tfoot><tr><td>f</table>
+-- Tables2 --
+-- in --
+<table><tr><td><table><tr><td>in</td></tr></table>out</td></tr></table>
+-- Tables3 --
+-- in --
+<table><td>a<td>b</tr><tr><td>c</td></table>
+-- Tables4 --
+-- in --
+<table><tbody><tr><td><p>x</table>y
+-- Tables5 --
+-- in --
+<table><col span=2><tr><td>x</td></tr></table>
+-- Tables6 --
+-- in --
+<table><tr><td><b>x</td><td>y</b></td></tr></table>
+-- Tables7 --
+-- in --
+<table><tr><td><form><input></form></td></tr></table>
+-- Tables8 --
+-- in --
+<select><option>a<option>b<optgroup><option>c</select>
+-- Formatting1 --
+-- in --
+<b><i><u>x</b>y</i>z</u>
+-- Formatting2 --
+-- in --
+<a href=x><b>1</a>2</b>
+-- Formatting3 --
+-- in --
+<p><b class=x><i>1</p>2</i>3</b>
+-- Formatting4 --
+-- in --
+<b>1<div>2</div>3</b>
+-- Formatting5 --
+-- in --
+<nobr>a<nobr>b</nobr>c
+-- Formatting6 --
+-- in --
+<font size=2><p>x</font>y
+-- Formatting7 --
+-- in --
+<em><strong>x</em></strong>
+-- Formatting8 --
+-- in --
+<s><strike><tt>x</s>y
+-- Formatting9 --
+-- in --
+<ul><li><b>a<li>b</ul>c
+-- Formatting10 --
+-- in --
+<dl><dt><i>a<dd>b</dl>
+-- HeadBody1 --
+-- in --
+<html><head><title>t</title><meta charset=utf-8><link rel=x><style>p{}</style><script>s</script><base href=/></head><body>b</body></html>
+-- HeadBody2 --
+-- in --
+<head><title>t</title></head><body><p>x</p></body><p>y
+-- HeadBody3 --
+-- in --
+<title>a</title><meta name=x><p>b<meta name=y>
+-- HeadBody4 --
+-- in --
+0<meta charset>00<meta charset=utf-8>0<meta http-equiv=content-type content=x>0
+-- HeadBody5 --
+-- in --
+<html lang=en><body class=a><html id=x><body id=y>
+-- HeadBody6 --
+-- in --
+<head></head><title>after</title><body>x
+-- HeadBody7 --
+-- in --
+<!doctype html><html><!--c--><head></head><!--d--><body></body><!--e--></html><!--f-->
+-- HeadBody8 --
+-- in quoted --
+" <html> <head> <title>x</title> </head> <body> y </body> </html> "
+-- HeadBody9 --
+-- in --
+<noscript><p>x</p></noscript><head><noscript><link rel=x></noscript>
+-- HeadBody10 --
+-- in --
+<template><td>x</td><tr><td>y</template><p>z
+-- HeadBody11 --
+-- in --
+<frameset><frame></frameset>
+-- HeadBody12 --
+-- in --
+x</body>y</html>z<p>w
+-- Misc1 --
+-- in --
+<pre>
+a</pre><textarea>
+
+b</textarea>
+-- Misc2 --
+-- in --
+<p>a<h1>b<h2>c</h1>d</h2>
+-- Misc3 --
+-- in --
+<button>a<button>b</button>
+-- Misc4 --
+-- in --
+<ruby>a<rb>b<rt>c<rp>d<rtc>e</ruby>
+-- Misc5 --
+-- in --
+<p>a<address>b</address><p>c<hr>d<p>e<listing>f</listing>
+-- Misc6 --
+-- in --
+<div><p>a</div>b</p>
+-- Misc7 --
+-- in --
+<image src=x><isindex><keygen><menuitem>
+-- Misc8 --
+-- in --
+<plaintext>a</plaintext><b>
+-- Misc9 --
+-- in --
+<script type=module>if (a<b) {}</script><script type=text/x-template><b>x</b></script>
+-- Misc10 --
+-- in --
+<p title="a&quot;b" data-x='&lt;'>&amp;&#0;&#x110000;&#128;</p>
+-- Misc11 --
+-- in quoted --
+"<p>a\r\nb\rc</p>"
+-- Misc12 --
+-- in --
+<body><div><p>x</body>
+</html>
+<!--c-->
+-- NULNames1 --
+NUL in names, which HTML parsers replace with U+FFFD
+-- in quoted --
+"<div><p\x00 a\x00=1 A�=2>x</P�>y<b\x00>z</div>"
