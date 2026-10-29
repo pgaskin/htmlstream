@@ -111,17 +111,17 @@ func TestPolyglot(t *testing.T) {
 			if tc.XMLSyntax {
 				html = xmlSyntaxInput(t, tc.In, tc.Scripting)
 			}
-			inDOM := htmlDOMScripting(t, html, tc.Scripting)
-			outDOM := htmlDOMScripting(t, out, tc.Scripting)
+			inDOM := htmlDOMScripting(t, html, tc.Scripting, false)
+			outDOM := htmlDOMScripting(t, out, tc.Scripting, false)
 			if !tc.HTMLDiff && html != "" && inDOM != outDOM {
 				t.Errorf("HTML DOM differs (input -, output +):\n%s", domDiff(inDOM, outDOM))
 			}
 			if tc.Warn == "" {
-				xmlDOM, err := xmlDOM(out)
+				xmlDOM, err := xmlDOM(out, true)
 				if err != nil {
 					t.Fatalf("output is not well-formed XML: %v", err)
 				}
-				if xmlDOM != outDOM {
+				if outDOM := htmlDOMScripting(t, out, tc.Scripting, true); xmlDOM != outDOM {
 					t.Errorf("XML DOM differs from HTML DOM (XML -, HTML +):\n%s", domDiff(xmlDOM, outDOM))
 				}
 			}
@@ -144,14 +144,14 @@ func TestPolyglot(t *testing.T) {
 			if out = b.String(); len(warnings) != 0 {
 				return
 			}
-			if outDOM = htmlDOMScripting(t, out, tc.Scripting); html != "" && inDOM != outDOM {
+			if outDOM = htmlDOMScripting(t, out, tc.Scripting, false); html != "" && inDOM != outDOM {
 				t.Errorf("NoDoctype: HTML DOM differs (input -, output +):\n%s\noutput: %s", domDiff(inDOM, outDOM), out)
 			}
-			xmlDOM, err := xmlDOM(out)
+			xmlDOM, err := xmlDOM(out, true)
 			if err != nil {
 				t.Fatalf("NoDoctype: output is not well-formed XML: %v", err)
 			}
-			if xmlDOM != outDOM {
+			if outDOM := htmlDOMScripting(t, out, tc.Scripting, true); xmlDOM != outDOM {
 				t.Errorf("NoDoctype: XML DOM differs from HTML DOM (XML -, HTML +):\n%s", domDiff(xmlDOM, outDOM))
 			}
 		})
@@ -189,7 +189,8 @@ func domDiff(a, b string) string {
 }
 
 // The DOMs are compared as indented text, ignoring comments, doctypes,
-// whitespace-only text, namespace declarations, xml:lang, charset
+// whitespace-only text (unless space is set: the HTML and XML DOMs of the
+// output are compared with it), namespace declarations, xml:lang, charset
 // declarations, and the CDATA wrappers in scripts and styles. An HTML element
 // with xml:lang and without lang is compared as having a lang attribute with
 // the value of xml:lang, since polyglot.Convert adds it. The SVG element
@@ -197,11 +198,12 @@ func domDiff(a, b string) string {
 // it and x/net doesn't.
 
 func htmlDOM(t *testing.T, s string) string {
-	return htmlDOMScripting(t, s, false)
+	return htmlDOMScripting(t, s, false, false)
 }
 
-// htmlDOMScripting is htmlDOM with the scripting flag of the parser set.
-func htmlDOMScripting(t *testing.T, s string, scripting bool) string {
+// htmlDOMScripting is htmlDOM with the scripting flag of the parser set,
+// keeping whitespace-only text if space is set.
+func htmlDOMScripting(t *testing.T, s string, scripting, space bool) string {
 	doc, err := html.ParseWithOptions(strings.NewReader(specCaptionTh(specPreNewlines(specDoctypes(s)))), html.ParseOptionEnableScripting(scripting))
 	if err != nil {
 		t.Fatalf("html parse: %v", err)
@@ -211,7 +213,7 @@ func htmlDOMScripting(t *testing.T, s string, scripting bool) string {
 	var walk func(n *html.Node, depth int)
 	walk = func(n *html.Node, depth int) {
 		flush := func() {
-			domText(&b, depth, text.String())
+			domText(&b, depth, text.String(), space)
 			text.Reset()
 		}
 		defer flush()
@@ -438,7 +440,11 @@ func htmlNS(ns string) string {
 // script and style contents, as seen by HTML parsers ("//<![CDATA[") and XML
 // parsers ("//"). The wrappers which polyglot removes from the input are
 // removed too, so that an input with one has the same contents as the
-// output.
+// output. The whitespace at the start and the end of the contents is
+// removed: polyglot keeps the whitespace around a wrapper it removes, while
+// CutCDATAWrapper removes it, and a single line end at the start or the end
+// of the contents takes the place of the one polyglot writes after the start
+// of a wrapper or before its end.
 func normalizeRawText(s string, script bool) string {
 	s = strings.NewReplacer(`\u003c`, "<", `\u003e`, ">", `\u0026`, "&").Replace(s)
 	// polyglot doesn't remove the CDATAHTMLComment forms from modules, but
@@ -448,14 +454,17 @@ func normalizeRawText(s string, script bool) string {
 		w |= htmlutil.CDATALineComment
 	}
 	if t, ok := htmlutil.CutCDATAWrapper(s, w); ok {
-		return t
-	}
-	for _, w := range [][2]string{{"//\n", "\n//"}, {"/**/\n", "\n/**/"}} {
-		if strings.HasPrefix(s, w[0]) && strings.HasSuffix(s, w[1]) {
-			return s[len(w[0]) : len(s)-len(w[1])]
+		s = t
+	} else {
+		t := strings.Trim(s, " \t\n\f\r")
+		for _, w := range [][2]string{{"//\n", "\n//"}, {"/**/\n", "\n/**/"}} {
+			if strings.HasPrefix(t, w[0]) && strings.HasSuffix(t, w[1]) {
+				s = t[len(w[0]) : len(t)-len(w[1])]
+				break
+			}
 		}
 	}
-	return s
+	return strings.Trim(s, " \t\n\f\r")
 }
 
 func domElem(b *strings.Builder, depth int, ns, name string, attrs []string) {
@@ -474,8 +483,8 @@ func domElem(b *strings.Builder, depth int, ns, name string, attrs []string) {
 	fmt.Fprintf(b, "%s<{%s}%s %q>\n", strings.Repeat("  ", depth), ns, name, attrs)
 }
 
-func domText(b *strings.Builder, depth int, text string) {
-	if strings.TrimSpace(text) == "" {
+func domText(b *strings.Builder, depth int, text string, space bool) {
+	if text == "" || !space && strings.TrimSpace(text) == "" {
 		return
 	}
 	fmt.Fprintf(b, "%s%q\n", strings.Repeat("  ", depth), text)
@@ -573,7 +582,9 @@ func xmlNSCheck(s string) error {
 	}
 }
 
-func xmlDOM(s string) (string, error) {
+// xmlDOM returns the DOM of the XML document s like htmlDOMScripting, without
+// the text outside the root element.
+func xmlDOM(s string, space bool) (string, error) {
 	if err := xmlNSCheck(s); err != nil {
 		return "", err
 	}
@@ -587,11 +598,14 @@ func xmlDOM(s string) (string, error) {
 	depth := 0
 	flush := func() {
 		t := text.String()
-		if n := len(names); n != 0 && (names[n-1] == "script" || names[n-1] == "style") {
+		text.Reset()
+		if len(names) == 0 {
+			return
+		}
+		if n := len(names); names[n-1] == "script" || names[n-1] == "style" {
 			t = normalizeRawText(t, names[n-1] == "script")
 		}
-		domText(&b, depth, t)
-		text.Reset()
+		domText(&b, depth, t, space)
 	}
 	for {
 		tok, err := d.Token()
@@ -603,7 +617,6 @@ func xmlDOM(s string) (string, error) {
 		}
 		switch tok := tok.(type) {
 		case xml.StartElement:
-			flush()
 			var attrs []string
 			var metaAttrs [][2]string
 			dns := ""
@@ -639,15 +652,18 @@ func xmlDOM(s string) (string, error) {
 			}
 			_, drop := charsetDecl(metaAttrs)
 			skip := tok.Name.Space == htmlstream.NamespaceXHTML && tok.Name.Local == "meta" && drop
-			stack = append(stack, skip)
-			names = append(names, tok.Name.Local)
 			if !skip {
+				// the text around a skipped element is one text node, as
+				// in htmlDOMScripting
+				flush()
 				domElem(&b, depth, tok.Name.Space, tok.Name.Local, attrs)
 				depth++
 			}
+			stack = append(stack, skip)
+			names = append(names, tok.Name.Local)
 		case xml.EndElement:
-			flush()
 			if !stack[len(stack)-1] {
+				flush()
 				depth--
 			}
 			stack = stack[:len(stack)-1]

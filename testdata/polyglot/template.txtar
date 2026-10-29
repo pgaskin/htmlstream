@@ -5,20 +5,23 @@ template contents don't start the body
 -- in --
 <template><div>a</div><body class=x><html lang=y><head>b</template><head></head><template><p>c</template><p>d
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><template><div>a</div>b</template><template><p>c</p></template></head><body><p>d</p></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><template><div>a</div>b</template><template><p>c</p></template></head><body><p>d</p></body></html>
 -- TemplateTableContents --
 template contents parsed like table contents
 -- in --
 <template><tr><td>a</td></tr><tr><td>b</template><template><td>c<td>d</template><template><caption>e</caption><tbody></tbody><div>f</div></template><template><col><col></template><template><script></script><tr><td>g</template>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><template><tr><td>a</td></tr><tr><td>b</td></tr></template><template><td>c</td><td>d</td></template><template><caption>e</caption><tbody></tbody><div>f</div></template><template><col /><col /></template><template><script></script><tr><td>g</td></tr></template></head><body></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><template><tr><td>a</td></tr><tr><td>b</td></tr></template><template><td>c</td><td>d</td></template><template><caption>e</caption><tbody></tbody><div>f</div></template><template><col /><col /></template><template><script></script><tr><td>g</td></tr></template></head><body></body></html>
 -- TemplateMixedContents --
 td after tr gets an implied tr
 the same tree for HTML parsers, but not for XML parsers
 -- in --
 <template><tr></tr><td>x</td></template>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><template><tr></tr><td>x</td></template></head><body></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><template><tr></tr><td>x</td></template></head><body></body></html>
 -- warn --
 19: kept td after tr in a template (HTML parsers would have ignored it or put it in implied table elements)
 -- TemplateStrayEndTags --
@@ -28,12 +31,14 @@ child element and after col
 -- in --
 <template></p></br>x<a0></p></br></template><template><tr></tr></p></template><template><col></p></br></template><p>y<template></p></template>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><template>x<a0><p></p><br /></a0></template><template><tr></tr><p></p></template><template><col /></template></head><body><p>y<template></template></p></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><template>x<a0><p></p><br /></a0></template><template><tr></tr><p></p></template><template><col /></template></head><body><p>y<template></template></p></body></html>
 -- TemplateTablePartAfterBody htmldiff --
 -- in --
 <template><div><td>x</template>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><template><div></div><td>x</td></template></head><body></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><template><div></div><td>x</td></template></head><body></body></html>
 -- warn --
 15: kept td after div in a template (HTML parsers would have ignored it or put it in implied table elements)
 -- TemplateMisplacedCol htmldiff --
@@ -41,7 +46,8 @@ html, head and body start tags select body contents
 -- in --
 <template><html><col></template><template><body><td>x</template>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><template><col /></template><template><td>x</td></template></head><body></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><template><col /></template><template><td>x</td></template></head><body></body></html>
 -- warn --
 16: kept col after html in a template (HTML parsers would have ignored it or put it in implied table elements)
 48: kept td after body in a template (HTML parsers would have ignored it or put it in implied table elements)
@@ -49,7 +55,8 @@ html, head and body start tags select body contents
 -- in --
 <template><tr></tr><table></table></template><template><td>x</td><form></form></template>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><template><tr></tr><table></table></template><template><td>x</td><form></form></template></head><body></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><template><tr></tr><table></table></template><template><td>x</td><form></form></template></head><body></body></html>
 -- warn --
 19: kept table after tr in a template (HTML parsers would have ignored it)
 65: kept form after td in a template (HTML parsers would have ignored it)
@@ -57,19 +64,22 @@ html, head and body start tags select body contents
 -- in --
 <template><tr></tr><a><table></table></a></template><template><tr></tr><div><tr></tr></div></template>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><template><tr></tr><a><table></table></a></template><template><tr></tr><div></div><tr></tr></template></head><body></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><template><tr></tr><a><table></table></a></template><template><tr></tr><div></div><tr></tr></template></head><body></body></html>
 -- warn --
 22: kept table after tr in a template (HTML parsers would have ignored it)
 -- TemplateNestedBodyInTableContents --
 -- in --
 <template><tr></tr><a><b>x</b><svg><td></td></svg></a><tr><td><table><tr><td>y</table></template>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><template><tr></tr><a><b>x</b><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><td></td></svg></a><tr><td><table><tbody><tr><td>y</td></tr></tbody></table></td></tr></template></head><body></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><template><tr></tr><a><b>x</b><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><td></td></svg></a><tr><td><table><tbody><tr><td>y</td></tr></tbody></table></td></tr></template></head><body></body></html>
 -- TemplateTableEndTag htmldiff --
 -- in --
 <template><thead></table><template></template></template>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><template><thead><template></template></thead></template></head><body></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><template><thead><template></template></thead></template></head><body></body></html>
 -- warn --
 17: kept thead open at </table> in a template (HTML parsers would have closed it)
 -- TableEndTagOutsideTemplate --
@@ -77,36 +87,42 @@ outside a table and a template, a table end tag is ignored
 -- in --
 <caption>x</table>y
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><caption>xy</caption></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><caption>xy</caption></body></html>
 -- warn --
 0: kept caption outside a table (HTML parsers would have ignored it)
 -- TemplateTableEndTagInCell --
 -- in --
 <template><td></table>x</template>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><template><td>x</td></template></head><body></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><template><td>x</td></template></head><body></body></html>
 -- TemplateTableReopen --
 -- in --
 <template><tr></tr><a><tr></tr>0<tr></tr>1</template>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><template><tr></tr><a></a><tr></tr><a>0</a><tr></tr><a>1</a></template></head><body></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><template><tr></tr><a></a><tr></tr><a>0</a><tr></tr><a>1</a></template></head><body></body></html>
 -- TemplateEndTagClosesTable --
 the template end tag closes the table in it
 -- in --
 <!DOCTYPE html><template><table><tr><td><template><select></template>x</template><p>y
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><template><table><tbody><tr><td><template><select></select></template>x</td></tr></tbody></table></template></head><body><p>y</p></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><template><table><tbody><tr><td><template><select></select></template>x</td></tr></tbody></table></template></head><body><p>y</p></body></html>
 -- TemplateTableInBodyContents --
 -- in --
 <!DOCTYPE html><template><p>x<table><tr><td>y</table><form></form></template>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><template><p>x</p><table><tbody><tr><td>y</td></tr></tbody></table><form></form></template></head><body></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><template><p>x</p><table><tbody><tr><td>y</td></tr></tbody></table><form></form></template></head><body></body></html>
 -- TemplateColgroupText --
 the whitespace stays in the colgroup
 -- in --
 <template><colgroup> x</template>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><template><colgroup> </colgroup>x</template></head><body></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><template><colgroup> </colgroup>x</template></head><body></body></html>
 -- TemplateWhitespaceReopen --
 whitespace reopens formatting elements in template contents parsed
 as body content, also in the head and in a cell, but not in table
@@ -114,7 +130,8 @@ contents
 -- in --
 <template><r><a></r> </template><template><td><p><b></p> </td></template><body><template><p><u></p> </template>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><template><r><a></a></r><a> </a></template><template><td><p><b></b></p><b> </b></td></template></head><body><template><p><u></u></p><u> </u></template></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><template><r><a></a></r><a> </a></template><template><td><p><b></b></p><b> </b></td></template></head><body><template><p><u></u></p><u> </u></template></body></html>
 -- TemplateEndWithOpenCell htmldiff --
 A template end tag with a cell open inside the template clears the
 active formatting elements up to the cell's marker in HTML
@@ -123,7 +140,8 @@ the template, and the b from before it isn't.
 -- in --
 <template><td></td><tt><td></template>0<p><b></p><template><td></template>1
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><template><td></td><tt></tt><td></td></template></head><body>0<p><b></b></p><template><td></td></template><b>1</b></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><template><td></td><tt></tt><td></td></template></head><body>0<p><b></b></p><template><td></td></template><b>1</b></body></html>
 -- warn --
 27: closed td at </template> (HTML parsers would have kept the template's formatting marker, changing which formatting elements are reopened)
 63: closed td at </template> (HTML parsers would have kept the template's formatting marker, changing which formatting elements are reopened)
@@ -132,26 +150,30 @@ no formatting elements, so nothing differs
 -- in --
 <template><td></template>0<p><span></p><template><caption></template>1
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><template><td></td></template></head><body>0<p><span></span></p><template><caption></caption></template>1</body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><template><td></td></template></head><body>0<p><span></span></p><template><caption></caption></template>1</body></html>
 -- TemplateTableWhitespaceReopen --
 also in template contents parsed like table contents when the
 current node is the template, but not in the row
 -- in --
 <template><tr></tr><p><b></p> <tr> </tr></template>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><template><tr></tr><p><b></b></p><b> </b><tr> </tr></template></head><body></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><template><tr></tr><p><b></b></p><b> </b><tr> </tr></template></head><body></body></html>
 -- TemplateColScript htmldiff --
 -- in --
 <template><col><template></template><script></script></template>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><template><col /><template></template><script></script></template></head><body></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><template><col /><template></template><script></script></template></head><body></body></html>
 -- warn --
 36: kept script after col in a template (HTML parsers would have ignored it or put it in implied table elements)
 -- TemplateColText htmldiff --
 -- in --
 <template><col>x</template>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><template><col />x</template></head><body></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><template><col />x</template></head><body></body></html>
 -- warn --
 15: kept text after col in a template (HTML parsers would have ignored it)
 -- TemplateInColgroup --
@@ -159,4 +181,5 @@ template stays in a colgroup, explicit or implied
 -- in --
 <table><colgroup><template><col></template><col></colgroup><col><template></template><tr><td>x</table>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><table><colgroup><template><col /></template><col /></colgroup><colgroup><col /><template></template></colgroup><tbody><tr><td>x</td></tr></tbody></table></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><table><colgroup><template><col /></template><col /></colgroup><colgroup><col /><template></template></colgroup><tbody><tr><td>x</td></tr></tbody></table></body></html>

@@ -4,45 +4,52 @@ content.
 -- in --
 <svg viewbox="0 0 10 10"><foreignobject><p>x</p></foreignobject><path d="M0 0"/><use xlink:href="#a"/><lineargradient id=g gradientunits=x></lineargradient></svg>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><svg viewBox="0 0 10 10" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><foreignObject><p xmlns="http://www.w3.org/1999/xhtml">x</p></foreignObject><path d="M0 0"></path><use xlink:href="#a"></use><linearGradient id="g" gradientUnits="x"></linearGradient></svg></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><svg viewBox="0 0 10 10" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><foreignObject><p xmlns="http://www.w3.org/1999/xhtml">x</p></foreignObject><path d="M0 0"></path><use xlink:href="#a"></use><linearGradient id="g" gradientUnits="x"></linearGradient></svg></body></html>
 -- MathML --
 -- in --
 <math definitionurl=x><mi>x</mi><annotation-xml encoding="text/html"><p>y</p></annotation-xml></math>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><math definitionURL="x" xmlns="http://www.w3.org/1998/Math/MathML"><mi>x</mi><annotation-xml encoding="text/html"><p xmlns="http://www.w3.org/1999/xhtml">y</p></annotation-xml></math></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><math definitionURL="x" xmlns="http://www.w3.org/1998/Math/MathML"><mi>x</mi><annotation-xml encoding="text/html"><p xmlns="http://www.w3.org/1999/xhtml">y</p></annotation-xml></math></body></html>
 -- AnnotationXMLNamespaces --
 svg in annotation-xml is an SVG element with or without an encoding;
 mglyph is a MathML element only in MathML text integration points
 -- in --
 <math><annotation-xml><svg><g/></svg></annotation-xml><annotation-xml encoding=text/html><mglyph></mglyph><svg><g/></svg></annotation-xml><mi><mglyph/></mi></math>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><math xmlns="http://www.w3.org/1998/Math/MathML"><annotation-xml><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><g></g></svg></annotation-xml><annotation-xml encoding="text/html"><mglyph xmlns="http://www.w3.org/1999/xhtml"></mglyph><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><g></g></svg></annotation-xml><mi><mglyph></mglyph></mi></math></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><math xmlns="http://www.w3.org/1998/Math/MathML"><annotation-xml><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><g></g></svg></annotation-xml><annotation-xml encoding="text/html"><mglyph xmlns="http://www.w3.org/1999/xhtml"></mglyph><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><g></g></svg></annotation-xml><mi><mglyph></mglyph></mi></math></body></html>
 -- ForeignEndTags --
 end tags with a foreign current node close through integration points
 -- in --
 <svg><foreignObject>x</svg>a<svg><desc>x</svg>b<svg><title>x</svg>c<math><mi>x</math>d<svg><foreignObject><math><mi>x</foreignObject>e</svg>f<math><mi><svg><g>x</math>g<math><annotation-xml encoding=text/html>x</math>h
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><foreignObject>x</foreignObject></svg>a<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><desc>x</desc></svg>b<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><title>x</title></svg>c<math xmlns="http://www.w3.org/1998/Math/MathML"><mi>x</mi></math>d<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><foreignObject><math xmlns="http://www.w3.org/1998/Math/MathML"><mi>x</mi></math></foreignObject>e</svg>f<math xmlns="http://www.w3.org/1998/Math/MathML"><mi><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><g>x</g></svg></mi></math>g<math xmlns="http://www.w3.org/1998/Math/MathML"><annotation-xml encoding="text/html">x</annotation-xml></math>h</body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><foreignObject>x</foreignObject></svg>a<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><desc>x</desc></svg>b<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><title>x</title></svg>c<math xmlns="http://www.w3.org/1998/Math/MathML"><mi>x</mi></math>d<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><foreignObject><math xmlns="http://www.w3.org/1998/Math/MathML"><mi>x</mi></math></foreignObject>e</svg>f<math xmlns="http://www.w3.org/1998/Math/MathML"><mi><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><g>x</g></svg></mi></math>g<math xmlns="http://www.w3.org/1998/Math/MathML"><annotation-xml encoding="text/html">x</annotation-xml></math>h</body></html>
 -- ForeignEndTagsIgnored --
 with an HTML current node, the end tag is ignored at the integration point
 -- in --
 <svg><foreignObject><p>x</svg>a</p></foreignObject></svg><svg><foreignObject><span>x</svg>b</span></foreignObject></svg><math><mi><b>x</math>c</b></mi></math><svg><foreignObject>x</foreignObject>d</svg><svg><foreignObject><svg><g>x</foreignObject>e</svg>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><foreignObject><p xmlns="http://www.w3.org/1999/xhtml">xa</p></foreignObject></svg><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><foreignObject><span xmlns="http://www.w3.org/1999/xhtml">xb</span></foreignObject></svg><math xmlns="http://www.w3.org/1998/Math/MathML"><mi><b xmlns="http://www.w3.org/1999/xhtml">xc</b></mi></math><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><foreignObject>x</foreignObject>d</svg><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><foreignObject><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><g>x</g></svg></foreignObject>e</svg></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><foreignObject><p xmlns="http://www.w3.org/1999/xhtml">xa</p></foreignObject></svg><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><foreignObject><span xmlns="http://www.w3.org/1999/xhtml">xb</span></foreignObject></svg><math xmlns="http://www.w3.org/1998/Math/MathML"><mi><b xmlns="http://www.w3.org/1999/xhtml">xc</b></mi></math><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><foreignObject>x</foreignObject>d</svg><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><foreignObject><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><g>x</g></svg></foreignObject>e</svg></body></html>
 -- ForeignEndTagThroughHTML htmldiff --
 with an HTML current node, the end tag of the integration point itself
 is ignored too; the Reader closes through the HTML elements
 -- in --
 <svg><foreignObject><p>x</foreignobject>y</svg>z
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><foreignObject><p xmlns="http://www.w3.org/1999/xhtml">x</p></foreignObject>y</svg>z</body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><foreignObject><p xmlns="http://www.w3.org/1999/xhtml">x</p></foreignObject>y</svg>z</body></html>
 -- warn --
 24: closed HTML element p at </foreignObject> of an SVG element (HTML parsers would have ignored the end tag)
 -- ForeignEndTagThroughHTMLNested htmldiff --
 -- in --
 <svg><foreignObject><p><svg><g>x</foreignObject>y</svg>z
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><foreignObject><p xmlns="http://www.w3.org/1999/xhtml"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><g>x</g></svg></p></foreignObject>y</svg>z</body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><foreignObject><p xmlns="http://www.w3.org/1999/xhtml"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><g>x</g></svg></p></foreignObject>y</svg>z</body></html>
 -- warn --
 32: closed HTML element p at </foreignObject> of an SVG element (HTML parsers would have ignored the end tag)
 -- ReopenAfterForeign --
@@ -51,13 +58,15 @@ other foreign elements
 -- in --
 <svg><foreignObject><p><b>x</p></foreignObject>y<g>z</g></svg>w<math><mi><p><i>a</p></mi><mn></mn></math>c
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><foreignObject><p xmlns="http://www.w3.org/1999/xhtml"><b>x</b></p></foreignObject>y<g>z</g></svg><b>w<math xmlns="http://www.w3.org/1998/Math/MathML"><mi><p xmlns="http://www.w3.org/1999/xhtml"><i>a</i></p></mi><mn></mn></math><i>c</i></b></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><foreignObject><p xmlns="http://www.w3.org/1999/xhtml"><b>x</b></p></foreignObject>y<g>z</g></svg><b>w<math xmlns="http://www.w3.org/1998/Math/MathML"><mi><p xmlns="http://www.w3.org/1999/xhtml"><i>a</i></p></mi><mn></mn></math><i>c</i></b></body></html>
 -- ForeignEndTagThroughReopened htmldiff nonidempotent --
 the reopened i is the current node for HTML parsers
 -- in --
 <svg><foreignObject><p><i>x</p>a</foreignObject>b</svg>c
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><foreignObject><p xmlns="http://www.w3.org/1999/xhtml"><i>x</i></p><i xmlns="http://www.w3.org/1999/xhtml">a</i></foreignObject>b</svg><i xmlns="http://www.w3.org/1999/xhtml">c</i></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><foreignObject><p xmlns="http://www.w3.org/1999/xhtml"><i>x</i></p><i xmlns="http://www.w3.org/1999/xhtml">a</i></foreignObject>b</svg><i xmlns="http://www.w3.org/1999/xhtml">c</i></body></html>
 -- warn --
 32: closed HTML element i at </foreignObject> of an SVG element (HTML parsers would have ignored the end tag)
 -- ForeignEndTagThroughImpliedReopened htmldiff nonidempotent --
@@ -65,7 +74,8 @@ the reopened a is closed by the implied end tag of foreignObject
 -- in --
 <svg><foreignObject><p><a></p>x</svg>y
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><foreignObject><p xmlns="http://www.w3.org/1999/xhtml"><a></a></p><a xmlns="http://www.w3.org/1999/xhtml">x</a></foreignObject></svg><a xmlns="http://www.w3.org/1999/xhtml">y</a></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><foreignObject><p xmlns="http://www.w3.org/1999/xhtml"><a></a></p><a xmlns="http://www.w3.org/1999/xhtml">x</a></foreignObject></svg><a xmlns="http://www.w3.org/1999/xhtml">y</a></body></html>
 -- warn --
 31: closed HTML element a at </svg> of an SVG element (HTML parsers would have ignored the end tag)
 -- ForeignStrayBrP --
@@ -73,10 +83,12 @@ br and p end tags break out of foreign content, up to an integration point
 -- in --
 <svg><g>x</br>a</svg><svg><g>x</p>b</svg><p><svg><g>x</p>c<math><mi>x</p>d</math><svg><foreignObject>x</br>e</svg>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><g>x</g></svg><br />a<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><g>x</g></svg><p></p>b<p><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><g>x</g></svg></p>c<math xmlns="http://www.w3.org/1998/Math/MathML"><mi>x<p xmlns="http://www.w3.org/1999/xhtml"></p>d</mi></math><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><foreignObject>x<br xmlns="http://www.w3.org/1999/xhtml" />e</foreignObject></svg></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><g>x</g></svg><br />a<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><g>x</g></svg><p></p>b<p><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><g>x</g></svg></p>c<math xmlns="http://www.w3.org/1998/Math/MathML"><mi>x<p xmlns="http://www.w3.org/1999/xhtml"></p>d</mi></math><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><foreignObject>x<br xmlns="http://www.w3.org/1999/xhtml" />e</foreignObject></svg></body></html>
 -- ReopenInIntegrationPoint --
 reopened as a child of a foreign element, with a namespace declaration
 -- in --
 <svg><foreignObject><p><i>x</p>a</i></foreignObject></svg><math><mtext><p><b class=c>y</p>b</b></mtext></math>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><foreignObject><p xmlns="http://www.w3.org/1999/xhtml"><i>x</i></p><i xmlns="http://www.w3.org/1999/xhtml">a</i></foreignObject></svg><math xmlns="http://www.w3.org/1998/Math/MathML"><mtext><p xmlns="http://www.w3.org/1999/xhtml"><b class="c">y</b></p><b class="c" xmlns="http://www.w3.org/1999/xhtml">b</b></mtext></math></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><foreignObject><p xmlns="http://www.w3.org/1999/xhtml"><i>x</i></p><i xmlns="http://www.w3.org/1999/xhtml">a</i></foreignObject></svg><math xmlns="http://www.w3.org/1998/Math/MathML"><mtext><p xmlns="http://www.w3.org/1999/xhtml"><b class="c">y</b></p><b class="c" xmlns="http://www.w3.org/1999/xhtml">b</b></mtext></math></body></html>

@@ -62,7 +62,7 @@ func TestProbe(t *testing.T) {
 			fmt.Printf("warn: %s\n", w)
 		}
 		in1, out1 := htmlDOM(t, in), htmlDOM(t, out)
-		x, xerr := xmlDOM(out)
+		x, xerr := xmlDOM(out, true)
 		fmt.Printf("HTML in == out: %v, XML == HTML out: %v (xml err %v)\n", in1 == out1, x == out1, xerr)
 		if in1 != out1 || x != out1 {
 			fmt.Printf("in DOM:\n%s\nout DOM:\n%s\nXML DOM:\n%s\n", in1, out1, x)

@@ -6,24 +6,30 @@ headings.
 <input type=checkbox checked disabled value='a"b' data-x=1 DATA-X=2><a href=?a=1&b=2 title="x&amp;y" data-t="a	b
 c">l</a>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><input type="checkbox" checked="" disabled="" value="a&quot;b" data-x="1" /><a href="?a=1&amp;b=2" title="x&amp;y" data-t="a&#9;b&#10;c">l</a></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><input type="checkbox" checked="" disabled="" value="a&quot;b" data-x="1" /><a href="?a=1&amp;b=2" title="x&amp;y" data-t="a&#9;b&#10;c">l</a></body></html>
 -- Entities --
 -- in --
 &nbsp;&amp;&lt;&copy;&#x1F600;&notin;&gt
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body>&#160;&amp;&lt;©😀∉&gt;</body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body>&#160;&amp;&lt;©😀∉&gt;</body></html>
 -- CarriageReturnRef --
 HTML and XML parsers convert a CR character to a newline
 -- in quoted --
 "<p title='a&#13;b\r\nc'>x&#13;y&#x0d;\r\nz</p>"
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p title="a&#13;b&#10;c">x&#13;y&#13;
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p title="a&#13;b&#10;c">x&#13;y&#13;
 z</p></body></html>
 -- Comments --
 -- in --
 <!-- a -- b --><!--->x<!---->y<!--a-->
 -- out --
-<!DOCTYPE html><!-- a - - b --><!----><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body>x<!---->y<!--a--></body></html>
+<!DOCTYPE html>
+<!-- a - - b -->
+<!---->
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body>x<!---->y<!--a--></body></html>
 -- EmptyEndTag --
 HTML parsers ignore </>, which the Reader reads as a bogus comment, so it
 is dropped, and the text around it is one text node.
@@ -31,12 +37,16 @@ is dropped, and the text around it is one text node.
 </><p>a</>b<pre></>
 c</pre>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p>ab</p><pre>c</pre></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p>ab</p><pre>c</pre></body></html>
 -- CommentControlChars --
 -- in quoted --
 "<!--a\x01bcdefghij\x02k--><?xml-stylesheet\x01?>"
 -- out --
-<!DOCTYPE html><!--a�bcdefghij�k--><!--?xml-stylesheet�?--><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body></body></html>
+<!DOCTYPE html>
+<!--a�bcdefghij�k-->
+<!--?xml-stylesheet�?-->
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body></body></html>
 -- warn --
 0: replaced characters XML doesn't allow
 20: replaced characters XML doesn't allow
@@ -45,14 +55,16 @@ HTML parsers lowercase only ASCII letters in names
 -- in --
 <aЋ Data-Ћ=y>0</aЋ><input type=hidden><script type="text/jaſcript">a<b</script>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><aЋ data-Ћ="y">0</aЋ><input type="hidden" /><script type="text/jaſcript">a<b</script></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><aЋ data-Ћ="y">0</aЋ><input type="hidden" /><script type="text/jaſcript">a<b</script></body></html>
 -- warn --
 71: script of type "text/jaſcript" containing <, & or ]]> can't be represented in XML
 -- ControlChars htmldiff --
 -- in quoted --
 "a\x01b\fc"
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body>a�b c</body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body>a�b c</body></html>
 -- warn --
 0: replaced characters XML doesn't allow
 -- NUL --
@@ -63,7 +75,8 @@ and raw text.
 -- in quoted --
 "<p title=\"a\x00b\">c\x00d<!--e\x00f--></p><svg><desc>g\x00h</desc><text>i\x00j</text><foreignObject>k\x00l</foreignObject><![CDATA[m\x00]]></svg><math><mi>n\x00</mi><annotation-xml>\x00o</annotation-xml></math><textarea>p\x00q</textarea><script>r\x00s</script>"
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p title="a�b">cd<!--e�f--></p><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><desc>gh</desc><text>i�j</text><foreignObject>kl</foreignObject>m�</svg><math xmlns="http://www.w3.org/1998/Math/MathML"><mi>n</mi><annotation-xml>�o</annotation-xml></math><textarea>p�q</textarea><script>r�s</script></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p title="a�b">cd<!--e�f--></p><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><desc>gh</desc><text>i�j</text><foreignObject>kl</foreignObject>m�</svg><math xmlns="http://www.w3.org/1998/Math/MathML"><mi>n</mi><annotation-xml>�o</annotation-xml></math><textarea>p�q</textarea><script>r�s</script></body></html>
 -- warn --
 59: replaced characters XML doesn't allow
 103: replaced characters XML doesn't allow
@@ -74,7 +87,8 @@ character.
 -- in quoted --
 "<p>a\xdd\x00\x98b</p>"
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p>a��b</p></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p>a��b</p></body></html>
 -- warn --
 3: invalid UTF-8 replaced with U+FFFD
 -- NULTable --
@@ -83,26 +97,30 @@ ignored like other NUL in a table.
 -- in quoted --
 "<table><colgroup>\x00<col></table><table><col> \x00 <col><tr>\x00<td>a\x00</table>"
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><table><colgroup></colgroup><colgroup><col /></colgroup></table><table><colgroup><col /> </colgroup> <colgroup><col /></colgroup><tbody><tr><td>a</td></tr></tbody></table></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><table><colgroup></colgroup><colgroup><col /></colgroup></table><table><colgroup><col /> </colgroup> <colgroup><col /></colgroup><tbody><tr><td>a</td></tr></tbody></table></body></html>
 -- NULTableFormatting --
 whitespace with a NUL in a table is whitespace only, before which HTML
 parsers don't reopen the formatting elements
 -- in quoted --
 "<b>x<table> \x00 <tr><td>y</table>"
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><b>x<table>  <tbody><tr><td>y</td></tr></tbody></table></b></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><b>x<table>  <tbody><tr><td>y</td></tr></tbody></table></b></body></html>
 -- NULHeadSelectList --
 HTML parsers start the body at a NUL in the head, and ignore it there.
 -- in quoted --
 "<head>\x00<title>t</title></head><select>a\x00b</select><ul>\x00<li>c</ul>"
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><title>t</title><select>ab</select><ul><li>c</li></ul></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><title>t</title><select>ab</select><ul><li>c</li></ul></body></html>
 -- InvalidUTF8 htmldiff --
 invalid UTF-8 (e.g., windows-1252 read as UTF-8) gets its own warning
 -- in quoted --
 "<p title=\"\xe9t\xe9\">caf\xe9 \x01</p><!--\xff-->"
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p title="�t�">caf� �</p><!--�--></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p title="�t�">caf� �</p><!--�--></body></html>
 -- warn --
 0: invalid UTF-8 replaced with U+FFFD
 15: invalid UTF-8 replaced with U+FFFD
@@ -112,39 +130,45 @@ invalid UTF-8 (e.g., windows-1252 read as UTF-8) gets its own warning
 -- in --
 </p>x</br>y</div>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body>x<br />y</body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body>x<br />y</body></html>
 -- Isindex --
 isindex is an ordinary element in HTML5
 -- in --
 <isindex prompt=p>x</isindex>y<isindex><keygen>z
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><isindex prompt="p">x</isindex>y<isindex><keygen />z</isindex></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><isindex prompt="p">x</isindex>y<isindex><keygen />z</isindex></body></html>
 -- IncompleteEndTag --
 -- in --
 <p>x</p
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p>x</p></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p>x</p></body></html>
 -- warn --
 4: dropped incomplete tag at the end of the input (to match HTML parsers)
 -- IncompleteStartTag --
 -- in --
 <p>x<a href="y
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p>x</p></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p>x</p></body></html>
 -- warn --
 4: dropped incomplete tag at the end of the input (to match HTML parsers)
 -- NestedForm --
 -- in --
 <form>a<form>b</form>c</form>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><form>a<form>b</form>c</form></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><form>a<form>b</form>c</form></body></html>
 -- warn --
 7: kept form inside an open form (HTML parsers would have ignored it)
 -- FormAfterImpliedEnd htmldiff --
 -- in --
 <div><form></div><form>b</form>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><div><form></form></div><form>b</form></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><div><form></form></div><form>b</form></body></html>
 -- warn --
 17: kept form inside an open form (HTML parsers would have ignored it)
 -- SelectImpliedEnds --
@@ -153,42 +177,49 @@ scope of end tags and of the p closed by a block
 -- in --
 <select><option>a<hr><optgroup><option>b<p>c<option>d</optgroup><option>e<p><b>f<hr>g</select><select><option>h<input>i<optgroup>j<optgroup>k<div><p>l<option>m</div><p>n<select><div>o</p>p</div></select><option>q<optgroup>r<optgroup>s
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><select><option>a</option><hr /><optgroup><option>b<p>c</p></option><option>d</option></optgroup><option>e<p><b>f</b></p></option><hr /><b>g</b></select><b><select><option>h</option></select><input />i<optgroup>j<optgroup>k<div><p>l<option>m</option></p></div><p>n<select><div>o<p></p>p</div></select><option>q</option><optgroup>r<optgroup>s</optgroup></optgroup></p></optgroup></optgroup></b></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><select><option>a</option><hr /><optgroup><option>b<p>c</p></option><option>d</option></optgroup><option>e<p><b>f</b></p></option><hr /><b>g</b></select><b><select><option>h</option></select><input />i<optgroup>j<optgroup>k<div><p>l<option>m</option></p></div><p>n<select><div>o<p></p>p</div></select><option>q</option><optgroup>r<optgroup>s</optgroup></optgroup></p></optgroup></optgroup></b></body></html>
 -- SelectImpliedEndsThroughReopened htmldiff --
 HTML parsers keep the p open: the reopened a is the current node
 -- in --
 <select><p><a>x<p>y<optgroup>z
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><select><p><a>x</a></p><p><a>y</a></p><a><optgroup>z</optgroup></a></select></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><select><p><a>x</a></p><p><a>y</a></p><a><optgroup>z</optgroup></a></select></body></html>
 -- warn --
 19: closed elements with reopened formatting elements inside them at <optgroup> (HTML parsers would have stopped at the reopened elements)
 -- NestedSelect htmldiff --
 -- in --
 <select><option>a<select><option>b</select>c
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><select><option>a<select><option>b</option></select>c</option></select></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><select><option>a<select><option>b</option></select>c</option></select></body></html>
 -- warn --
 17: kept select inside an open select (HTML parsers would have ignored it and closed the open one)
 -- NestedSelectInButton --
 -- in --
 <select><button><select></select></button></select>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><select><button><select></select></button></select></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><select><button><select></select></button></select></body></html>
 -- warn --
 16: kept select inside an open select (HTML parsers would have ignored it and closed the open one)
 -- RubyOutsideRuby --
 -- in --
 <p><rb>a<rt>b</p><ruby><rb>c<rt>d</ruby>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p><rb>a<rt>b</rt></rb></p><ruby><rb>c</rb><rt>d</rt></ruby></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p><rb>a<rt>b</rt></rb></p><ruby><rb>c</rb><rt>d</rt></ruby></body></html>
 -- RubyImpliedEnds --
 ruby annotations close p and other elements with implied end tags
 -- in --
 <ruby><p>a<rp>(</rp><div><p>b<rt>c</div><rtc><li>d<rt>e<rb>f</ruby>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><ruby><p>a</p><rp>(</rp><div><p>b</p><rt>c</rt></div><rtc><li>d</li><rt>e</rt></rtc><rb>f</rb></ruby></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><ruby><p>a</p><rp>(</rp><div><p>b</p><rt>c</rt></div><rtc><li>d</li><rt>e</rt></rtc><rb>f</rb></ruby></body></html>
 -- HeadingEndTag --
 -- in --
 <h1>x<h2>y</h1>z
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><h1>x</h1><h2>y</h2>z</body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><h1>x</h1><h2>y</h2>z</body></html>

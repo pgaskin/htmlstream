@@ -29,7 +29,8 @@ func ExampleConvert() {
 		panic(err)
 	}
 	// Output:
-	// <!DOCTYPE html><html lang="en" xmlns="http://www.w3.org/1999/xhtml" xml:lang="en"><head><meta charset="UTF-8" /><title>Fish &amp; chips</title>
+	// <!DOCTYPE html>
+	// <html lang="en" xmlns="http://www.w3.org/1999/xhtml" xml:lang="en"><head><meta charset="UTF-8" /><title>Fish &amp; chips</title>
 	// </head><body><p class="intro">Fish&#160;&amp;&#160;chips<br />
 	// <img src="fish.png" alt="Fish" />
 	// </p><table><tbody><tr><td>Cod</td><td>£8</td></tr></tbody></table>
@@ -79,9 +80,9 @@ func ExampleConvert_doctype() {
 		fmt.Printf("%q\n", head)
 	}
 	// Output:
-	// "<!DOCTYPE html>"
-	// "<?xml version=\"1.0\" encoding=\"UTF-8\"?><!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.1//EN\" \"http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd\">"
-	// "<!DOCTYPE html SYSTEM \"about:legacy-compat\">"
+	// "<!DOCTYPE html>\n"
+	// "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.1//EN\" \"http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd\">\n"
+	// "<!DOCTYPE html SYSTEM \"about:legacy-compat\">\n"
 	// ""
 }
 

@@ -96,13 +96,13 @@ func TestDoctype(t *testing.T) {
 		args []string
 		out  string
 	}{
-		{nil, "<!DOCTYPE html>" + body},
-		{[]string{"-doctype", ""}, "<!DOCTYPE html>" + body},
-		{[]string{"-doctype", "default"}, "<!DOCTYPE html>" + body},
-		{[]string{"-doctype", "keep"}, xhtml1 + body},
+		{nil, "<!DOCTYPE html>\n" + body},
+		{[]string{"-doctype", ""}, "<!DOCTYPE html>\n" + body},
+		{[]string{"-doctype", "default"}, "<!DOCTYPE html>\n" + body},
+		{[]string{"-doctype", "keep"}, xhtml1 + "\n" + body},
 		{[]string{"-doctype", "none"}, body},
-		{[]string{"-doctype", `<!DOCTYPE html SYSTEM "about:legacy-compat">`}, `<!DOCTYPE html SYSTEM "about:legacy-compat">` + body},
-		{[]string{"-doctype", xhtml1}, xhtml1 + body},
+		{[]string{"-doctype", `<!DOCTYPE html SYSTEM "about:legacy-compat">`}, `<!DOCTYPE html SYSTEM "about:legacy-compat">` + "\n" + body},
+		{[]string{"-doctype", xhtml1}, xhtml1 + "\n" + body},
 	} {
 		t.Run(strings.Join(tc.args, " "), func(t *testing.T) {
 			stdout, stderr, code := runCmd(t, in, tc.args...)
@@ -118,7 +118,7 @@ func TestDoctype(t *testing.T) {
 
 func TestXMLDecl(t *testing.T) {
 	const decl = `<?xml version="1.0" encoding="UTF-8"?>`
-	const out = "<!DOCTYPE html>" + htmlStart + "<p>x</p>" + htmlEnd
+	const out = "<!DOCTYPE html>\n" + htmlStart + "<p>x</p>" + htmlEnd
 	for _, tc := range []struct {
 		args []string
 		in   string
@@ -126,8 +126,8 @@ func TestXMLDecl(t *testing.T) {
 	}{
 		{nil, `<?xml version="1.0"?><p>x`, out},
 		{[]string{"-xmldecl", "none"}, `<?xml version="1.0"?><p>x`, out},
-		{[]string{"-xmldecl", "add"}, `<p>x`, decl + out},
-		{[]string{"-xmldecl", "keep"}, `<?xml version="1.0"?><p>x`, decl + out},
+		{[]string{"-xmldecl", "add"}, `<p>x`, decl + "\n" + out},
+		{[]string{"-xmldecl", "keep"}, `<?xml version="1.0"?><p>x`, decl + "\n" + out},
 		{[]string{"-xmldecl", "keep"}, `<p>x`, out},
 	} {
 		t.Run(strings.Join(tc.args, " ")+" "+tc.in, func(t *testing.T) {
@@ -244,7 +244,7 @@ func TestPositionManyLines(t *testing.T) {
 }
 
 func TestStdin(t *testing.T) {
-	const want = "<!DOCTYPE html>" + htmlStart + "<p>x</p>" + htmlEnd
+	const want = "<!DOCTYPE html>\n" + htmlStart + "<p>x</p>" + htmlEnd
 	for _, args := range [][]string{nil, {"-"}, {"-strict", "-"}} {
 		stdout, stderr, code := runCmd(t, "<p>x", args...)
 		if code != 0 || stderr != "" || stdout != want {
@@ -262,7 +262,7 @@ func TestFile(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit status %d, stderr %q", code, stderr)
 	}
-	if want := "<!DOCTYPE html>" + htmlStart + "<p>a\n</p><p>x<b></b></p>" + htmlEnd; stdout != want {
+	if want := "<!DOCTYPE html>\n" + htmlStart + "<p>a\n</p><p>x<b></b></p>" + htmlEnd; stdout != want {
 		t.Errorf("got\n\t%s\nwant\n\t%s", stdout, want)
 	}
 	if got := readFile(t, file); got != "<p>a\n<p>x<b></p>" {

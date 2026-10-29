@@ -196,8 +196,8 @@ func checkDoctype(s string) error {
 	if err != nil {
 		return err
 	}
-	doctype, _, _ := strings.Cut(b.String(), "<html")
-	if doctype == "" {
+	doctype, _, written := strings.Cut(b.String(), "\n<html")
+	if !written {
 		if reason == "" {
 			reason = "not a doctype"
 		}

@@ -6,22 +6,34 @@ one element.
 -- in --
 <p>a<br></br>b<br> </br>c<img src=i></img></p>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p>a<br />b<br /> c<img src="i" /></p></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p>a<br />b<br /> c<img src="i" /></p></body></html>
 -- XMLSyntaxSelfClosed xs --
 Self-closing tags of non-void elements are empty elements.
 -- in --
 <div/>a<span/>b<p/>c
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><div></div>a<span></span>b<p></p>c</body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><div></div>a<span></span>b<p></p>c</body></html>
 -- XMLSyntaxScriptCDATA xs --
 A CDATA section around the script contents, as XHTML writes it, is
 removed, and the contents are wrapped again as needed.
 -- in --
 <script><![CDATA[if (a < b) x();]]></script><title><![CDATA[a<b]]></title>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><script>//<![CDATA[
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><script>//<![CDATA[
 if (a < b) x();
 //]]></script><title>a&lt;b</title></head><body></body></html>
+-- XMLSyntaxStyleCDATASpace xs --
+The whitespace around a CDATA section around the style contents is kept.
+-- in --
+<style> <![CDATA[0]]>
+</style>
+-- out --
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><style> 0
+</style></head><body></body></html>
 -- ScriptingNoscript scripting htmldiff nonidempotent --
 Noscript contents are raw text, written unchanged without <, & or ]]>,
 and escaped otherwise, which HTML parsers with scripting enabled read as
@@ -29,6 +41,7 @@ it is, and which is escaped again on every pass.
 -- in --
 <body><noscript>no js</noscript><noscript><b>x</b></noscript>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><noscript>no js</noscript><noscript>&lt;b&gt;x&lt;/b&gt;</noscript></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><noscript>no js</noscript><noscript>&lt;b&gt;x&lt;/b&gt;</noscript></body></html>
 -- warn --
 42: escaped raw text noscript contents containing <, & or ]]> (HTML parsers with scripting enabled will read them as raw text when parsing the output)

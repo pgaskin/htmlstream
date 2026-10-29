@@ -209,8 +209,11 @@ type Options struct {
 	// contents read with XML syntax, buffered until the text after it, the
 	// whitespace at the start of text before which formatting elements are
 	// reopened if other text follows (see [Convert]), buffered until that
-	// text or the end of the text (up to 64 KiB), the output before the root
-	// element with [KeepXMLDecl], and the output held by [Writer.Hold].
+	// text or the end of the text (up to 64 KiB), the whitespace at the
+	// start of the head, buffered until the next token (up to 256 bytes),
+	// the whitespace and comments between the head end tag and the body,
+	// buffered until the body starts (up to 64 KiB), the output before the
+	// root element with [KeepXMLDecl], and the output held by [Writer.Hold].
 	Warn func(w Warning)
 
 	// MaxRawText limits the size of script and style contents, noscript
@@ -749,7 +752,12 @@ const (
 // a call with Last set and no Data is made before the markup following the
 // text, or at Close. Elements the conversion adds between parts of the input
 // text (reopened formatting elements) end the text node like other tags, and
-// so do removed elements (see [Tag.Remove]).
+// so do removed elements (see [Tag.Remove]). Whitespace held back (see
+// [Options.Warn]) is reported when it is written, so the whitespace between
+// the head end tag and the body is reported after the tag events of the head
+// content after it, and the whitespace at the start of the head after the
+// head start tag event, before or after the event of the charset meta
+// element (see [Convert]).
 //
 // The event is owned by the writer and valid during the call, like [Tag]. Its
 // fields are for reading, like those of Tag, and the bytes of Data must not
@@ -820,7 +828,8 @@ type Text struct {
 // contain <, & or ]]>, keeping the output well-formed is up to the caller.
 // A CDATA wrapper in data (e.g., //<![CDATA[ ... //]]>) isn't removed like
 // that of the contents of the input, whose Data is without it: it is written
-// as part of the contents.
+// as part of the contents. The whitespace around the wrapper of the input is
+// written around the new contents.
 func (t *Text) SetText(data []byte) {
 	if t.check() == nil {
 		t.data, t.set, t.isText = data, true, true
@@ -996,14 +1005,28 @@ const (
 //     [Options.DoctypeMode] for the alternatives), the XML declaration
 //     before the root element is removed (see [Options.XMLDecl] for writing
 //     one), and
-//     <meta charset="UTF-8" /> is added right after the head start tag
-//     (before the markup hooks insert after it), replacing the charset
-//     declarations of the input, so the output has one encoding
+//     <meta charset="UTF-8" /> is added at the start of the head (before
+//     the markup hooks insert after the head start tag), replacing the
+//     charset declarations of the input, so the output has one encoding
 //     declaration: the charset attribute, and http-equiv="Content-Type"
 //     with its content attribute, are removed from meta elements, including
 //     the declarations HTML parsers don't recognize (see
 //     [htmlutil.MetaCharset]), and a meta element without other
-//     attributes is dropped.
+//     attributes is dropped. If such a meta element is the first element of
+//     the head, the added one takes its place, after the whitespace before
+//     it (up to 256 bytes); otherwise, and if the Tag hook of the head start
+//     tag inserts markup after it or starts a hold, the added one comes
+//     right after the head start tag.
+//   - The XML declaration, the doctype and each comment before the root
+//     element are followed by a line break, which HTML and XML parsers
+//     ignore there. Other whitespace before the root element, which they
+//     ignore too, is dropped.
+//   - Whitespace between the html start tag and the head, which HTML
+//     parsers drop (and XML parsers would keep), is dropped. Whitespace and
+//     comments between the head end tag and the body, which HTML parsers put
+//     in the html element, while they put head content after them in the
+//     head, are written between the head end tag and the body start tag.
+//     Past 64 KiB of them, they are written in the head instead.
 //   - Implied elements (html, head, body, tbody, tr, colgroup) and implied end
 //     tags are written explicitly.
 //   - In quirks mode documents (no doctype, or a legacy one), HTML parsers
@@ -1043,7 +1066,10 @@ const (
 //     section inside a comment of the script or style language, after
 //     removing such a wrapper if the contents already have one, including
 //     the forms with HTML comment markers written by CMSs such as Drupal
-//     (see [htmlutil.CutCDATAWrapper]; not in modules). For JSON
+//     (see [htmlutil.CutCDATAWrapper]; not in modules), and keeping the
+//     whitespace around it. The start of the wrapper is followed by a line
+//     break and its end preceded by one, unless the contents start or end
+//     with a single line break, which takes its place. For JSON
 //     scripts, the characters are escaped as JSON instead. Scripts of other
 //     types are written as they are, with a warning (see Well-formedness in
 //     the package documentation).
@@ -1342,7 +1368,7 @@ func NewWriter(w io.Writer, opt Options) *Writer {
 	p.opt.MaxDepth = max(p.opt.MaxDepth, 3)
 	switch p.opt.XMLDecl {
 	case AddXMLDecl:
-		p.w.WriteString(xmlDeclaration)
+		p.w.WriteString(xmlDeclaration + "\n")
 		p.declOut = true
 	case KeepXMLDecl:
 		// written before the output held back, if the input has one
@@ -1352,7 +1378,8 @@ func NewWriter(w io.Writer, opt Options) *Writer {
 	switch p.opt.DoctypeMode {
 	case ReplaceDoctype:
 		p.w.WriteString(p.opt.Doctype)
-		p.cw.free = len(p.opt.Doctype) // not counted for MaxRawText
+		p.w.WriteByte('\n')
+		p.cw.free = len(p.opt.Doctype) + 1 // not counted for MaxRawText
 		var d htmlutil.Document
 		r := htmlstream.NewReader(strings.NewReader(p.opt.Doctype))
 		for r.Next() {
@@ -1436,6 +1463,9 @@ func (p *polyglot) close() error {
 	}
 	if p.prolog {
 		p.endProlog()
+	}
+	if p.charsetWait {
+		p.placeCharset(nil)
 	}
 	p.structure(p.doc.End())
 	for len(p.out) > 0 {
@@ -2158,11 +2188,25 @@ type polyglot struct {
 	quirksOut bool // the output is in quirks mode for HTML parsers if the input is
 
 	// the head start tag is written, and the charset meta element comes
-	// next, before the markup inserted after the head start tag and the
-	// holds started in the hooks of both (see writeCharset)
+	// next (after the whitespace at the start of the head, see
+	// placeCharset), before the markup inserted after the head start tag
+	// and the holds started in the hooks of both (see writeCharset)
 	charsetNext bool
 	headAfter   []byte // the markup inserted after the head start tag
 	charsetEnd  int64  // the output written up to the end of the charset meta element
+
+	// the charset meta element waits for the whitespace at the start of the
+	// head (headSpace), to be written in place of a charset meta element of
+	// the input after it (see placeCharset)
+	charsetWait bool
+	headSpace   heldSpace
+	headPos     htmlstream.Pos // the position of the head start tag, or of the token implying the head
+
+	// the whitespace and comments after the head end tag, written after it
+	// when the body starts (see closeHead), or in the head once they exceed
+	// maxAfterHead (afterHeadFull)
+	afterHead     heldSpace
+	afterHeadFull bool
 
 	// the last start tag event, kept with the element by pushOut
 	startNS   string // the namespace reported
@@ -2349,6 +2393,9 @@ func (p *polyglot) token(tok *htmlstream.Token) {
 		// HTML parsers ignore it (see htmlstream.Token.Bogus); a Continued
 		// token with this Raw is the end of a longer bogus comment
 		return
+	}
+	if p.charsetWait && !p.headSpaceToken(tok) {
+		p.placeCharset(tok)
 	}
 	if p.pClose >= 0 || p.keptP >= 0 {
 		p.keepP(tok)
@@ -2556,7 +2603,7 @@ func (p *polyglot) endProlog() {
 	// element's start tag): its output is in hbuf, written after them.
 	c.holding = false
 	if p.decl {
-		p.w.WriteString(xmlDeclaration)
+		p.w.WriteString(xmlDeclaration + "\n")
 		p.declOut = true
 		if err := p.w.Flush(); err != nil {
 			return
@@ -2610,7 +2657,7 @@ func (p *polyglot) keepDoctype(tok *htmlstream.Token) {
 		b = append(b, " SYSTEM "...)
 		b = appendQuoted(b, out.System)
 	}
-	p.buf = append(b, '>')
+	p.buf = append(b, ">\n"...)
 	p.markup(p.buf)
 }
 
@@ -2670,7 +2717,7 @@ func (p *polyglot) structure(ev htmlutil.DocumentEvent) {
 		p.pushOut(outElem{name: "html", synthetic: true})
 	}
 	if ev&htmlutil.ImpliedHead != 0 {
-		p.charsetNext = true
+		p.charsetNext, p.headPos = true, p.pos
 		p.tagString("<head>", htmlTag("head", true))
 		p.pushOut(outElem{name: "head", synthetic: true})
 		p.writeCharset()
@@ -2689,6 +2736,7 @@ func (p *polyglot) closeHead() {
 			for len(p.out) > i {
 				p.popOut()
 			}
+			p.afterHead.write(p)
 			return
 		}
 	}
@@ -2714,8 +2762,103 @@ func (p *polyglot) writeCharset() {
 	if p.charsetEnd > 1024 && !p.declOut {
 		// without an XML declaration at the start, from which the prescan
 		// takes UTF-8 if it finds no meta element
-		p.warn(p.pos, "wrote the charset meta element past the first 1024 bytes (HTML parsers which aren't told the encoding will not find it before parsing the output)")
+		p.warn(p.headPos, "wrote the charset meta element past the first 1024 bytes (HTML parsers which aren't told the encoding will not find it before parsing the output)")
 	}
+}
+
+// placeCharset writes the charset meta element and the whitespace at the
+// start of the head held back before tok (nil at the end of the input): if
+// tok is the start tag of a meta element which is dropped (see
+// metaCharsetAttrs), the meta element takes its place after the whitespace,
+// and otherwise, it comes first, right after the head start tag.
+func (p *polyglot) placeCharset(tok *htmlstream.Token) {
+	p.charsetWait = false
+	inPlace := false
+	if tok != nil && tok.Kind() == htmlstream.StartTag && tok.HTMLRules() && tok.NS() == htmlstream.NamespaceXHTML && tok.Is("meta") && !tok.Incomplete() {
+		_, keep := metaCharsetAttrs(tok, htmlstream.NamespaceXHTML)
+		inPlace = !keep
+	}
+	if inPlace {
+		p.headSpace.write(p)
+		p.writeCharset()
+	} else {
+		p.writeCharset()
+		p.headSpace.write(p)
+	}
+}
+
+// headSpaceToken reports whether tok is whitespace at the start of the head
+// which the charset meta element waits for (see placeCharset), up to
+// maxHeadSpace bytes.
+func (p *polyglot) headSpaceToken(tok *htmlstream.Token) bool {
+	if tok.Kind() != htmlstream.Text || p.doc.Part() != htmlutil.InHead || !p.inHeadTop() {
+		return false
+	}
+	p.sbuf = tok.AppendText(p.sbuf[:0])
+	return ascii.IsBlank(p.sbuf) && p.headSpace.size+len(p.sbuf) <= maxHeadSpace
+}
+
+// holdAfterHead holds back whitespace (text of tok) or a comment (markup,
+// with a nil tok) after the head end tag, which HTML parsers put after the
+// head, while they put head content after it in the head: they are written
+// when the body starts. It reports whether b was held back: past
+// maxAfterHead bytes, the parts held back are written in the head instead,
+// and so are b and the rest.
+func (p *polyglot) holdAfterHead(tok *htmlstream.Token, b []byte) bool {
+	if p.afterHead.size+len(b) > maxAfterHead {
+		p.afterHeadFull = true
+		p.afterHead.write(p)
+		return false
+	}
+	p.afterHead.add(tok, b)
+	return true
+}
+
+// inHeadTop reports whether the innermost element open in the output is the
+// head.
+func (p *polyglot) inHeadTop() bool {
+	t := p.top()
+	return t != nil && t.name == "head" && t.ns == ""
+}
+
+// maxHeadSpace is the size of the whitespace at the start of the head held
+// back by placeCharset, and maxAfterHead that of the whitespace and comments
+// after the head held back by holdAfterHead.
+const (
+	maxHeadSpace = 256
+	maxAfterHead = 64 << 10
+)
+
+// heldSpace is whitespace and comments written later.
+type heldSpace struct {
+	parts []heldPart
+	size  int
+}
+
+// heldPart is whitespace (text of a token) or a comment (markup).
+type heldPart struct {
+	tok  *htmlstream.Token // a clone, or nil for a comment
+	data []byte
+}
+
+func (h *heldSpace) add(tok *htmlstream.Token, b []byte) {
+	if tok != nil {
+		tok = tok.Clone()
+	}
+	h.parts = append(h.parts, heldPart{tok, bytes.Clone(b)})
+	h.size += len(b)
+}
+
+// write writes the parts held back, and empties h.
+func (h *heldSpace) write(p *polyglot) {
+	for _, part := range h.parts {
+		if part.tok == nil {
+			p.markup(part.data)
+		} else {
+			p.text(part.tok, part.data)
+		}
+	}
+	h.parts, h.size = h.parts[:0], 0
 }
 
 // Output stack.
@@ -3235,7 +3378,13 @@ func (p *polyglot) commentPart(b []byte, first, last bool) {
 		out = append(out, "-->"...)
 	}
 	p.buf = out
+	if p.doc.Part() == htmlutil.AfterHead && p.inHeadTop() && !p.afterHeadFull && p.holdAfterHead(nil, out) {
+		return
+	}
 	p.markup(out)
+	if last && p.doc.Part() == htmlutil.BeforeHTML {
+		p.emitString("\n")
+	}
 }
 
 // textToken writes a text or CDATA token. Text split into multiple tokens is
@@ -3262,8 +3411,14 @@ func (p *polyglot) textToken(tok *htmlstream.Token, start, end int) {
 		b = b[:end]
 	}
 	b = b[start:]
-	if p.doc.Part() == htmlutil.BeforeHTML {
-		return // whitespace before the html element
+	switch part := p.doc.Part(); {
+	case part == htmlutil.BeforeHTML, part == htmlutil.BeforeHead:
+		return // whitespace before the html element or the head, which HTML parsers drop
+	case p.charsetWait:
+		p.headSpace.add(tok, b) // see placeCharset
+		return
+	case part == htmlutil.AfterHead && p.inHeadTop() && !p.afterHeadFull && p.holdAfterHead(tok, b):
+		return
 	}
 	if top := p.top(); top != nil && (top.name == "iframe" || top.name == "noembed" || top.name == "noframes") && top.ns == "" {
 		if !ascii.IsBlank(b) && !p.warned {
@@ -3740,7 +3895,12 @@ func (p *polyglot) rawText(tok *htmlstream.Token, f *frame) {
 		w |= htmlutil.CDATABare
 	}
 	var found bool
-	if b, found = htmlutil.CutCDATAWrapper(b, w); found && bytes.Contains(b, []byte(splitCDATAEnd)) {
+	var lead, trail []byte // the whitespace around a wrapper of the input, which is kept
+	whole := b
+	if b, found = htmlutil.CutCDATAWrapper(b, w); found {
+		lead, trail = whole[:spaceLen(whole)], whole[len(bytes.TrimRight(whole, "\t\n\f\r ")):]
+	}
+	if found && bytes.Contains(b, []byte(splitCDATAEnd)) {
 		// "]]>" as written in a CDATA section, split again below
 		b = bytes.ReplaceAll(b, []byte(splitCDATAEnd), []byte("]]>"))
 	}
@@ -3766,6 +3926,8 @@ func (p *polyglot) rawText(tok *htmlstream.Token, f *frame) {
 		}
 	}
 	p.textOpen = true
+	p.emit(lead)
+	defer p.emit(trail)
 	if !bytes.ContainsAny(b, "<&") && !bytes.Contains(b, []byte("]]>")) {
 		p.emit(b)
 		return
@@ -3811,15 +3973,22 @@ func (p *polyglot) rawText(tok *htmlstream.Token, f *frame) {
 		}
 		b = bytes.ReplaceAll(b, []byte("]]>"), []byte(splitCDATAEnd))
 	}
+	// A line end follows the start marker and precedes the end marker
+	// (needed after a line comment), unless the contents start or end with
+	// a single one, which takes its place: CutCDATAWrapper removes one.
+	start, end := "/*<![CDATA[*/", "/*]]>*/"
 	if script {
-		p.emitString("//<![CDATA[\n")
-		p.emit(b)
-		p.emitString("\n//]]>")
-	} else {
-		p.emitString("/*<![CDATA[*/\n")
-		p.emit(b)
-		p.emitString("\n/*]]>*/")
+		start, end = "//<![CDATA[", "//]]>"
 	}
+	p.emitString(start)
+	if !bytes.HasPrefix(b, []byte("\n")) || bytes.HasPrefix(b, []byte("\n\n")) {
+		p.emitString("\n")
+	}
+	p.emit(b)
+	if !bytes.HasSuffix(b, []byte("\n")) || bytes.HasSuffix(b, []byte("\n\n")) {
+		p.emitString("\n")
+	}
+	p.emitString(end)
 }
 
 // xmlMarkup reports whether the contents b of a script or style element
@@ -3980,11 +4149,15 @@ func (p *polyglot) startTag(tok *htmlstream.Token) {
 			p.pushFrame(tok, frame{out: len(p.out) - 1, name: "html"})
 			return
 		case "head":
-			p.charsetNext = true
+			p.charsetNext, p.headPos = true, p.pos
 			p.writeStart(tok, "head", ns, false, nil)
 			p.pushOut(outElem{name: "head", decls: p.outDecls()})
 			p.pushFrame(tok, frame{out: len(p.out) - 1, name: "head"})
-			p.writeCharset()
+			if p.pendHolds == 0 && len(p.headAfter) == 0 {
+				p.charsetWait = true // see placeCharset
+			} else {
+				p.writeCharset()
+			}
 			return
 		case "body":
 			p.closeHead()
@@ -3995,21 +4168,8 @@ func (p *polyglot) startTag(tok *htmlstream.Token) {
 		case "meta":
 			// charset declarations are replaced by the meta element written
 			// with the head, keeping the other attributes
-			if _, ok := tok.Attr("charset"); ok {
-				drop = append(drop, "charset")
-			}
-			if a, ok := tok.Attr("http-equiv"); ok && ascii.EqualFold(a.Value(), "content-type") {
-				drop = append(drop, "http-equiv", "content")
-			}
-			keep := len(drop) == 0
-			for a := range tok.Attrs() {
-				if keep {
-					break
-				}
-				an := attrName(a, ns)
-				keep = an != "xmlns" && !slices.Contains(drop, an)
-			}
-			if !keep {
+			var keep bool
+			if drop, keep = metaCharsetAttrs(tok, ns); !keep {
 				p.dropElement(tok) // opened with XML syntax
 				return
 			}
@@ -4397,6 +4557,27 @@ func (p *polyglot) pushFrame(tok *htmlstream.Token, f frame) {
 
 // dropElement skips writing a start tag, and the end tag of the element it
 // opens.
+// metaCharsetAttrs returns the attributes of the meta start tag tok which
+// declare the charset, which are dropped, and whether the element has other
+// attributes, so that it is kept.
+func metaCharsetAttrs(tok *htmlstream.Token, ns string) (drop []string, keep bool) {
+	if _, ok := tok.Attr("charset"); ok {
+		drop = append(drop, "charset")
+	}
+	if a, ok := tok.Attr("http-equiv"); ok && ascii.EqualFold(a.Value(), "content-type") {
+		drop = append(drop, "http-equiv", "content")
+	}
+	keep = len(drop) == 0
+	for a := range tok.Attrs() {
+		if keep {
+			break
+		}
+		an := attrName(a, ns)
+		keep = an != "xmlns" && !slices.Contains(drop, an)
+	}
+	return drop, keep
+}
+
 func (p *polyglot) dropElement(tok *htmlstream.Token) {
 	if tok.Kind() == htmlstream.StartTag {
 		p.pushFrame(tok, frame{out: -1, name: htmlName(tok)})

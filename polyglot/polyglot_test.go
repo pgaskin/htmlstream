@@ -219,13 +219,13 @@ func TestWriter(t *testing.T) {
 		{"XMLSyntaxScriptMarkup", `<script>a && b &amp;&amp; c;</script><style><!-- p::before{content:"&#38;"} --></style><script>x(<![CDATA["&amp;<!--"]]>);</script><script type=application/json>{"a":"&#x26;"}</script><style>a&b;c</style>`, xmlSyntax, nil,
 			"<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta charset=\"UTF-8\" /><script>//<![CDATA[\na && b &amp;&amp; c;\n//]]></script><style>/*<![CDATA[*/\n<!-- p::before{content:\"&#38;\"} -->\n/*]]>*/</style><script>//<![CDATA[\nx(<![CDATA[\"&amp;<!--\"]]]]><![CDATA[>);\n//]]></script><script type=\"application/json\">{\"a\":\"\\u0026#x26;\"}</script><style>/*<![CDATA[*/\na&b;c\n/*]]>*/</style></head><body></body></html>", "8: kept character references in script as text (XML parsers would have decoded them) (will not warn again)\n44: kept comments in style as text (XML parsers would have read them as comments) (will not warn again)\n95: kept CDATA section markers in script as text (XML parsers would have read a CDATA section)\n"},
 		{"XMLSyntaxPI", "<?xml version=\"1.0\"?><?pi a\r\nb?><p>a<?xml:namespace prefix = o ns = \"urn:o\" />b<?php echo $a->b; ?><?", xmlSyntax, nil,
-			`<!--?pi a` + "\n" + `b?--><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p>a<!--?xml:namespace prefix = o ns = "urn:o" /-->b<!--?php echo $a- -->b; ?&gt;<!--?--></p></body></html>`, ""},
+			`<!--?pi a` + "\n" + `b?-->` + "\n" + `<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p>a<!--?xml:namespace prefix = o ns = "urn:o" /-->b<!--?php echo $a- -->b; ?&gt;<!--?--></p></body></html>`, ""},
 		{"XMLSyntaxPIXMLDeclaration", "<?xml?a b?><?xml ?><?xml?><p>a<?xml version='1.0'?>b<?xml", xmlSyntax, nil,
-			`<!--?xml?a b?--><!--?xml?--><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p>a<!--?xml version='1.0'?-->b<!--?xml--></p></body></html>`, ""},
+			"<!--?xml?a b?-->\n<!--?xml?-->\n" + `<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p>a<!--?xml version='1.0'?-->b<!--?xml--></p></body></html>`, ""},
 		{"XMLSyntaxCDATANUL", "<textarea><![CDATA[a\x00b]]></textarea>", xmlSyntax, nil,
 			"<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta charset=\"UTF-8\" /></head><body><textarea>a\uFFFDb</textarea></body></html>", "10: replaced characters XML doesn't allow\n"},
 		{"XMLSyntaxCDATARawText", "<title> <![CDATA[a<b & c]]> </title><script>\n<![CDATA[\nif (a<b) x();\n]]>\n</script><style><![CDATA[p::before{content:\"&\"}]]></style><script type=\"application/ld+json\"><![CDATA[{\"a\":\"<b>\"}]]></script><script type=module> <![CDATA[a<b]]]]><![CDATA[>]]> </script></head><body><textarea><![CDATA[\nx&amp;<y\r\n]]></textarea><textarea>\n <![CDATA[a]]>\n</textarea>", xmlSyntax, nil,
-			"<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta charset=\"UTF-8\" /><title> a&lt;b &amp; c </title><script>//<![CDATA[\nif (a<b) x();\n//]]></script><style>/*<![CDATA[*/\np::before{content:\"&\"}\n/*]]>*/</style><script type=\"application/ld+json\">{\"a\":\"\\u003cb\\u003e\"}</script><script type=\"module\">//<![CDATA[\na<b]]]]><![CDATA[>\n//]]></script></head><body><textarea>x&amp;amp;&lt;y\n</textarea><textarea> a\n</textarea></body></html>", "218: script containing ]]> can't be represented in XML\n282: leading newline in pre, textarea or listing can't be represented\n326: leading newline in pre, textarea or listing can't be represented\n"},
+			"<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta charset=\"UTF-8\" /><title> a&lt;b &amp; c </title><script>\n//<![CDATA[\nif (a<b) x();\n//]]>\n</script><style>/*<![CDATA[*/\np::before{content:\"&\"}\n/*]]>*/</style><script type=\"application/ld+json\">{\"a\":\"\\u003cb\\u003e\"}</script><script type=\"module\"> //<![CDATA[\na<b]]]]><![CDATA[>\n//]]> </script></head><body><textarea>x&amp;amp;&lt;y\n</textarea><textarea> a\n</textarea></body></html>", "218: script containing ]]> can't be represented in XML\n282: leading newline in pre, textarea or listing can't be represented\n326: leading newline in pre, textarea or listing can't be represented\n"},
 		{"XMLSyntaxCDATARawTextKept", "<title>t <![CDATA[a<b]]></title><script>a(); <![CDATA[ b<c ]]></script><style><![CDATA[a]]><![CDATA[b]]></style><script type=\"text/x-template\"><![CDATA[<b>x</b>]]></script></head><body><textarea><![CDATA[a]]><![CDATA[b]]></textarea>", xmlSyntax, nil,
 			"<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta charset=\"UTF-8\" /><title>t &lt;![CDATA[a&lt;b]]&gt;</title><script>//<![CDATA[\na(); <![CDATA[ b<c ]]]]><![CDATA[>\n//]]></script><style>/*<![CDATA[*/\n<![CDATA[a]]]]><![CDATA[><![CDATA[b]]]]><![CDATA[>\n/*]]>*/</style><script type=\"text/x-template\"><![CDATA[<b>x</b>]]></script></head><body><textarea>&lt;![CDATA[a]]&gt;&lt;![CDATA[b]]&gt;</textarea></body></html>", "7: kept CDATA section markers in title as text (XML parsers would have read a CDATA section)\n40: kept CDATA section markers in script as text (XML parsers would have read a CDATA section)\n78: kept CDATA section markers in style as text (XML parsers would have read a CDATA section)\n143: script of type \"text/x-template\" containing <, & or ]]> can't be represented in XML\n195: kept CDATA section markers in textarea as text (XML parsers would have read a CDATA section)\n"},
 		{"CDATARawText", "<title><![CDATA[a<b]]></title><script><![CDATA[ b<c ]]></script>", nil, nil,
@@ -263,7 +263,7 @@ func TestWriter(t *testing.T) {
 		{"UnwrapFormatting", `<p><b>a<i>b</p>c`, nil, removeIf(htmlstream.Tag("b"), true),
 			`<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p>a<i>b</i></p><i>c</i></body></html>`, ""},
 		{"Positions", `<!--xxxxxxxxxx--><p xmlns:a="u" a:b="1">`, nil, removeIf(htmlstream.Tag("x"), false),
-			`<!--xxxxxxxxxx--><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p xmlns:a="u" a:b="1"></p></body></html>`,
+			"<!--xxxxxxxxxx-->\n" + `<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p xmlns:a="u" a:b="1"></p></body></html>`,
 			`17: attribute "a:b" is in namespace "u" for XML parsers and in no namespace for HTML parsers (will not warn again for this prefix and namespace)` + "\n"},
 		{"Scripting", "<noscript><p>a</p></noscript><noscript>b</noscript><body><noscript>c > d\u00a0</noscript><noscript>]]></noscript>", func(rd *htmlstream.Reader) { rd.SetScripting(true) }, nil,
 			"<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta charset=\"UTF-8\" /><noscript>&lt;p&gt;a&lt;/p&gt;</noscript><noscript>b</noscript></head><body><noscript>c > d\u00a0</noscript><noscript>]]&gt;</noscript></body></html>",
@@ -378,31 +378,31 @@ func TestXMLDecl(t *testing.T) {
 		warnings string
 	}{
 		{"None", `<?xml version="1.0"?><p>x`, Options{DoctypeMode: NoDoctype}, rest, ""},
-		{"Add", `<p>x`, Options{XMLDecl: AddXMLDecl, DoctypeMode: NoDoctype}, decl + rest, ""},
-		{"AddReplacesInput", `<?xml version="1.0" encoding="latin1"?><p>x`, Options{XMLDecl: AddXMLDecl, DoctypeMode: NoDoctype}, decl + rest, ""},
-		{"KeepNone", `<!--c--><!DOCTYPE html><p>x`, Options{XMLDecl: KeepXMLDecl, DoctypeMode: KeepDoctype}, `<!--c--><!DOCTYPE html>` + rest, ""},
-		{"Keep", `<?xml version="1.0" encoding="latin1"?><!DOCTYPE html><p>x`, Options{XMLDecl: KeepXMLDecl, DoctypeMode: KeepDoctype}, decl + `<!DOCTYPE html>` + rest, ""},
-		{"KeepAfterComment", "\n<!--c-->\n<?xml version='1.0'?><!DOCTYPE html><!--d--><p>x", Options{XMLDecl: KeepXMLDecl, DoctypeMode: KeepDoctype}, decl + `<!--c--><!DOCTYPE html><!--d-->` + rest, ""},
-		{"KeepReplaceDoctype", `<!--c--><?xml version="1.0"?><p>x`, Options{XMLDecl: KeepXMLDecl}, decl + `<!DOCTYPE html><!--c-->` + rest, ""},
+		{"Add", `<p>x`, Options{XMLDecl: AddXMLDecl, DoctypeMode: NoDoctype}, decl + "\n" + rest, ""},
+		{"AddReplacesInput", `<?xml version="1.0" encoding="latin1"?><p>x`, Options{XMLDecl: AddXMLDecl, DoctypeMode: NoDoctype}, decl + "\n" + rest, ""},
+		{"KeepNone", `<!--c--><!DOCTYPE html><p>x`, Options{XMLDecl: KeepXMLDecl, DoctypeMode: KeepDoctype}, "<!--c-->\n<!DOCTYPE html>\n" + rest, ""},
+		{"Keep", `<?xml version="1.0" encoding="latin1"?><!DOCTYPE html><p>x`, Options{XMLDecl: KeepXMLDecl, DoctypeMode: KeepDoctype}, decl + "\n<!DOCTYPE html>\n" + rest, ""},
+		{"KeepAfterComment", "\n<!--c-->\n<?xml version='1.0'?><!DOCTYPE html><!--d--><p>x", Options{XMLDecl: KeepXMLDecl, DoctypeMode: KeepDoctype}, decl + "\n<!--c-->\n<!DOCTYPE html>\n<!--d-->\n" + rest, ""},
+		{"KeepReplaceDoctype", `<!--c--><?xml version="1.0"?><p>x`, Options{XMLDecl: KeepXMLDecl}, decl + "\n<!DOCTYPE html>\n<!--c-->\n" + rest, ""},
 		// other XML declarations are written as comments, as HTML parsers read them
-		{"NoneTwice", `<?xml version="1.0"?><?xml version='1.0'?><p>x`, Options{DoctypeMode: NoDoctype}, `<!--?xml version='1.0'?-->` + rest, ""},
+		{"NoneTwice", `<?xml version="1.0"?><?xml version='1.0'?><p>x`, Options{DoctypeMode: NoDoctype}, "<!--?xml version='1.0'?-->\n" + rest, ""},
 		{"NoneInBody", `<!DOCTYPE html><p>x<?xml version="1.0"?>`, Options{DoctypeMode: NoDoctype}, strings.Replace(rest, ">x<", `>x<!--?xml version="1.0"?--><`, 1), ""},
-		{"KeepTwice", `<?xml version="1.0"?><?xml version='1.0'?><p>x`, Options{XMLDecl: KeepXMLDecl, DoctypeMode: NoDoctype}, decl + `<!--?xml version='1.0'?-->` + rest, ""},
+		{"KeepTwice", `<?xml version="1.0"?><?xml version='1.0'?><p>x`, Options{XMLDecl: KeepXMLDecl, DoctypeMode: NoDoctype}, decl + "\n<!--?xml version='1.0'?-->\n" + rest, ""},
 		{"KeepInBody", `<!DOCTYPE html><p>x<?xml version="1.0"?>`, Options{XMLDecl: KeepXMLDecl, DoctypeMode: NoDoctype}, strings.Replace(rest, ">x<", `>x<!--?xml version="1.0"?--><`, 1), ""},
 		{"KeepAfterHTML", `<html><?xml version="1.0"?><p>x`, Options{XMLDecl: KeepXMLDecl, DoctypeMode: NoDoctype}, strings.Replace(rest, "<head>", `<!--?xml version="1.0"?--><head>`, 1), ""},
-		{"KeepLimit", `<!--cccccccc--><?xml version="1.0"?><p>x`, Options{XMLDecl: KeepXMLDecl, DoctypeMode: NoDoctype, MaxRawText: 8}, `<!--cccccccc-->` + rest, "15: dropped XML declaration (output before the root element exceeds MaxRawText)\n"},
-		{"KeepAtLimit", `<!--cccc--><?xml version="1.0"?><p>x`, Options{XMLDecl: KeepXMLDecl, DoctypeMode: NoDoctype, MaxRawText: 11}, decl + `<!--cccc-->` + rest, ""},
-		{"KeepLimitReplaceDoctype", `<!--cccc--><?xml version="1.0"?><p>x`, Options{XMLDecl: KeepXMLDecl, MaxRawText: 11}, decl + `<!DOCTYPE html><!--cccc-->` + rest, ""},
-		{"KeepLimitReplaceDoctypeExceeded", `<!--ccccc--><?xml version="1.0"?><p>x`, Options{XMLDecl: KeepXMLDecl, MaxRawText: 11}, `<!DOCTYPE html><!--ccccc-->` + rest, "12: dropped XML declaration (output before the root element exceeds MaxRawText)\n"},
-		{"KeepNegativeLimit", `<?xml version="1.0"?><p>x`, Options{XMLDecl: KeepXMLDecl, MaxRawText: -1}, decl + `<!DOCTYPE html>` + rest, ""},
-		{"KeepNegativeLimitExceeded", `<!----><?xml version="1.0"?><p>x`, Options{XMLDecl: KeepXMLDecl, MaxRawText: -1}, `<!DOCTYPE html><!---->` + rest, "7: dropped XML declaration (output before the root element exceeds MaxRawText)\n"},
-		{"KeepEmpty", `<?xml version="1.0"?>`, Options{XMLDecl: KeepXMLDecl, DoctypeMode: NoDoctype}, decl + `<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body></body></html>`, ""},
+		{"KeepLimit", `<!--cccccccc--><?xml version="1.0"?><p>x`, Options{XMLDecl: KeepXMLDecl, DoctypeMode: NoDoctype, MaxRawText: 8}, "<!--cccccccc-->\n" + rest, "15: dropped XML declaration (output before the root element exceeds MaxRawText)\n"},
+		{"KeepAtLimit", `<!--cccc--><?xml version="1.0"?><p>x`, Options{XMLDecl: KeepXMLDecl, DoctypeMode: NoDoctype, MaxRawText: 12}, decl + "\n<!--cccc-->\n" + rest, ""},
+		{"KeepLimitReplaceDoctype", `<!--cccc--><?xml version="1.0"?><p>x`, Options{XMLDecl: KeepXMLDecl, MaxRawText: 12}, decl + "\n<!DOCTYPE html>\n<!--cccc-->\n" + rest, ""},
+		{"KeepLimitReplaceDoctypeExceeded", `<!--ccccc--><?xml version="1.0"?><p>x`, Options{XMLDecl: KeepXMLDecl, MaxRawText: 12}, "<!DOCTYPE html>\n<!--ccccc-->\n" + rest, "12: dropped XML declaration (output before the root element exceeds MaxRawText)\n"},
+		{"KeepNegativeLimit", `<?xml version="1.0"?><p>x`, Options{XMLDecl: KeepXMLDecl, MaxRawText: -1}, decl + "\n<!DOCTYPE html>\n" + rest, ""},
+		{"KeepNegativeLimitExceeded", `<!----><?xml version="1.0"?><p>x`, Options{XMLDecl: KeepXMLDecl, MaxRawText: -1}, "<!DOCTYPE html>\n<!---->\n" + rest, "7: dropped XML declaration (output before the root element exceeds MaxRawText)\n"},
+		{"KeepEmpty", `<?xml version="1.0"?>`, Options{XMLDecl: KeepXMLDecl, DoctypeMode: NoDoctype}, decl + "\n" + `<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body></body></html>`, ""},
 		// HTML parsers take UTF-8 from an XML declaration at the start, when
 		// they don't find the meta element
-		{"AddCharsetPast1024", long + `<p>x`, Options{XMLDecl: AddXMLDecl, DoctypeMode: NoDoctype}, decl + long + rest, ""},
-		{"KeepCharsetPast1024", `<?xml version="1.0"?>` + long + `<p>x`, Options{XMLDecl: KeepXMLDecl, DoctypeMode: NoDoctype}, decl + long + rest, ""},
-		{"KeepNoneCharsetPast1024", long + `<p>x`, Options{XMLDecl: KeepXMLDecl, DoctypeMode: NoDoctype}, long + rest, "997: wrote the charset meta element past the first 1024 bytes (HTML parsers which aren't told the encoding will not find it before parsing the output)\n"},
-		{"KeepLimitCharsetPast1024", `<?xml version="1.0"?>` + long + `<p>x`, Options{XMLDecl: KeepXMLDecl, DoctypeMode: NoDoctype, MaxRawText: 100}, long + rest, "0: dropped XML declaration (output before the root element exceeds MaxRawText)\n1018: wrote the charset meta element past the first 1024 bytes (HTML parsers which aren't told the encoding will not find it before parsing the output)\n"},
+		{"AddCharsetPast1024", long + `<p>x`, Options{XMLDecl: AddXMLDecl, DoctypeMode: NoDoctype}, decl + "\n" + long + "\n" + rest, ""},
+		{"KeepCharsetPast1024", `<?xml version="1.0"?>` + long + `<p>x`, Options{XMLDecl: KeepXMLDecl, DoctypeMode: NoDoctype}, decl + "\n" + long + "\n" + rest, ""},
+		{"KeepNoneCharsetPast1024", long + `<p>x`, Options{XMLDecl: KeepXMLDecl, DoctypeMode: NoDoctype}, long + "\n" + rest, "997: wrote the charset meta element past the first 1024 bytes (HTML parsers which aren't told the encoding will not find it before parsing the output)\n"},
+		{"KeepLimitCharsetPast1024", `<?xml version="1.0"?>` + long + `<p>x`, Options{XMLDecl: KeepXMLDecl, DoctypeMode: NoDoctype, MaxRawText: 100}, long + "\n" + rest, "0: dropped XML declaration (output before the root element exceeds MaxRawText)\n1018: wrote the charset meta element past the first 1024 bytes (HTML parsers which aren't told the encoding will not find it before parsing the output)\n"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var warnings strings.Builder
@@ -452,7 +452,7 @@ func TestXMLDecl(t *testing.T) {
 	if err := pw.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if want := decl + `<!--c-->` + rest; b.String() != want {
+	if want := decl + "\n<!--c-->\n" + rest; b.String() != want {
 		t.Errorf("XML syntax: got  %q\nwant %q", b.String(), want)
 	}
 }
@@ -588,7 +588,7 @@ func TestHooks(t *testing.T) {
 	// script contents upper-cased (the charset meta element comes before the
 	// markup inserted after the head start tag)
 	in := `<!DOCTYPE html><title>t</title><p>a<o:p> </o:p>b<img src=i><b>c</p><p>d</b><script>x</script>`
-	want := `<!DOCTYPE html>{<html xmlns="http://www.w3.org/1999/xhtml">}{<head>{<meta charset="UTF-8" />}{}}{<title>}[t]{</title>}{</head>}{<body>}{<p>}[a b]{<img src="i" />}{}{<b>}[c]{</b>}{</p>}{<p>}{<b>}[d]{</b>}{<script>}X{</script>}{</p>}{</body>}{</html>}`
+	want := "<!DOCTYPE html>\n" + `{<html xmlns="http://www.w3.org/1999/xhtml">}{<head>{<meta charset="UTF-8" />}{}}{<title>}[t]{</title>}{</head>}{<body>}{<p>}[a b]{<img src="i" />}{}{<b>}[c]{</b>}{</p>}{<p>}{<b>}[d]{</b>}{<script>}X{</script>}{</p>}{</body>}{</html>}`
 	raw := false
 	var dst []byte
 	got := convertHooked(t, in, Options{
@@ -852,7 +852,7 @@ func convertHookedErr(in string, opt Options, scripting bool) (string, error) {
 // the tags the conversion adds.
 func testAttrs(t *testing.T) {
 	in := `<body class="k"><p lang="en" class="a" id="x" title="t">t</p><br class="c"><svg viewBox="0 0 1 1"><rect x="1"/></svg><div xml:lang="de">d</div><p><b class="a">1</p><p>2</b></p>`
-	want := `<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml" class="h"><head><meta charset="UTF-8" /></head><body class="k2"><p lang="fr" class="b c" xml:lang="fr" data-x="&quot;&lt;&amp;&gt;">t</p><br class="c" id="y" /><svg viewBox="0 0 2 2" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><rect x="1" y="2"></rect></svg><div>d</div><p><b class="z">1</b></p><p><b class="z">2</b></p></body></html>`
+	want := "<!DOCTYPE html>\n" + `<html xmlns="http://www.w3.org/1999/xhtml" class="h"><head><meta charset="UTF-8" /></head><body class="k2"><p lang="fr" class="b c" xml:lang="fr" data-x="&quot;&lt;&amp;&gt;">t</p><br class="c" id="y" /><svg viewBox="0 0 2 2" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><rect x="1" y="2"></rect></svg><div>d</div><p><b class="z">1</b></p><p><b class="z">2</b></p></body></html>`
 	got, err := convertHookedErr(in, Options{
 		OnTag: func(e *Tag) {
 			if !e.Start || e.Reopened {
@@ -1846,18 +1846,18 @@ func TestDoctype(t *testing.T) {
 		want string // the output up to the html start tag
 		warn bool
 	}{
-		{Options{}, `<!-- c --><!DOCTYPE x>`, `<!DOCTYPE html><!-- c -->`, false},
-		{Options{Doctype: xhtml11}, `<!DOCTYPE x>`, xhtml11, false},
-		{Options{XMLDecl: AddXMLDecl}, `<?xml version="1.0" encoding="iso-8859-1"?><p>`, `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html>`, false},
-		{Options{DoctypeMode: NoDoctype, XMLDecl: AddXMLDecl}, `<!-- c --><?xml version="1.0"?><!DOCTYPE html>`, `<?xml version="1.0" encoding="UTF-8"?><!-- c -->`, false},
+		{Options{}, `<!-- c --><!DOCTYPE x>`, "<!DOCTYPE html>\n<!-- c -->\n", false},
+		{Options{Doctype: xhtml11}, `<!DOCTYPE x>`, xhtml11 + "\n", false},
+		{Options{XMLDecl: AddXMLDecl}, `<?xml version="1.0" encoding="iso-8859-1"?><p>`, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE html>\n", false},
+		{Options{DoctypeMode: NoDoctype, XMLDecl: AddXMLDecl}, `<!-- c --><?xml version="1.0"?><!DOCTYPE html>`, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!-- c -->\n", false},
 
 		// KeepDoctype writes the doctype as HTML parsers read it, where it is
 		{Options{DoctypeMode: KeepDoctype}, `<p>`, ``, false},
-		{Options{DoctypeMode: KeepDoctype}, `<!-- c --> <!doctype HTML>`, `<!-- c --><!DOCTYPE html>`, false},
-		{Options{DoctypeMode: KeepDoctype}, "<!DOCTYPE html\npublic '-//W3C//DTD XHTML 1.1//EN'\n\t'http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd'>", xhtml11, false},
-		{Options{DoctypeMode: KeepDoctype}, `<!DOCTYPE html SYSTEM 'a"b'>`, `<!DOCTYPE html SYSTEM 'a"b'>`, false},
-		{Options{DoctypeMode: KeepDoctype}, `<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN">`, `<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "">`, false},
-		{Options{DoctypeMode: KeepDoctype}, `<!DOCTYPE html><!DOCTYPE x>`, `<!DOCTYPE html>`, false},
+		{Options{DoctypeMode: KeepDoctype}, `<!-- c --> <!doctype HTML>`, "<!-- c -->\n<!DOCTYPE html>\n", false},
+		{Options{DoctypeMode: KeepDoctype}, "<!DOCTYPE html\npublic '-//W3C//DTD XHTML 1.1//EN'\n\t'http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd'>", xhtml11 + "\n", false},
+		{Options{DoctypeMode: KeepDoctype}, `<!DOCTYPE html SYSTEM 'a"b'>`, "<!DOCTYPE html SYSTEM 'a\"b'>\n", false},
+		{Options{DoctypeMode: KeepDoctype}, `<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN">`, "<!DOCTYPE html PUBLIC \"-//W3C//DTD HTML 4.01//EN\" \"\">\n", false},
+		{Options{DoctypeMode: KeepDoctype}, `<!DOCTYPE html><!DOCTYPE x>`, "<!DOCTYPE html>\n", false},
 		{Options{DoctypeMode: KeepDoctype}, `<p><!DOCTYPE html>`, ``, false},
 		{Options{DoctypeMode: KeepDoctype}, `<!DOCTYPE "x>`, ``, true},
 		{Options{DoctypeMode: KeepDoctype}, `<!DOCTYPE html PUBLIC "<x>" "">`, ``, true},
@@ -2508,6 +2508,46 @@ func TestSpaceHold(t *testing.T) {
 			}
 			if wout != out || wwarnings != warnings {
 				t.Errorf("%d bytes of whitespace, chunk size %d: output or warnings differ", n, chunk)
+			}
+		}
+	}
+}
+
+// TestHeadSpaceLimits checks that the whitespace at the start of the head
+// waits for the charset meta element up to maxHeadSpace bytes, and that the
+// whitespace and comments after the head are written after the head end tag
+// up to maxAfterHead bytes, and in the head past it, whatever the chunk size.
+func TestHeadSpaceLimits(t *testing.T) {
+	for _, tc := range []struct {
+		n    int
+		in   func(space string) string
+		want func(space string) string
+	}{
+		{maxHeadSpace, func(sp string) string { return "<head>" + sp + "<meta charset=utf-8><title>t</title>" },
+			func(sp string) string { return "<head>" + sp + `<meta charset="UTF-8" /><title>` }},
+		{maxHeadSpace + 1, func(sp string) string { return "<head>" + sp + "<meta charset=utf-8><title>t</title>" },
+			func(sp string) string { return `<head><meta charset="UTF-8" />` + sp + "<title>" }},
+		{maxAfterHead - 8, func(sp string) string { return "<head></head><!--c-->" + sp + "<link rel=x><p>x" },
+			func(sp string) string { return `<link rel="x" /></head><!--c-->` + sp + "<body>" }},
+		{maxAfterHead - 7, func(sp string) string { return "<head></head><!--c-->" + sp + "<link rel=x><p>x" },
+			func(sp string) string { return `<!--c-->` + sp + `<link rel="x" /></head><body>` }},
+	} {
+		space := strings.Repeat(" ", tc.n)
+		in := tc.in(space)
+		out, warnings, err := convertWarnings(strings.NewReader(in), Options{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want := tc.want(space); !strings.Contains(out, want) {
+			t.Errorf("%d bytes of whitespace in %.30q: output doesn't contain %.40q...: %.200s", tc.n, in, want, out)
+		}
+		for _, chunk := range []int{1, 7, 4096} {
+			wout, wwarnings, err := writerWarnings(strings.NewReader(in), chunk, Options{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if wout != out || wwarnings != warnings {
+				t.Errorf("%d bytes of whitespace in %.30q, chunk size %d: output or warnings differ", tc.n, in, chunk)
 			}
 		}
 	}

@@ -215,7 +215,7 @@ func isPTableWarning(w string) bool {
 // checked. Warnings other than those of neutralWarnings stop the comparisons
 // once the output is checked to be well-formed.
 func checkPolyglot(t *testing.T, in, html, out string, warnings []string, scripting, xmlOnly bool) {
-	xml, xmlErr := xmlDOM(out)
+	xml, xmlErr := xmlDOM(out, true)
 	compareXML := true
 	for _, w := range warnings {
 		_, msg, _ := strings.Cut(w, ": ")
@@ -234,21 +234,21 @@ func checkPolyglot(t *testing.T, in, html, out string, warnings []string, script
 	if xmlOnly {
 		return
 	}
-	outDOM := htmlDOMScripting(t, out, scripting)
+	outDOM := htmlDOMScripting(t, out, scripting, false)
 	if html != "" {
 		if xnetForeignTemplate(html) {
 			return
 		}
 		html = xnetDroppedSlash(html)
-		inDOM := htmlDOMScripting(t, html, scripting)
-		if inDOM != outDOM && htmlDOMScripting(t, dropSpaceAfterBody(html), scripting) == outDOM {
+		inDOM := htmlDOMScripting(t, html, scripting, false)
+		if inDOM != outDOM && htmlDOMScripting(t, dropSpaceAfterBody(html), scripting, false) == outDOM {
 			return
 		}
 		if inDOM != outDOM && xnetScriptEscape(html) {
 			return
 		}
 		if inDOM != outDOM {
-			if d := htmlDOMScripting(t, xnetTemplateTableSpace(html), scripting); d == outDOM {
+			if d := htmlDOMScripting(t, xnetTemplateTableSpace(html), scripting, false); d == outDOM {
 				inDOM = d
 			}
 		}
@@ -256,6 +256,7 @@ func checkPolyglot(t *testing.T, in, html, out string, warnings []string, script
 			t.Fatalf("%q: HTML DOM differs without a warning:\noutput: %s\nDOM (input -, output +):\n%s", in, out, domDiff(inDOM, outDOM))
 		}
 	}
+	outDOM = htmlDOMScripting(t, out, scripting, true)
 	if !compareXML || xml != outDOM && (xnetTextareaCR.MatchString(out) || xnetScriptEscape(out)) {
 		return
 	}
@@ -554,7 +555,12 @@ func xmlSyntaxInput(t *testing.T, in string, scripting bool) string {
 					whole = false
 				}
 				if s, ok := htmlutil.CutCDATAWrapper(tok.Data(), w); whole && ok {
-					if err := x.Replace(s); err != nil {
+					// with the whitespace around the wrapper, which polyglot
+					// keeps
+					data := tok.Data()
+					lead := data[:len(data)-len(bytes.TrimLeft(data, "\t\n\f\r "))]
+					trail := data[len(bytes.TrimRight(data, "\t\n\f\r ")):]
+					if err := x.Replace(slices.Concat(lead, s, trail)); err != nil {
 						t.Fatal(err)
 					}
 				}
@@ -1007,7 +1013,7 @@ func FuzzPolyglotHooks(f *testing.F) {
 		if identicalFormatting(plain) {
 			return // renames can change the Noah's Ark clause (see polyglot.Tag.Rename)
 		}
-		if want, got := renameCanonical(htmlDOMScripting(t, plain, scripting)), renameCanonical(htmlDOMScripting(t, renamed, scripting)); got != want {
+		if want, got := renameCanonical(htmlDOMScripting(t, plain, scripting, false)), renameCanonical(htmlDOMScripting(t, renamed, scripting, false)); got != want {
 			t.Fatalf("%q, mode %#x: HTML DOM differs with renames:\noutput: %s\nwith renames: %s\nDOM (without -, with +):\n%s", in, mode, plain, renamed, domDiff(want, got))
 		}
 	})

@@ -4,51 +4,59 @@ parenting, and tables in a p in quirks mode.
 -- in --
 <table><tr><td>a<td>b<tr><td>c</table><table><col width=1><tr><th>h</table><table><td>x</table>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><table><tbody><tr><td>a</td><td>b</td></tr><tr><td>c</td></tr></tbody></table><table><colgroup><col width="1" /></colgroup><tbody><tr><th>h</th></tr></tbody></table><table><tbody><tr><td>x</td></tr></tbody></table></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><table><tbody><tr><td>a</td><td>b</td></tr><tr><td>c</td></tr></tbody></table><table><colgroup><col width="1" /></colgroup><tbody><tr><th>h</th></tr></tbody></table><table><tbody><tr><td>x</td></tr></tbody></table></body></html>
 -- TableMarkers --
 -- in --
 <p><b>x</p><table><tr><td>y</td></tr></table>z
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p><b>x</b></p><table><tbody><tr><td>y</td></tr></tbody></table><b>z</b></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p><b>x</b></p><table><tbody><tr><td>y</td></tr></tbody></table><b>z</b></body></html>
 -- QuirksTableInP htmldiff --
 in quirks mode, the table doesn't close the p
 -- in --
 <p>a<table><tr><td>x</table>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p>a</p><table><tbody><tr><td>x</td></tr></tbody></table></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p>a</p><table><tbody><tr><td>x</td></tr></tbody></table></body></html>
 -- warn --
 4: closed p before table (HTML parsers would have put the table in the p in quirks mode)
 -- QuirksDoctypeTableInP htmldiff --
 -- in --
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"><p>a<table><tr><td>x</table>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p>a</p><table><tbody><tr><td>x</td></tr></tbody></table></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p>a</p><table><tbody><tr><td>x</td></tr></tbody></table></body></html>
 -- warn --
 67: closed p before table (HTML parsers would have put the table in the p in quirks mode)
 -- NoQuirksTableInP --
 -- in --
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"><p>a<table><tr><td>x</table><!doctype html><p>b<table></table>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p>a</p><table><tbody><tr><td>x</td></tr></tbody></table><p>b</p><table></table></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p>a</p><table><tbody><tr><td>x</td></tr></tbody></table><p>b</p><table></table></body></html>
 -- FosterParenting htmldiff --
 -- in --
 <table><b>x</b><tr><td>y</table>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><table><b>x</b><tbody><tr><td>y</td></tr></tbody></table></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><table><b>x</b><tbody><tr><td>y</td></tr></tbody></table></body></html>
 -- warn --
 7: kept b in a table outside a cell (HTML parsers would have moved it before the table)
 -- FosterParentingColgroupText htmldiff --
 -- in --
 <table><colgroup> x</colgroup></table>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><table><colgroup> </colgroup>x</table></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><table><colgroup> </colgroup>x</table></body></html>
 -- warn --
 18: kept text in a table outside a cell (HTML parsers would have moved it before the table)
 -- FosterParentingInput htmldiff --
 -- in --
 <table><input type=" hidden"><tr><td>x</table>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><table><input type=" hidden" /><tbody><tr><td>x</td></tr></tbody></table></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><table><input type=" hidden" /><tbody><tr><td>x</td></tr></tbody></table></body></html>
 -- warn --
 7: kept input in a table outside a cell (HTML parsers would have moved it before the table)
 -- FosterParentingReopened htmldiff --
@@ -56,7 +64,8 @@ the reopened a is moved before the table too
 -- in --
 <p><a></p><table>x</table><p><b></p><table><span>y</span></table>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p><a></a></p><table><a>x</a></table><p><a><b></b></a></p><table><a><b><span>y</span></b></a></table></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p><a></a></p><table><a>x</a></table><p><a><b></b></a></p><table><a><b><span>y</span></b></a></table></body></html>
 -- warn --
 17: kept text in a table outside a cell (HTML parsers would have moved it before the table)
 43: kept span in a table outside a cell (HTML parsers would have moved it before the table)
@@ -64,40 +73,46 @@ the reopened a is moved before the table too
 -- in --
 <table><input type=HIDDEN><tr><td>x</table>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><table><input type="HIDDEN" /><tbody><tr><td>x</td></tr></tbody></table></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><table><input type="HIDDEN" /><tbody><tr><td>x</td></tr></tbody></table></body></html>
 -- FosterParentingSVG htmldiff --
 -- in --
 <table><svg><g>x</g></svg><tr><td>y</table>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><table><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><g>x</g></svg><tbody><tr><td>y</td></tr></tbody></table></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><table><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><g>x</g></svg><tbody><tr><td>y</td></tr></tbody></table></body></html>
 -- warn --
 7: kept svg in a table outside a cell (HTML parsers would have moved it before the table)
 -- FosterParentingSVGInColgroup htmldiff --
 -- in --
 <table><colgroup><svg></svg></table>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><table><colgroup><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"></svg></colgroup></table></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><table><colgroup><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"></svg></colgroup></table></body></html>
 -- warn --
 17: kept svg in a table outside a cell (HTML parsers would have moved it before the table)
 -- FosterParentingStrayBr htmldiff --
 -- in --
 <table><tr></br><td>x</table>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><table><tbody><tr><br /><td>x</td></tr></tbody></table></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><table><tbody><tr><br /><td>x</td></tr></tbody></table></body></html>
 -- warn --
 11: wrote br for </br> in a table outside a cell (HTML parsers would have put it before the table)
 -- FosterParentingStrayP htmldiff --
 -- in --
 <table></p><tr><td>x</table>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><table><p></p><tbody><tr><td>x</td></tr></tbody></table></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><table><p></p><tbody><tr><td>x</td></tr></tbody></table></body></html>
 -- warn --
 7: wrote p for </p> in a table outside a cell (HTML parsers would have put it before the table)
 -- TablePartOutsideTable --
 -- in --
 <td>x</td>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><td>x</td></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><td>x</td></body></html>
 -- warn --
 0: kept td outside a table (HTML parsers would have ignored it)
 -- ImpliedTableEnds --
@@ -105,35 +120,41 @@ end tags of the elements HTML parsers imply close them
 -- in --
 <table><td>a</td></tr><td>b</td></tbody><tr><td>c</table><table><col></colgroup><col><tr><td>d</td></tr></tbody><td>e</table>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><table><tbody><tr><td>a</td></tr><tr><td>b</td></tr></tbody><tbody><tr><td>c</td></tr></tbody></table><table><colgroup><col /></colgroup><colgroup><col /></colgroup><tbody><tr><td>d</td></tr></tbody><tbody><tr><td>e</td></tr></tbody></table></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><table><tbody><tr><td>a</td></tr><tr><td>b</td></tr></tbody><tbody><tr><td>c</td></tr></tbody></table><table><colgroup><col /></colgroup><colgroup><col /></colgroup><tbody><tr><td>d</td></tr></tbody><tbody><tr><td>e</td></tr></tbody></table></body></html>
 -- ColInCell --
 col closes a cell, row or caption
 -- in --
 <table><tr><td>x<col><caption>y<col><tr><td>z</table>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><table><tbody><tr><td>x</td></tr></tbody><colgroup><col /></colgroup><caption>y</caption><colgroup><col /></colgroup><tbody><tr><td>z</td></tr></tbody></table></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><table><tbody><tr><td>x</td></tr></tbody><colgroup><col /></colgroup><caption>y</caption><colgroup><col /></colgroup><tbody><tr><td>z</td></tr></tbody></table></body></html>
 -- ColgroupStrayEndTag --
 end tags other than col, colgroup and template close a colgroup
 -- in --
 <table><col></a><col><colgroup><col></b><col></colgroup><col></template></col><col></table>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><table><colgroup><col /></colgroup><colgroup><col /></colgroup><colgroup><col /></colgroup><colgroup><col /></colgroup><colgroup><col /><col /></colgroup></table></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><table><colgroup><col /></colgroup><colgroup><col /></colgroup><colgroup><col /></colgroup><colgroup><col /></colgroup><colgroup><col /><col /></colgroup></table></body></html>
 -- ColgroupMisplaced --
 misplaced body and head start tags close a colgroup, html doesn't
 -- in --
 <table><col><html><col><body><col><colgroup><html><col><head><col></table>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><table><colgroup><col /><col /></colgroup><colgroup><col /></colgroup><colgroup><col /></colgroup><colgroup><col /></colgroup></table></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><table><colgroup><col /><col /></colgroup><colgroup><col /></colgroup><colgroup><col /></colgroup><colgroup><col /></colgroup></table></body></html>
 -- TableSpaceNoReopen --
 -- in --
 <!DOCTYPE html><p><a>x</p><table> <tr> <td>y</table>z
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p><a>x</a></p><table> <tbody><tr> <td>y</td></tr></tbody></table><a>z</a></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p><a>x</a></p><table> <tbody><tr> <td>y</td></tr></tbody></table><a>z</a></body></html>
 -- ColgroupText htmldiff --
 -- in --
 <table><col>x<col><colgroup>y<col></table>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><table><colgroup><col /></colgroup>x<colgroup><col /></colgroup><colgroup></colgroup>y<colgroup><col /></colgroup></table></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><table><colgroup><col /></colgroup>x<colgroup><col /></colgroup><colgroup></colgroup>y<colgroup><col /></colgroup></table></body></html>
 -- warn --
 12: kept text in a table outside a cell (HTML parsers would have moved it before the table)
 28: kept text in a table outside a cell (HTML parsers would have moved it before the table)
@@ -143,7 +164,8 @@ and close it for the other text
 -- in --
 <table><col>  x</table>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><table><colgroup><col />  </colgroup>x</table></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><table><colgroup><col />  </colgroup>x</table></body></html>
 -- warn --
 12: kept text in a table outside a cell (HTML parsers would have moved it before the table)
 -- TableTextReopened --
@@ -152,7 +174,8 @@ text in a table, whatever the chunk size
 -- in --
 <!DOCTYPE html><p><b>x<table>  y</table>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p><b>x</b></p><table><b>  y</b></table></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p><b>x</b></p><table><b>  y</b></table></body></html>
 -- warn --
 29: kept text in a table outside a cell (HTML parsers would have moved it before the table)
 -- CaptionTh --
@@ -160,26 +183,30 @@ th closes the caption like td (x/net ignores it)
 -- in --
 <table><caption>x<th>y</table>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><table><caption>x</caption><tbody><tr><th>y</th></tr></tbody></table></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><table><caption>x</caption><tbody><tr><th>y</th></tr></tbody></table></body></html>
 -- ImpliedTableEndInForeign htmldiff --
 -- in --
 <table><td><svg></tbody>x</table>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><table><tbody><tr><td><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">x</svg></td></tr></tbody></table></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><table><tbody><tr><td><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">x</svg></td></tr></tbody></table></body></html>
 -- warn --
 16: kept td open at </tbody> of an implied element (HTML parsers would have closed it)
 -- ImpliedTableEndInCell htmldiff --
 -- in --
 <table><td></tbody>x</table>
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><table><tbody><tr><td>x</td></tr></tbody></table></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><table><tbody><tr><td>x</td></tr></tbody></table></body></html>
 -- warn --
 11: kept td open at </tbody> of an implied element (HTML parsers would have closed it)
 -- RowAfterTable --
 -- in --
 <table><tr><td>x</td></tr></table><tr><td>y
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><table><tbody><tr><td>x</td></tr></tbody></table><tr><td>y</td></tr></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><table><tbody><tr><td>x</td></tr></tbody></table><tr><td>y</td></tr></body></html>
 -- warn --
 34: kept tr outside a table (HTML parsers would have ignored it)
 38: kept td outside a table (HTML parsers would have ignored it)
@@ -189,7 +216,8 @@ them
 -- in --
 <tbody><td>x</td></tr><td>y
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><tbody><tr><td>x</td></tr><tr><td>y</td></tr></tbody></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><tbody><tr><td>x</td></tr><tr><td>y</td></tr></tbody></body></html>
 -- warn --
 0: kept tbody outside a table (HTML parsers would have ignored it)
 7: kept td outside a table (HTML parsers would have ignored it)
@@ -198,7 +226,8 @@ them
 -- in --
 <tbody><td>x</tr>y
 -- out --
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><tbody><tr><td>xy</td></tr></tbody></body></html>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><tbody><tr><td>xy</td></tr></tbody></body></html>
 -- warn --
 0: kept tbody outside a table (HTML parsers would have ignored it)
 7: kept td outside a table (HTML parsers would have ignored it)

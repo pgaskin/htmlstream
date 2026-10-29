@@ -19,7 +19,8 @@
 // Documents are compared as DOMs dumped as indented text, ignoring comments,
 // doctypes, whitespace-only text, namespace declarations, xml:lang,
 // character encoding declarations, and the CDATA wrappers in scripts and
-// styles. Known differences between x/net and the HTML Standard are worked
+// styles. The x/net and encoding/xml DOMs of an output are compared with
+// whitespace-only text, which both must have in the same places. Known differences between x/net and the HTML Standard are worked
 // around by rewriting the input before x/net parses it (specDoctypes,
 // specPreNewlines, specCaptionTh, xnetTemplateTableSpace, xnetDroppedSlash),
 // or the input is skipped (xnetScriptEscape, xnetTextareaCR,
