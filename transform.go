@@ -128,8 +128,9 @@ var ErrIncompleteTag = errors.New("htmlstream: can't edit an incomplete start ta
 
 // ErrHeldOpen is returned by [Transformer.HoldDiscard] when the output held
 // back has the start tag of an element which is still open and whose end tag
-// has edits (from Wrap, Rename or Unwrap). The hold doesn't end, and the
-// Transformer continues.
+// has edits (from Wrap, Rename or Unwrap, or InsertAfter at the start tag of
+// a void element under XML rules or with XML syntax). The hold doesn't end,
+// and the Transformer continues.
 var ErrHeldOpen = errors.New("htmlstream: can't discard held output containing the start tag of an open element (its end tag has edits)")
 
 // ErrHoldReleased is returned by [Transformer.HoldRelease] and
@@ -339,8 +340,9 @@ func (t *Transformer) InsertAtEnd(raw []byte) {
 //
 // The edits of a held token can't be changed after the Transformer advances
 // past it, but the edits of an element's end tag (from Wrap, Rename and
-// Unwrap of its start tag) apply when the end tag is written, which may be
-// after the hold ends.
+// Unwrap of its start tag, and InsertAfter at the start tag of a void element
+// under XML rules or with XML syntax) apply when the end tag is written,
+// which may be after the hold ends.
 //
 // The held output is limited to [DefaultMaxHold] by default (see
 // [Transformer.SetMaxHold]): exceeding it is an error ([ErrHoldLimit]). To
@@ -395,11 +397,12 @@ func (t *Transformer) HoldRelease(h Hold) error {
 // in it, and counts toward the limit (see [Transformer.SetMaxHold]).
 //
 // If the output held back contains the start tag of an element which is still
-// open and whose end tag has edits (from Wrap, Rename or Unwrap), the end
-// tag would no longer match the start tag written, so HoldDiscard returns
-// [ErrHeldOpen] and the hold doesn't end. The end tags of elements without
-// such edits are written as usual, like after Replace(nil) on the start tag:
-// use Remove on the end tag to drop it.
+// open and whose end tag has edits (from Wrap, Rename or Unwrap, or
+// InsertAfter at the start tag of a void element under XML rules or with XML
+// syntax), the end tag would no longer match the start tag written, so
+// HoldDiscard returns [ErrHeldOpen] and the hold doesn't end. The end tags of
+// elements without such edits are written as usual, like after Replace(nil)
+// on the start tag: use Remove on the end tag to drop it.
 //
 // See [Transformer.Hold] for the other errors.
 func (t *Transformer) HoldDiscard(h Hold, raw []byte) error {
@@ -603,7 +606,8 @@ func (t *Transformer) rec(f *frame) *frameRec {
 // current token becomes the element's end tag. Markup inserted before the
 // start tag and the markup passed to [Transformer.Wrap] are still written;
 // markup inserted after the start tag is inside the element and is removed
-// with it.
+// with it, except at a void element under XML rules or with XML syntax,
+// where it is after the element (see [Transformer.InsertAfter]).
 //
 // A void element under XML rules or with XML syntax (e.g., <br>, see
 // Element model in the package documentation) opens an element only up to
@@ -680,7 +684,10 @@ func (t *Transformer) InsertBefore(raw []byte) error {
 // is inside the element too, whatever the order of the calls, unless the
 // start tag is removed, replaced or unwrapped, which leaves out the end tag.
 // To insert markup after such an element, use [Transformer.Wrap] with a nil
-// start.
+// start. For the start tag of a void element under XML rules or with XML
+// syntax (e.g., <br> in <br></br>, see Element model in the package
+// documentation), it is after the element, like the end of a wrap (see
+// [Transformer.Wrap]), since <br>x</br> isn't one element.
 //
 // An implied end tag (see [Token.Implied]) writes nothing, so HTML parsers
 // read markup inserted after it as inside the element, which they close
@@ -690,11 +697,30 @@ func (t *Transformer) InsertBefore(raw []byte) error {
 //
 // The current token can be of any kind.
 func (t *Transformer) InsertAfter(raw []byte) error {
-	if _, err := t.current("insertion"); err != nil {
+	c, err := t.current("insertion")
+	if err != nil {
 		return err
+	}
+	if c.kind == StartTag && t.opensVoid(c) {
+		f, _, err := t.element()
+		if err != nil {
+			return err
+		}
+		r := t.rec(f)
+		r.wrapEnd = append(r.wrapEnd, raw...)
+		return nil
 	}
 	t.after = append(t.after, raw...)
 	return nil
+}
+
+// opensVoid reports whether the start tag c opens a void element under XML
+// rules or with XML syntax (see Reader.next).
+func (t *Transformer) opensVoid(c *Token) bool {
+	if c.Untracked() {
+		return t.r.voidOpen
+	}
+	return c.flags&tokPushed != 0 && t.r.stack[len(t.r.stack)-1].flags&frameXMLVoid != 0
 }
 
 // Unwrap removes the current start tag and, if it opens an element, the
@@ -863,9 +889,10 @@ func (t *Transformer) Empty() error {
 	if err != nil {
 		return err
 	}
-	// markup inserted after the start tag of an element other than a void
-	// element is written inside it, so it needs an end tag
-	inside := f != nil && len(t.after) != 0 && !(c.Untracked() && t.r.voidOpen || !c.Untracked() && f.flags&frameXMLVoid != 0)
+	// markup inserted after the start tag is written inside the element, so
+	// it needs an end tag (InsertAfter at a void element under XML rules or
+	// with XML syntax writes after the element)
+	inside := f != nil && len(t.after) != 0
 	t.edited = true
 	t.selfClose = 0
 	if c.ns == nsHTML && c.HTMLRules() && !htmlVoid(c) || inside {
