@@ -35,11 +35,15 @@ The [`ascii`](https://pkg.go.dev/github.com/pgaskin/htmlstream/ascii) package ha
 
 #### Robustness
 
-This library is optimized for allocations, and, to a slightly lesser degree, throughput. There are zero-copy versions of most methods. It is designed to not crash even on malformed inputs. The `htmlstream`, `polyglot`, and `sax` packages have configurable bounded resource requirements, even for untrusted input.
+This library is optimized for allocations, and, to a slightly lesser degree, throughput. There are zero-copy versions of most methods. It is designed to not crash even on malformed inputs. The `htmlstream`, `polyglot`, and `sax` packages have configurable bounded resource requirements, even for untrusted input (these should be configured explicitly and tuned to your use case if you depend on it).
 
 This library is also designed to pass through malformed input as faithfully as possible (byte-identical in most cases). If content cannot be represented or parsed appropriately, it will emit warnings/errors, which can be handled by the caller. Most of the errors are sticky to reduce the amount of error handling boilerplate.
 
 This library is designed to work on UTF-8 or ASCII-compatible input, but has helpers for sniffing/parsing the charset which can be used with [`x/text/encoding`](https://pkg.go.dev/golang.org/x/text/encoding) to convert it on-the-fly.
+
+The polyglot output is intended to be idempotent in almost all cases, and this is checked for the entire test suite. This is not a guarantee in 100% of cases (it's quite hard to prove it), but I will fix it if I ever find a case where it isn't.
+
+The polyglot output also tries to preserve the original document's structure as much as possible, including for mostly-cosmetic things like whitespace placement.
 
 This library is well-tested, fuzzed, and used in quite a few of my projects. Although it is relatively new, a lot of the core code and design is based on previous things I've written. The high-level `htmlutil`/`xmlutil`/`sax` packages are a little bit less battle-tested, but should still be stable.
 
@@ -47,6 +51,20 @@ I haven't released a v1 yet since I want to be able to make minor changes to the
 
 #### LLM Usage
 
-I used Claude to write a lot of the actual code and do the fuzzing, but I designed the API myself, and I reviewed (and tweaked) a lot of the code it wrote (and corrected a few misconceptions it had). If anything, this significantly increased the code quality and robustness since the LLM wrote a lot of fuzzers, and spent more time on the rarer edge cases than I would have (e.g., I wasn't originally planning on matching the HTML5 spec for adopting misnested or unclosed elements, but it spent the time to handle that correctly). I spent almost a week's worth of time iterating upon this library with Claude, even after it finished my original specification. Furthermore, I've already done a lot of other work in this area (kepubify, ebook tooling, multiple scrapers, some private projects), and I had Claude use it as a starting point. Note that unlike my other projects, I let Claude write some of the doc comments and examples given the large API surface (I understand the API and semantics since I designed it, so I'm not really motivated to spend too much time writing extensive docs, but it can be a bit daunting without them).
+This README is written entirely by me.
+
+I designed the API and architected the internal bits of this library almost entirely by hand. Claude did the implementation, using code I had previously written for kepubify and other projects over the last 10 years a starting point. I read ALL of the thinking traces, and actively worked with claude on figuring out the details. I spent around 60 hours in total (over multiple days) working on this library, with more than half of that time being after Claude thought it was complete.
+
+I let Claude write the initial set of doc comments and examples given the large API surface, and verified them for accuracy (but not concision and clarity yet, see below). In the past, I would have left the initial v0 release of a library like this with minimal documentation, as I already understand it since I wrote it.
+
+All commits are closely reviewed by me, and I write ALL commit messages myself, including the ones `Co-Authored-By` claude (for those, I also have it read my hand-written commit message to ensure I understand the change and its implications correctly). I do this (unlike with some of my other LLM-assisted projects like [Vento](https://github.com/pgaskin/vento)) since a lot of the changes here are quite subtle, and I also need to ensure behaviour changes are documented correctly.
+
+For the same reason, I'm currently working on rewriting all the doc comments and examples by hand. They're all accurate regardless (I've reviewed them myself), but most are overly verbose (burying important details), and some emphasize the wrong details or underspecify some of the behaviour I already guarantee. I figured overly-verbose documentation is better than none for the initial release at any rate (and it also helps LLMs use this library correctly).
+
+On a more positive note, the amount of fuzzing Claude was able to do (both by reasoning about the code adversially, and by writing comprehensive fuzzers) significantly improved the quality and robustness of this library past what I'd be able to do on my own, and has made me much more confident in the output.
+
+Without the LLM-assisted fuzzing and testing, I would have needed to drop some of the trickier/rarer features like quirks mode support, polyglot output idempotency, and matching the HTML5 spec and test suite (rather than just approximating the common parts), the SAX wrapper, and the stdlib xml adapter, as it'd be too hard to guarantee correct handling without formal verification. In addition, there would probably be a lot more unhandled edge-cases, as the specifications aren't explicit about quite a few of them, and the publicly available test data doesn't cover all of them.
+
+And, without LLMs, I probably would never have gotten around to creating this library, even though I had wanted to for years, since the benefit wouldn't have outweighed the time cost versus doing more specific one-off things for projects where I needed it.
 
 <!-- TODO: some examples here -->
