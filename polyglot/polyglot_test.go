@@ -1934,7 +1934,14 @@ func TestQuirksTableInP(t *testing.T) {
 		// don't change where the content after them goes
 		{Options{DoctypeMode: NoDoctype}, `<p>a<table></table>b<html><span>c</span>`, `<p>a<table></table>b</p><span>c</span>`, "26: closed p at <span> after a table in it (HTML parsers would have kept the p open in quirks mode)"},
 		{Options{DoctypeMode: NoDoctype}, `<p>a<table></table><html>b<br>c</p>d<p>e<table></table><body><div>f`, `<p>a<table></table>b<br />c</p>d<p>e<table></table></p><div>f</div>`, ""},
-		{Options{DoctypeMode: NoDoctype}, `<p>a<table></table><head><noscript><div>b`, `<p>a<table></table></p><noscript></noscript><div>b</div>`, "25: closed p at <noscript> after a table in it (HTML parsers would have kept the p open in quirks mode)\n35: closed noscript after a misplaced <head> at the content after it (HTML parsers would have kept it open as body content)"},
+		// a noscript after a misplaced head start tag is in the p for HTML
+		// parsers, which close it with the p (at the div and the p end tag),
+		// and keep it open at other content
+		{Options{DoctypeMode: NoDoctype}, `<p>a<table></table><head><noscript><div>b`, `<p>a<table></table></p><noscript></noscript><div>b</div>`, "25: closed p at <noscript> after a table in it (HTML parsers would have kept the p open in quirks mode)"},
+		{Options{Doctype: transitional}, `<p>a<table></table><head><noscript> <meta><h1>b`, `<p>a<table></table></p><noscript> <meta /></noscript><h1>b</h1>`, "25: closed p at <noscript> after a table in it (HTML parsers would have kept the p open in quirks mode)"},
+		{Options{DoctypeMode: NoDoctype}, `<p>a<table></table><head><noscript></p>b`, `<p>a<table></table></p><noscript><p></p></noscript>b`, "25: closed p at <noscript> after a table in it (HTML parsers would have kept the p open in quirks mode)"},
+		{Options{DoctypeMode: NoDoctype}, `<p>a<table></table><head><noscript>b<div>c`, `<p>a<table></table></p><noscript></noscript>b<div>c</div>`, "25: closed p at <noscript> after a table in it (HTML parsers would have kept the p open in quirks mode)\n35: closed noscript after a misplaced <head> at the content after it (HTML parsers would have kept it open as body content)"},
+		{Options{DoctypeMode: NoDoctype}, `<p>a<table></table><head><noscript></noscript><div>b`, `<p>a<table></table></p><noscript></noscript><div>b</div>`, "25: closed p at <noscript> after a table in it (HTML parsers would have kept the p open in quirks mode)"},
 		{Options{DoctypeMode: NoDoctype}, `<span><p>a<table></table>b</span>c`, `<span><p>a<table></table>b</p></span>c`, "26: closed p at </span> (HTML parsers would have ignored the end tag)"},
 		{Options{DoctypeMode: NoDoctype}, `<b><p>a<table></table>b</b>c`, `<b><p>a<table></table>b</p></b>c`, "23: closed p at </b> (HTML parsers would have kept p open and cloned b into it)"},
 		// HTML parsers reopen the b in the p, like an element whose start tag

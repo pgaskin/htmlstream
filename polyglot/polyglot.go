@@ -2328,9 +2328,14 @@ type polyglot struct {
 	keptOpen, keptBy string
 	kept             []string // the names of all elements closed before the end tag
 
-	// a noscript after a misplaced head start tag was closed by an implied
-	// end tag, which the Reader gives with the head noscript rules
-	misplacedNoscript bool
+	// a noscript after a misplaced head start tag, which HTML parsers read
+	// as body content: noscriptInP is set while it is in a p for HTML
+	// parsers (kept open around a table, and closed before the noscript in
+	// the output, see keepP), which they close with the noscript at a p end
+	// tag (setting noscriptPEnd) or a start tag which closes a p, and
+	// misplacedNoscript when the noscript was closed by an implied end tag,
+	// which the Reader gives with the head noscript rules
+	noscriptInP, noscriptPEnd, misplacedNoscript bool
 
 	form     bool  // a form element is open for HTML parsers, which ignore nested forms
 	stripNL  bool  // remove a leading newline from the next text (pre, textarea)
@@ -2749,9 +2754,13 @@ func (p *polyglot) token(tok *htmlstream.Token) {
 		p.resolveTentative(tok)
 	}
 	if p.misplacedNoscript && !tok.Implied() {
-		// not at the end of the input, where HTML parsers close it too
-		p.warn(tok.Pos(), "closed noscript after a misplaced <head> at the content after it (HTML parsers would have kept it open as body content)")
-		p.misplacedNoscript = false
+		// not at the end of the input, where HTML parsers close it too, or
+		// at a start tag which closes the p around it for them
+		var buf [16]byte
+		if !p.noscriptInP || tok.Kind() != htmlstream.StartTag || tok.NS() != htmlstream.NamespaceXHTML || internal.HTMLElem(tok.AppendLocalName(buf[:0]))&internal.ClosesP == 0 {
+			p.warn(tok.Pos(), "closed noscript after a misplaced <head> at the content after it (HTML parsers would have kept it open as body content)")
+		}
+		p.misplacedNoscript, p.noscriptInP = false, false
 	}
 	if tok.Kind() == htmlstream.EndTag && !tok.Implied() && (tok.Is("body") || tok.Is("html")) && p.impliedHeadNoscript() {
 		// htmlutil.Document starts the body for it
@@ -5368,6 +5377,12 @@ func (p *polyglot) endTag(tok *htmlstream.Token) {
 			// explicit one, then handle the end tag in the table
 			p.popOut()
 		}
+		if tok.Is("p") && p.noscriptInP {
+			// closes the noscript after a misplaced head start tag with the
+			// p around it for HTML parsers, which the output closes before
+			// the noscript (see keepP)
+			p.noscriptInP, p.noscriptPEnd = false, true
+		}
 		switch {
 		case (tok.Is("br") || tok.Is("p")) && p.templateIgnoresEnd():
 			// ignored by HTML parsers
@@ -5449,9 +5464,12 @@ func (p *polyglot) endTag(tok *htmlstream.Token) {
 		// after the reopen entry below copies them
 		defer func() { p.starts, p.bounds = p.starts[:f.startOff], p.bounds[:f.boundOff] }()
 	}
-	if ok && tok.Implied() && f.name == "noscript" {
+	if ok && f.name == "noscript" {
 		if h, ok := p.frames.Top(); ok && h.out < 0 && h.name == "head" {
-			p.misplacedNoscript = true
+			// not after a p end tag, which closed it for HTML parsers
+			p.misplacedNoscript = tok.Implied() && !p.noscriptPEnd
+			p.noscriptInP = p.noscriptInP && p.misplacedNoscript
+			p.noscriptPEnd = false
 		}
 	}
 	if ok && !tok.Implied() && tok.NS() == htmlstream.NamespaceXHTML && (tok.Is("body") || tok.Is("html")) {
@@ -5634,6 +5652,10 @@ func (p *polyglot) keepP(tok *htmlstream.Token) {
 	}
 	p.warn(tok.Pos(), "closed p at <%s> after a table in it (HTML parsers would have kept the p open in quirks mode)", htmlName(tok))
 	p.popTo(p.keptP)
+	if h, ok := p.frames.Top(); ok && h.out < 0 && h.name == "head" && tok.Is("noscript") {
+		// HTML parsers close it with the p (see noscriptInP)
+		p.noscriptInP = true
+	}
 }
 
 // inKeptP reports whether a p is kept open around a table (see keepP), and
