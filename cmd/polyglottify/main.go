@@ -54,6 +54,7 @@ func run(name string, args []string, stdin io.Reader, stdout, stderr io.Writer) 
 	doctype := fset.String("doctype", "", "doctype `mode` to use (default or \"\", keep, none, <replacement_doctype>) (default \"<!DOCTYPE html>\")")
 	xmlDecl := fset.String("xmldecl", "none", "xml declaration `mode` to use (none, add, keep)")
 	strict := fset.Bool("strict", false, "fail if input is structurally unsound/ambiguous (instead of attempting to continue)")
+	finalNewline := fset.Bool("final-newline", false, "end the output with a line break (HTML parsers append it to the body, taking it from whitespace at the end of the body if it ends with one, and XML parsers ignore it)")
 	quiet := fset.Bool("quiet", false, "don't print warnings to stderr")
 	inPlace := fset.Bool("i", false, "convert the files in place, writing to a temporary file first (requires at least one filename)")
 	xmlSyntax := fset.Bool("xml-syntax", false, "accept CDATA sections, processing instructions, self-closing tags on non-void elements, end tags of void elements (<br></br> is one br), and doctypes with an internal subset, for documents written as XHTML (e.g., EPUB content) (it may slightly change the meaning of looser HTML documents if used for them)")
@@ -81,6 +82,7 @@ func run(name string, args []string, stdin io.Reader, stdout, stderr io.Writer) 
 	c.opt.Strict = *strict
 	c.opt.XMLSyntax = *xmlSyntax
 	c.opt.Scripting = *scripting
+	c.opt.FinalNewline = *finalNewline
 	switch *doctype {
 	case "", "default":
 	case "keep":

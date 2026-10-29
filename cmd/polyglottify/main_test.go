@@ -77,7 +77,7 @@ func TestHelp(t *testing.T) {
 	if code != 0 || stdout != "" || !strings.HasPrefix(stderr, "usage: polyglottify [flags] [file|-]...\n") {
 		t.Errorf("got %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
-	for _, f := range []string{"-doctype", "-xmldecl", "-strict", "-quiet", "-i", "-xml-syntax", "-scripting", "-max-token-size", "-max-depth", "-max-stack-bytes", "-max-raw-text"} {
+	for _, f := range []string{"-doctype", "-xmldecl", "-strict", "-quiet", "-i", "-xml-syntax", "-scripting", "-max-token-size", "-max-depth", "-max-stack-bytes", "-max-raw-text", "-final-newline"} {
 		if !strings.Contains(stderr, "\n  "+f) {
 			t.Errorf("usage doesn't have %s", f)
 		}
@@ -113,6 +113,13 @@ func TestDoctype(t *testing.T) {
 				t.Errorf("got\n\t%s\nwant\n\t%s", stdout, tc.out)
 			}
 		})
+	}
+}
+
+func TestFinalNewline(t *testing.T) {
+	stdout, stderr, code := runCmd(t, "<p>x</p>\n", "-final-newline")
+	if want := "<!DOCTYPE html>\n" + htmlStart + "<p>x</p>" + htmlEnd + "\n"; code != 0 || stderr != "" || stdout != want {
+		t.Errorf("got %d, stderr %q, stdout\n\t%s\nwant\n\t%s", code, stderr, stdout, want)
 	}
 }
 

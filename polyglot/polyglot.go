@@ -248,6 +248,15 @@ type Options struct {
 	// output is an error.
 	MaxHold int
 
+	// FinalNewline ends the output with a line break after the html end tag,
+	// which HTML parsers append to the body and XML parsers ignore. A line
+	// break ending whitespace at the end of the body (e.g., the line break
+	// at the end of the input, which HTML parsers put in the body) is written
+	// there instead of in the body, so HTML parsers read the same body;
+	// otherwise, the body HTML parsers read ends with a line break more than
+	// the one XML parsers read. No Text event is reported for it.
+	FinalNewline bool
+
 	// OnTag, if not nil, is called before each element tag is written, with a
 	// description of the tag (see [Tag]). It is called for the tags of the
 	// output: those written for the input, and those of the elements the
@@ -1558,10 +1567,17 @@ func (p *polyglot) close() error {
 		p.placeCharset(nil)
 	}
 	p.structure(p.doc.End())
+	if p.opt.FinalNewline {
+		p.bodySpace.cutNewline() // written after the html end tag instead
+	}
+	p.bodySpace.write(p)
 	for len(p.out) > 0 {
 		p.popOut()
 	}
 	p.endText()
+	if p.opt.FinalNewline {
+		p.emitString("\n")
+	}
 	p.holds = p.holds[:0]
 	p.flushHeld()
 	if p.err == nil {
@@ -2310,8 +2326,12 @@ type polyglot struct {
 	// implied end tags held back until the next token, followed by body and
 	// html end tags if keptByEnd (see queueToken), and the text after them,
 	// held back while it is whitespace (afterEndText is set once it isn't)
-	implied      htmlstream.TokenBuffer
-	keptByEnd    bool
+	implied   htmlstream.TokenBuffer
+	keptByEnd bool
+
+	// with FinalNewline, the whitespace directly in the body, until the next
+	// token, for a line break at its end (see bodySpaceToken)
+	bodySpace    heldSpace
 	afterEnd     htmlstream.TokenBuffer
 	afterEndText bool
 
@@ -2503,6 +2523,9 @@ func (p *polyglot) token(tok *htmlstream.Token) {
 	}
 	if p.charsetWait && !p.headSpaceToken(tok) {
 		p.placeCharset(tok)
+	}
+	if p.bodySpace.size() != 0 && !p.bodySpaceToken(tok) {
+		p.bodySpace.write(p)
 	}
 	if p.pClose >= 0 || p.keptP >= 0 {
 		p.keepP(tok)
@@ -2902,7 +2925,7 @@ func (p *polyglot) headSpaceToken(tok *htmlstream.Token) bool {
 		return false
 	}
 	p.sbuf = tok.AppendText(p.sbuf[:0])
-	return ascii.IsBlank(p.sbuf) && p.headSpace.size+len(p.sbuf) <= maxHeadSpace
+	return ascii.IsBlank(p.sbuf) && p.headSpace.size()+len(p.sbuf) <= maxHeadSpace
 }
 
 // holdAfterHead holds back whitespace (text of tok) or a comment (markup,
@@ -2912,13 +2935,29 @@ func (p *polyglot) headSpaceToken(tok *htmlstream.Token) bool {
 // maxAfterHead bytes, the parts held back are written in the head instead,
 // and so are b and the rest.
 func (p *polyglot) holdAfterHead(tok *htmlstream.Token, b []byte) bool {
-	if p.afterHead.size+len(b) > maxAfterHead {
+	if p.afterHead.size()+len(b) > maxAfterHead {
 		p.afterHeadFull = true
 		p.afterHead.write(p)
 		return false
 	}
 	p.afterHead.add(tok, b)
 	return true
+}
+
+// bodySpaceToken reports whether tok is whitespace directly in the body held
+// back with FinalNewline, in case it ends the body: its last line break is
+// then written after the html end tag. Whitespace before which formatting
+// elements are reopened isn't.
+func (p *polyglot) bodySpaceToken(tok *htmlstream.Token) bool {
+	if tok.Kind() != htmlstream.Text || tok.Continued() && p.bodySpace.size() == 0 || p.doc.Part() != htmlutil.InBody || len(p.pending) != 0 {
+		// (the rest of a text whose start wasn't whitespace)
+		return false
+	}
+	if t := p.top(); t == nil || t.name != "body" || t.ns != "" {
+		return false
+	}
+	p.sbuf = tok.AppendText(p.sbuf[:0])
+	return ascii.IsBlank(p.sbuf)
 }
 
 // inHeadTop reports whether the innermost element open in the output is the
@@ -2936,36 +2975,61 @@ const (
 	maxAfterHead = 64 << 10
 )
 
-// heldSpace is whitespace and comments written later.
+// heldSpace is whitespace and comments written later. Its memory is reused.
 type heldSpace struct {
+	toks  htmlstream.TokenBuffer // the tokens of the whitespace
 	parts []heldPart
-	size  int
+	data  []byte // the whitespace and comments, in order
 }
 
-// heldPart is whitespace (text of a token) or a comment (markup).
+// heldPart is whitespace (text of a token) or a comment (markup), ending at
+// end in data.
 type heldPart struct {
-	tok  *htmlstream.Token // a clone, or nil for a comment
-	data []byte
+	tok int // the index of the token in toks, or -1 for a comment
+	end int
 }
 
+func (h *heldSpace) size() int { return len(h.data) }
+
+// add holds back the text b of tok, or the markup of a comment if tok is
+// nil.
 func (h *heldSpace) add(tok *htmlstream.Token, b []byte) {
+	i := -1
 	if tok != nil {
-		tok = tok.Clone()
+		h.toks.Append(tok)
+		i = h.toks.Len() - 1
 	}
-	h.parts = append(h.parts, heldPart{tok, bytes.Clone(b)})
-	h.size += len(b)
+	h.data = append(h.data, b...)
+	h.parts = append(h.parts, heldPart{i, len(h.data)})
+}
+
+// cutNewline removes a line break at the end of the whitespace, and reports
+// whether there was one.
+func (h *heldSpace) cutNewline() bool {
+	n := len(h.parts)
+	if n == 0 || h.parts[n-1].tok < 0 || !bytes.HasSuffix(h.data, []byte("\n")) {
+		return false
+	}
+	h.data = h.data[:len(h.data)-1]
+	if h.parts[n-1].end--; n > 1 && h.parts[n-1].end == h.parts[n-2].end || n == 1 && h.parts[0].end == 0 {
+		h.parts = h.parts[:n-1]
+	}
+	return true
 }
 
 // write writes the parts held back, and empties h.
 func (h *heldSpace) write(p *polyglot) {
+	start := 0
 	for _, part := range h.parts {
-		if part.tok == nil {
-			p.markup(part.data)
+		if b := h.data[start:part.end]; part.tok < 0 {
+			p.markup(b)
 		} else {
-			p.text(part.tok, part.data)
+			p.text(h.toks.At(part.tok), b)
 		}
+		start = part.end
 	}
-	h.parts, h.size = h.parts[:0], 0
+	h.toks.Reset()
+	h.parts, h.data = h.parts[:0], h.data[:0]
 }
 
 // Output stack.
@@ -3523,6 +3587,9 @@ func (p *polyglot) textToken(tok *htmlstream.Token, start, end int) {
 		return // whitespace before the html element or the head, which HTML parsers drop
 	case p.charsetWait:
 		p.headSpace.add(tok, b) // see placeCharset
+		return
+	case p.opt.FinalNewline && p.bodySpaceToken(tok):
+		p.bodySpace.add(tok, b)
 		return
 	case part == htmlutil.AfterHead && p.inHeadTop() && !p.afterHeadFull && p.holdAfterHead(tok, b):
 		return

@@ -2552,3 +2552,35 @@ func TestHeadSpaceLimits(t *testing.T) {
 		}
 	}
 }
+
+// TestFinalNewline checks that FinalNewline ends the output with a line
+// break, taken from whitespace at the end of the body, whatever the chunk
+// size.
+func TestFinalNewline(t *testing.T) {
+	const start = `<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body>`
+	for _, tc := range []struct{ in, out string }{
+		{"<p>a</p>\n</body>\n</html>\n", "<p>a</p>\n\n</body></html>\n"},
+		{"<p>a</p>", "<p>a</p></body></html>\n"},
+		{"<p>a\n", "<p>a\n</p></body></html>\n"},
+		{"a\n", "a\n</body></html>\n"},
+		{"a<!---->\n \n", "a<!---->\n </body></html>\n"},
+		{"<b>x</b> \n", "<b>x</b> </body></html>\n"},
+		{"<p><b>x</p> \n", "<p><b>x</b></p><b> \n</b></body></html>\n"},
+		{"<body><div><p>x</body>\n</html>\n", "<div><p>x\n\n</p></div></body></html>\n"},
+		{"", "</body></html>\n"},
+	} {
+		opt := Options{DoctypeMode: NoDoctype, FinalNewline: true}
+		out, warnings, err := convertWarnings(strings.NewReader(tc.in), opt)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want := start + tc.out; out != want || warnings != "" {
+			t.Errorf("%q:\n got %q\nwant %q\nwarnings: %s", tc.in, out, want, warnings)
+		}
+		for _, chunk := range []int{1, 3} {
+			if wout, _, err := writerWarnings(strings.NewReader(tc.in), chunk, opt); err != nil || wout != out {
+				t.Errorf("%q, chunk size %d: got %q, error %v", tc.in, chunk, wout, err)
+			}
+		}
+	}
+}
