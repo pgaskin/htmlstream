@@ -2590,6 +2590,7 @@ type closed struct {
 	first                  string   // the first element, in any namespace
 	p                      bool     // a p element
 	reopened               bool     // reopened formatting elements
+	kept                   bool     // a p kept open around a table (see keepP), closed first
 }
 
 type outElem struct {
@@ -2721,7 +2722,7 @@ func (p *polyglot) token(tok *htmlstream.Token) {
 	if p.bodySpace.size() != 0 && !p.bodySpaceToken(tok) {
 		p.bodySpace.write(p)
 	}
-	if p.pClose >= 0 || p.keptP >= 0 {
+	if p.pClose >= 0 || p.keptP >= 0 || p.closed.kept {
 		p.keepP(tok)
 	}
 	if k := tok.Kind(); tok.Incomplete() && (k == htmlstream.StartTag || k == htmlstream.EndTag) {
@@ -5618,6 +5619,13 @@ func (p *polyglot) keepOpen(tok *htmlstream.Token) {
 // the Reader keeps open. Formatting elements reopened after the table are
 // written with start tags too, so it is closed before them (see
 // reconstruct).
+//
+// The end tags of the elements around the p, explicit or implied before
+// another token, close it like an element closed by implied end tags
+// (recorded in p.closed). HTML parsers keep it open at a start tag after
+// such implied end tags (e.g., an a start tag with an a open around the p,
+// where the adoption agency algorithm keeps the p open), unless the start
+// tag closes a p, or a cell, button or ruby element part around it.
 func (p *polyglot) keepP(tok *htmlstream.Token) {
 	if p.pClose >= 0 {
 		if tok.Kind() == htmlstream.StartTag && tok.NS() == htmlstream.NamespaceXHTML && tok.Is("table") && !tok.Untracked() {
@@ -5631,19 +5639,37 @@ func (p *polyglot) keepP(tok *htmlstream.Token) {
 		}
 		p.pClose = -1
 	}
+	var buf [16]byte
+	var info internal.Elem
+	if tok.Kind() == htmlstream.StartTag {
+		info = internal.HTMLElem(tok.AppendLocalName(buf[:0]))
+	}
+	if p.closed.kept && tok.Kind() == htmlstream.StartTag {
+		switch {
+		case tok.NS() == htmlstream.NamespaceXHTML && (info&internal.ClosesP != 0 || tok.Is("button") ||
+			tok.Is("td") || tok.Is("th") || tok.Is("tr") || tok.Is("tbody") || tok.Is("thead") || tok.Is("tfoot") || tok.Is("caption") || tok.Is("colgroup") || tok.Is("col") ||
+			tok.Is("rb") || tok.Is("rtc") || tok.Is("rt") || tok.Is("rp")):
+			// the implied end tags close the p for HTML parsers too
+		default:
+			p.warn(tok.Pos(), "closed p at <%s> after a table in it (HTML parsers would have kept the p open in quirks mode)", htmlName(tok))
+		}
+	}
 	if !p.inKeptP() {
 		return
 	}
-	if tok.Kind() == htmlstream.EndTag && !tok.Implied() && !tok.Stray() && !tok.Is("body") && !tok.Is("html") && p.closed.special == "" {
-		// the end tag of an element around it closes it, like an implied end
-		// tag (see checkEndTag)
-		p.closed.special = "p"
+	if tok.Kind() == htmlstream.EndTag && !tok.Stray() && p.frames.Len() <= p.keptDepth {
+		if f, ok := p.frames.Top(); ok && f.out >= 0 && f.name != "body" && f.name != "html" {
+			// the end tag of an element around it closes it first: the
+			// elements closed by the implied end tags before it aren't
+			// written (see inKeptP)
+			p.closed.first, p.closed.html, p.closed.special = "p", "p", "p"
+			p.closed.names = append(p.closed.names, "p")
+			p.closed.kept = true
+		}
 	}
 	if tok.Kind() != htmlstream.StartTag {
 		return
 	}
-	var buf [16]byte
-	info := internal.HTMLElem(tok.AppendLocalName(buf[:0]))
 	switch {
 	case tok.NS() != htmlstream.NamespaceXHTML:
 	case tok.Is("table"), tok.Is("html"), tok.Is("head"), tok.Is("body"):
@@ -5655,6 +5681,19 @@ func (p *polyglot) keepP(tok *htmlstream.Token) {
 	case info&(internal.Void|internal.RawText|internal.RCDATA|internal.Script) != 0:
 		// can't contain elements
 		return
+	case tok.Is("rb") || tok.Is("rtc") || tok.Is("rt") || tok.Is("rp"):
+		// HTML parsers close the p with a ruby element in scope (generate
+		// implied end tags), where the Reader closes nothing
+		for i := p.keptP - 1; i >= 0; i-- {
+			e := &p.out[i]
+			if e.name == "ruby" && e.ns == "" {
+				p.popTo(p.keptP)
+				return
+			}
+			if e.ns == "" && internal.HTMLElem([]byte(e.name))&internal.Scope != 0 || e.ns != "" && e.integration {
+				break
+			}
+		}
 	}
 	p.warn(tok.Pos(), "closed p at <%s> after a table in it (HTML parsers would have kept the p open in quirks mode)", htmlName(tok))
 	p.popTo(p.keptP)

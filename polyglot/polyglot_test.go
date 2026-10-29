@@ -1944,6 +1944,30 @@ func TestQuirksTableInP(t *testing.T) {
 		{Options{DoctypeMode: NoDoctype}, `<p>a<table></table><head><noscript></noscript><div>b`, `<p>a<table></table></p><noscript></noscript><div>b</div>`, "25: closed p at <noscript> after a table in it (HTML parsers would have kept the p open in quirks mode)"},
 		{Options{DoctypeMode: NoDoctype}, `<span><p>a<table></table>b</span>c`, `<span><p>a<table></table>b</p></span>c`, "26: closed p at </span> (HTML parsers would have ignored the end tag)"},
 		{Options{DoctypeMode: NoDoctype}, `<b><p>a<table></table>b</b>c`, `<b><p>a<table></table>b</p></b>c`, "23: closed p at </b> (HTML parsers would have kept p open and cloned b into it)"},
+		// the Reader closes the elements inside the element around the p
+		// first, with implied end tags, which close the p in the output: HTML
+		// parsers ignore the end tag (the p is special), or apply the adoption
+		// agency algorithm with the p as the furthest block, or close the p
+		// (the end tag of a special element), or keep the p open after body
+		// and html end tags and ignore noscript end tags
+		{Options{DoctypeMode: NoDoctype}, `<g><a><p>a<table></table>b</g>c`, `<g><a><p>a<table></table>b</p></a></g><a>c</a>`, "26: closed p at </g> (HTML parsers would have ignored the end tag)"},
+		{Options{DoctypeMode: NoDoctype}, `<b><span><p>a<table></table>b</b>c`, `<b><span><p>a<table></table>b</p></span></b>c`, "29: closed p at </b> (HTML parsers would have kept p open and cloned b into it)"},
+		{Options{DoctypeMode: NoDoctype}, `<div><a><p>a<table></table>b</div>c`, `<div><a><p>a<table></table>b</p></a></div><a>c</a>`, ""},
+		{Options{DoctypeMode: NoDoctype}, `<body><span><p>a<table></table>b</body> c`, `<span><p>a<table></table>b </p></span>c`, "40: wrote content after </body> outside the p it closed (HTML parsers would have kept p open and put the content in it)"},
+		{Options{DoctypeMode: NoDoctype}, `<body><span><p>a<table></table>b</body> `, `<span><p>a<table></table>b </p></span>`, ""},
+		{Options{DoctypeMode: NoDoctype}, `<body><noscript><p>a<table></table>b</noscript>c`, `<noscript><p>a<table></table>b</p></noscript>c`, "47: wrote content after </noscript> outside the p it closed (HTML parsers would have kept p open and put the content in it)"},
+		{Options{DoctypeMode: NoDoctype}, `<svg><foreignObject><a><p>a<table></table></foreignObject>b`, `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><foreignObject><a xmlns="http://www.w3.org/1999/xhtml"><p>a<table></table></p></a></foreignObject>b</svg>`, "42: closed HTML element p at </foreignObject> of an SVG element (HTML parsers would have ignored the end tag)"},
+		// and before a start tag: HTML parsers keep the p open with the
+		// adoption agency algorithm for a nested a, and put an option in it,
+		// and close it at another li, a nested button and a cell
+		{Options{DoctypeMode: NoDoctype}, `<a><p>a<table></table>b<a>c`, `<a><p>a<table></table>b</p></a><a>c</a>`, "23: closed p at <a> after a table in it (HTML parsers would have kept the p open in quirks mode)"},
+		{Options{DoctypeMode: NoDoctype}, `<option><p>a<table></table><option>b`, `<option><p>a<table></table></p></option><option>b</option>`, "27: closed p at <option> after a table in it (HTML parsers would have kept the p open in quirks mode)"},
+		{Options{DoctypeMode: NoDoctype}, `<li><a><p>a<table></table><li>b`, `<li><a><p>a<table></table></p></a></li><li><a>b</a></li>`, ""},
+		{Options{DoctypeMode: NoDoctype}, `<button><b><p>a<table></table><button>c`, `<button><b><p>a<table></table></p></b></button><b><button>c</button></b>`, ""},
+		{Options{DoctypeMode: NoDoctype}, `<table><td><a><p>a<table></table><td>b`, `<table><tbody><tr><td><a><p>a<table></table></p></a></td><td>b</td></tr></tbody></table>`, ""},
+		// ruby element parts close the p with a ruby element in scope
+		{Options{DoctypeMode: NoDoctype}, `<ruby><p>a<table></table><rt>b`, `<ruby><p>a<table></table></p><rt>b</rt></ruby>`, ""},
+		{Options{DoctypeMode: NoDoctype}, `<ruby><object><p>a<table></table><rt>b`, `<ruby><object><p>a<table></table></p><rt>b</rt></object></ruby>`, "33: closed p at <rt> after a table in it (HTML parsers would have kept the p open in quirks mode)"},
 		// HTML parsers reopen the b in the p, like an element whose start tag
 		// is after the table
 		{Options{DoctypeMode: NoDoctype}, `<p><b>x<p><table></table>y<br>z`, `<p><b>x</b></p><p><table></table></p><b>y<br />z</b>`, "25: closed p before reopening b after a table in it (HTML parsers would have reopened it in the p in quirks mode)"},
@@ -2380,6 +2404,9 @@ func FuzzConvert(f *testing.F) {
 	f.Add("<p><tABle></tABle><html><A>", byte('Q'), byte(0x05))
 	// a formatting element reopened after a table in a p kept open
 	f.Add("<p><A><p><tABle></tABle>0", byte('K'), byte('|'))
+	// elements around a p kept open closed by the implied end tags before an
+	// end tag
+	f.Add("<g><A><P><TABLE></tABle></g>00", byte(0), byte(4))
 	// the last chunk of a bogus comment has the Raw of </>
 	f.Add("</00</>", byte(5), byte(0x26))
 	// invalid UTF-8 around a dropped NUL
