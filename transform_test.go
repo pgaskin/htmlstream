@@ -594,7 +594,13 @@ func TestTransformSelfClosingEdits(t *testing.T) {
 		{HTML, true, `<p>a<i/>b`, []func(*Transformer) error{expand, unwrap}, `<p>ab`},
 		{HTML, true, `<p>a<i/>b`, []func(*Transformer) error{expand, replace}, `<p>aRb`},
 		{HTML, true, `<p>a<i/>b`, []func(*Transformer) error{expand, rename}, `<p>a<j></j>b`},
-		{HTML, true, `<p>a<i/>b`, []func(*Transformer) error{expand, wrap, after}, `<p>a[<i></i>]+b`},
+		{HTML, true, `<p>a<i/>b`, []func(*Transformer) error{expand, wrap, after}, `<p>a[<i>+</i>]b`},
+		{HTML, true, `<p>a<i/>b`, []func(*Transformer) error{after, expand}, `<p>a<i>+</i>b`},
+		{XML, false, `<p>a<i/>b</p>`, []func(*Transformer) error{expand, after}, `<p>a<i>+</i>b</p>`},
+		{XML, false, `<p>a<i/>b</p>`, []func(*Transformer) error{expand, unwrap, after}, `<p>a+b</p>`},
+		{XML, false, `<p>a<i/>b</p>`, []func(*Transformer) error{expand, replace, after}, `<p>aR+b</p>`},
+		{HTML, false, `<svg><g/></svg>`, []func(*Transformer) error{expand, after}, `<svg><g>+</g></svg>`},
+		{HTML, false, `<p>a<br/>b`, []func(*Transformer) error{expand, after}, `<p>a<br>+b`},
 		{HTML, true, `<p>a<i/>b`, []func(*Transformer) error{expand, remove, after}, `<p>a+b`},
 		{XML, false, `<p>a<i/>b</p>`, []func(*Transformer) error{expand, remove}, `<p>ab</p>`},
 		{HTML, false, `<p>a<i/>b`, []func(*Transformer) error{expand, remove}, `<p>a`},
@@ -614,6 +620,11 @@ func TestTransformSelfClosingEdits(t *testing.T) {
 		{HTML, true, `<p>a<i //>b`, []func(*Transformer) error{expand}, `<p>a<i ></i>b`},
 		{HTML, false, `<i//>x</i>y`, []func(*Transformer) error{empty}, `<i></i>y`},
 		{XML, false, `<i>x</i>y`, []func(*Transformer) error{empty}, `<i/>y`},
+		{XML, false, `<p><i/>y</p>`, []func(*Transformer) error{empty, after}, `<p><i>+</i>y</p>`},
+		{XML, false, `<p><i/>y</p>`, []func(*Transformer) error{after, empty}, `<p><i>+</i>y</p>`},
+		{XML, false, `<p><i a="1"/>y</p>`, []func(*Transformer) error{wrap, empty, after}, `<p>[<i a="1">+</i>]y</p>`},
+		{HTML, false, `<svg><g/></svg>`, []func(*Transformer) error{empty, after}, `<svg><g>+</g></svg>`},
+		{HTML, false, `<p>a<br>b`, []func(*Transformer) error{empty, after}, `<p>a<br/>+b`},
 		{Universal, false, `<i>x</i><b xmlns="http://www.w3.org/1999/xhtml"><i>x</i></b>`, []func(*Transformer) error{empty}, `<i></i><b xmlns="http://www.w3.org/1999/xhtml"><i></i></b>`},
 		{Universal, false, decl + `<b xmlns="http://www.w3.org/1999/xhtml"><i>x</i></b>`, []func(*Transformer) error{empty}, decl + `<b xmlns="http://www.w3.org/1999/xhtml"><i/></b>`},
 
@@ -626,6 +637,9 @@ func TestTransformSelfClosingEdits(t *testing.T) {
 		{Universal, false, xhtmlBr, []func(*Transformer) error{empty}, decl + `<p xmlns="http://www.w3.org/1999/xhtml">a<br/>b<br/>c<br/>d</p>`},
 		{Universal, false, xhtmlBr, []func(*Transformer) error{expand}, decl + `<p xmlns="http://www.w3.org/1999/xhtml">a<br></br>b<br></br>c<br>d</p>`},
 		{Universal, false, xhtmlBr, []func(*Transformer) error{after}, decl + `<p xmlns="http://www.w3.org/1999/xhtml">a<br>+</br>b<br/>+c<br>+d</p>`},
+		{Universal, false, xhtmlBr, []func(*Transformer) error{expand, after}, decl + `<p xmlns="http://www.w3.org/1999/xhtml">a<br>+</br>b<br></br>+c<br>+d</p>`},
+		{Universal, false, xhtmlBr, []func(*Transformer) error{empty, after}, decl + `<p xmlns="http://www.w3.org/1999/xhtml">a<br/>+b<br/>+c<br/>+d</p>`},
+		{Universal, false, xhtmlBr, []func(*Transformer) error{after, empty}, decl + `<p xmlns="http://www.w3.org/1999/xhtml">a<br/>+b<br/>+c<br/>+d</p>`},
 	} {
 		var b bytes.Buffer
 		x := NewTransformer(&b, strings.NewReader(tc.in))

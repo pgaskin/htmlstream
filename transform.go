@@ -82,10 +82,12 @@ type Transformer struct {
 	before    []byte
 	wrapStart []byte // written after before
 	after     []byte
+	wrapEnd   []byte // the ends of the wraps of a start tag which doesn't open an element
 	name      []byte
 	renamed   bool
 	selfClose int8 // 1 to add self-closing syntax, -1 to remove it
 	closeTag  bool // write an end tag after the start tag
+	emptied   bool // Empty was called on a start tag which doesn't open an element
 	dropAfter bool // drop the element's content and end tag after writing the start tag
 	attrOps   []attrOp
 	newAttrs  []newAttr
@@ -672,7 +674,13 @@ func (t *Transformer) InsertBefore(raw []byte) error {
 // InsertAfter writes raw after the current token. For a start tag which
 // opens an element, this is inside the element, before its contents:
 // [Transformer.Remove] removes it with the element, and [Transformer.Empty]
-// keeps it in the element.
+// keeps it in the element. For a start tag which doesn't open an element
+// but is written with an end tag by [Transformer.ExpandSelfClosing] or
+// [Transformer.Empty] (e.g., <x/> under XML rules, written as <x></x>), it
+// is inside the element too, whatever the order of the calls, unless the
+// start tag is removed, replaced or unwrapped, which leaves out the end tag.
+// To insert markup after such an element, use [Transformer.Wrap] with a nil
+// start.
 //
 // An implied end tag (see [Token.Implied]) writes nothing, so HTML parsers
 // read markup inserted after it as inside the element, which they close
@@ -712,8 +720,10 @@ func (t *Transformer) Unwrap() error {
 // of the element it opens (or after the start tag if it doesn't open an
 // element). Later wraps are inside earlier ones. Markup inserted before the
 // start tag (see [Transformer.InsertBefore]), and after the element (with
-// [Transformer.InsertAfter] at its end tag, or at the start tag if it doesn't
-// open an element), is outside the wrap, whatever the order of the calls.
+// [Transformer.InsertAfter] at its end tag, or at a start tag which doesn't
+// open an element and isn't written with an end tag), is outside the wrap,
+// whatever the order of the calls. With a nil start, Wrap inserts end after
+// the element.
 //
 // Under HTML rules, end is written after the element's end tag also when it
 // is implied (see [Token.Implied]), where HTML parsers still have the element
@@ -737,7 +747,7 @@ func (t *Transformer) Wrap(start, end []byte) error {
 		r := t.rec(f)
 		r.wrapEnd = append(append([]byte(nil), end...), r.wrapEnd...)
 	} else {
-		t.after = append(append([]byte(nil), end...), t.after...)
+		t.wrapEnd = append(append([]byte(nil), end...), t.wrapEnd...)
 	}
 	return nil
 }
@@ -790,6 +800,10 @@ func (t *Transformer) RenameEnd(name string) error {
 // is an HTML void element under HTML rules (e.g., <br/>), only these "/"
 // characters are removed. The end tag is part of the start
 // tag's edits: Remove, Replace and Unwrap remove it with the start tag.
+// Markup inserted after the start tag (see [Transformer.InsertAfter]) is
+// written before the end tag, inside the element, except for a void element
+// under XML rules in [Universal] mode (e.g., <br/> in an XHTML document,
+// written as <br></br>), since <br>x</br> isn't one element.
 //
 // The current token must be a start tag.
 func (t *Transformer) ExpandSelfClosing() error {
@@ -812,6 +826,15 @@ func htmlVoid(c *Token) bool {
 	return c.ns == nsHTML && c.HTMLRules() && internal.HTMLElem(lowerASCII(make([]byte, 0, 16), c.Name()))&internal.Void != 0
 }
 
+// xmlVoid reports whether the start tag c is an HTML void element under XML
+// rules in Universal mode, which is one element with its end tag only if the
+// end tag follows it directly or after whitespace (see Element model in the
+// package documentation).
+func xmlVoid(c *Token) bool {
+	l := c.Local()
+	return c.flags&tokUniversal != 0 && c.mode == XML && internal.HTMLElem(l)&internal.Void != 0 && string(l) != "image" && c.NS() == NamespaceXHTML
+}
+
 // Empty removes the contents of the element opened by the current start tag
 // and its end tag, and writes it as an empty element. The current token
 // becomes the element's end tag. Markup inserted after the start tag (see
@@ -823,9 +846,10 @@ func htmlVoid(c *Token) bool {
 // self-closing syntax on them. Other elements are written with self-closing
 // syntax, like <x .../>, which XML parsers and, for SVG and MathML elements,
 // HTML parsers read as empty, or as <x ...></x> to keep markup inserted after
-// the start tag inside the element. Void elements are always written with
-// self-closing syntax, with the markup inserted after the start tag following
-// them. The stray end tag of a void element under XML rules or with XML
+// the start tag inside the element (for a start tag which doesn't open an
+// element, e.g., <x/> under XML rules, also markup inserted after the call to
+// Empty). Void elements are always written with self-closing syntax, with the
+// markup inserted after the start tag following them. The stray end tag of a void element under XML rules or with XML
 // syntax (e.g., the </br> in <br>x</br>, see [Transformer.Remove]) stays in
 // the output, after the contents following the element.
 //
@@ -856,6 +880,7 @@ func (t *Transformer) Empty() error {
 		t.closeTag = false
 	}
 	if f == nil {
+		t.emptied = true
 		return nil
 	}
 	t.dropAfter = true
@@ -1126,10 +1151,12 @@ func (t *Transformer) resetEdits() {
 	t.before = t.before[:0]
 	t.wrapStart = t.wrapStart[:0]
 	t.after = t.after[:0]
+	t.wrapEnd = t.wrapEnd[:0]
 	t.name = t.name[:0]
 	t.renamed = false
 	t.selfClose = 0
 	t.closeTag = false
+	t.emptied = false
 	t.dropAfter = false
 	t.attrOps = t.attrOps[:0]
 	t.newAttrs = t.newAttrs[:0]
@@ -1165,6 +1192,17 @@ func (t *Transformer) emit(c *Token) {
 	case t.replaced:
 		t.write(t.replace)
 	case c.kind == StartTag && t.edited:
+		if t.emptied && len(t.after) != 0 && !t.closeTag && !htmlVoid(c) && !xmlVoid(c) {
+			// an emptied start tag which doesn't open an element (e.g.,
+			// <x/> under XML rules), with markup inserted after it: keep
+			// the markup inside the element
+			if c.SelfClosing() {
+				t.selfClose = -1
+			} else {
+				t.selfClose = 0
+			}
+			t.closeTag = true
+		}
 		t.buf = t.appendStart(t.buf[:0], c)
 		t.write(t.buf)
 	case c.kind == EndTag && t.renamed:
@@ -1178,6 +1216,12 @@ func (t *Transformer) emit(c *Token) {
 		t.after = t.after[:0]
 	}
 	if t.closeTag && !t.remove && !t.replaced {
+		if !xmlVoid(c) {
+			// markup inserted after a start tag written with an end tag is
+			// inside the element
+			t.write(t.after)
+			t.after = t.after[:0]
+		}
 		t.buf = append(t.buf[:0], "</"...)
 		if t.renamed {
 			t.buf = append(t.buf, t.name...)
@@ -1187,6 +1231,7 @@ func (t *Transformer) emit(c *Token) {
 		t.buf = append(t.buf, '>')
 		t.write(t.buf)
 	}
+	t.write(t.wrapEnd)
 	t.write(t.after)
 	if t.dropAfter {
 		t.drop = t.Depth()
