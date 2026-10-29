@@ -16,8 +16,9 @@
 //
 // # Comparing documents
 //
-// Documents are compared as DOMs dumped as indented text, ignoring comments,
-// doctypes, whitespace-only text, namespace declarations, xml:lang,
+// Documents are compared as DOMs dumped as indented text, ignoring comments
+// other than those in the root element and after it (compared without their
+// data), doctypes, whitespace-only text, namespace declarations, xml:lang,
 // character encoding declarations, and the CDATA wrappers in scripts and
 // styles. The x/net and encoding/xml DOMs of an output are compared with
 // whitespace-only text, which both must have in the same places. Known differences between x/net and the HTML Standard are worked

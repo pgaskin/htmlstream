@@ -654,6 +654,20 @@ func TestHooks(t *testing.T) {
 		t.Errorf("reopened element events:\n got %q\nwant %q", events, wantEvents)
 	}
 
+	// comments after the body and html end tags are written after them, and
+	// the whitespace around them in the body is one text node
+	events = events[:0]
+	got = convertHooked(t, "<p>x</p> </body> <!--c--> </html> <!--d--> ", Options{
+		DoctypeMode: NoDoctype,
+		OnText: func(x *Text) {
+			events = append(events, fmt.Sprintf("%q %t %t", x.Data, x.First, x.Last))
+		},
+	})
+	wantEvents = []string{`"x" true false`, `"" false true`, `" " true false`, `" " false false`, `" " false false`, `" " false false`, `" " false false`, `"" false true`}
+	if want := "<p>x</p>     </body><!--c--></html><!--d-->"; !strings.HasSuffix(got, want) || !slices.Equal(events, wantEvents) {
+		t.Errorf("comments after the body: got %s, want it to end with %s, events:\n got %q\nwant %q", got, want, events, wantEvents)
+	}
+
 	// holds: the output after the body start tag is held back until the
 	// first element, and the held output is discarded or kept
 	for _, tc := range []struct{ in, want string }{
@@ -2351,6 +2365,9 @@ func FuzzConvert(f *testing.F) {
 	f.Add("</00</>", byte(5), byte(0x26))
 	// invalid UTF-8 around a dropped NUL
 	f.Add("000\xdd\x00\x98", byte(5), byte(0x59))
+	// text split into parts in an SVG or MathML element left open by a body
+	// end tag, before a comment
+	f.Add("<BodY><mAth></BodY>0000<!0", byte(3), byte(0))
 	// the output depth limit
 	f.Add("<div><b></div>x<div><b><i></div>y</br></p><table><td>z", byte(0), byte(0x18))
 	f.Add("<table><td><div><b></div><svg><g/></svg>x", byte(3), byte(0x0b))
@@ -2526,11 +2543,13 @@ func TestSpaceHold(t *testing.T) {
 	}
 }
 
-// TestHeadSpaceLimits checks that the whitespace at the start of the head
-// waits for the charset meta element up to maxHeadSpace bytes, and that the
-// whitespace and comments after the head are written after the head end tag
-// up to maxAfterHead bytes, and in the head past it, whatever the chunk size.
-func TestHeadSpaceLimits(t *testing.T) {
+// TestHoldLimits checks that the whitespace at the start of the head waits
+// for the charset meta element up to maxHeadSpace bytes, that the whitespace
+// and comments after the head are written after the head end tag up to
+// maxAfterHead bytes, and in the head past it, and that the comments after
+// the body end tag are written after it up to maxAfterBody bytes, and in the
+// body past it, whatever the chunk size.
+func TestHoldLimits(t *testing.T) {
 	for _, tc := range []struct {
 		n    int
 		in   func(space string) string
@@ -2544,6 +2563,10 @@ func TestHeadSpaceLimits(t *testing.T) {
 			func(sp string) string { return `<link rel="x" /></head><!--c-->` + sp + "<body>" }},
 		{maxAfterHead - 7, func(sp string) string { return "<head></head><!--c-->" + sp + "<link rel=x><p>x" },
 			func(sp string) string { return `<!--c-->` + sp + `<link rel="x" /></head><body>` }},
+		{maxAfterBody - 23, func(sp string) string { return "<p>x</p></body><!--c--><p>y</p></body><!--" + sp + "--><!--d-->" },
+			func(sp string) string { return "<p>x</p><p>y</p></body><!--c--><!--" + sp + "--><!--d--></html>" }},
+		{maxAfterBody - 22, func(sp string) string { return "<p>x</p></body><!--c--><p>y</p></body><!--" + sp + "--><!--d-->" },
+			func(sp string) string { return "<p>x</p><p>y</p><!--c--><!--" + sp + "--><!--d--></body></html>" }},
 	} {
 		space := strings.Repeat(" ", tc.n)
 		in := tc.in(space)
@@ -2581,6 +2604,7 @@ func TestFinalNewline(t *testing.T) {
 		{"<b>x</b> \n", "<b>x</b> </body></html>\n"},
 		{"<p><b>x</p> \n", "<p><b>x</b></p><b> \n</b></body></html>\n"},
 		{"<body><div><p>x</body>\n</html>\n", "<div><p>x\n\n</p></div></body></html>\n"},
+		{"<p>a</p>\n</body>\n<!--c-->\n</html>\n<!--d-->\n", "<p>a</p>\n\n\n\n</body><!--c--></html><!--d-->\n"},
 		{"", "</body></html>\n"},
 	} {
 		opt := Options{DoctypeMode: NoDoctype, FinalNewline: true}
@@ -2678,6 +2702,14 @@ func TestIndent(t *testing.T) {
 		{"Prefix", "<!-- c --><title>t</title><p>a\n  b</p><pre>c\nd</pre>", "", "\t", "<!DOCTYPE html>\n\t<!-- c -->\n" + "\t" + `<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><title>t</title></head><body><p>a
 	b</p><pre>c
 d</pre></body></html>`},
+		{"CommentsAfterBody", "<p>x</p>\n<!-- a -->\n</body>\n<!-- b -->\n</html>\n<!-- c -->\n", "  ", "", `<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head>
+  <meta charset="UTF-8" />
+</head>
+<body>
+  <p>x</p>
+  <!-- a -->
+</body><!-- b --></html><!-- c -->`},
 		{"IndentPrefix", "<div><p>a\n   b</p></div>", " ", "\t", "<!DOCTYPE html>\n" + "\t" + `<html xmlns="http://www.w3.org/1999/xhtml"><head>
 	 <meta charset="UTF-8" />
 	</head>

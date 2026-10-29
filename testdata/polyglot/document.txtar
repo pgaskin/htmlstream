@@ -192,9 +192,9 @@ the head.
   
 </head><body></body></html>
 -- SpaceAfterBodyInElement --
-Whitespace and comments after a body end tag which closed other elements
-are written in them, as HTML parsers keep them open and put the whitespace
-in them.
+Whitespace after a body end tag which closed other elements is written in
+them, as HTML parsers keep them open and put the whitespace in them. The
+comment after it is written after the body end tag, where they put it.
 -- in --
 <body><div><p>x</body>
 <!-- c -->
@@ -202,8 +202,71 @@ in them.
 -- out --
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><div><p>x
+
+</p></div></body><!-- c --></html>
+-- CommentsAfterBody --
+Comments after the body end tag are written after it, in the html element,
+and comments after the html end tag after it, where HTML parsers put them.
+The whitespace around them is written in the body.
+-- in --
+<body><p>x</p>
+</body>
+<!-- a -->
+<!-- b -->
+</html>
 <!-- c -->
-</p></div></body></html>
+-- out --
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p>x</p>
+
+
+
+
+</body><!-- a --><!-- b --></html><!-- c -->
+-- CommentsAfterBodyContent --
+A comment after content following a body end tag (d) is written in the
+body, and one after an html end tag followed by a body end tag (f) after the
+body end tag, where HTML parsers put them.
+-- in --
+<p>x</body> <!-- a --> <p>y</body><!-- b --></html> <!-- c --><div></div><!-- d --></body><!-- e --></html></body><!-- f -->
+-- out --
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p>x  </p><p>y </p><div></div><!-- d --></body><!-- a --><!-- b --><!-- e --><!-- f --></html><!-- c -->
+-- CommentsAfterIgnoredBodyEnd --
+HTML parsers ignore a body end tag in a table cell or an object, and put
+the comments after it in place.
+-- in --
+<table><tr><td>x</body><!-- a -->y</table><object></body><!-- b --></object></html><!-- c -->
+-- out --
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><table><tbody><tr><td>x<!-- a -->y</td></tr></tbody></table><object><!-- b --></object></body></html><!-- c -->
+-- CommentsAfterBodyInForeign --
+HTML parsers put a comment after a body or html end tag in the current
+element when it is an SVG or MathML element.
+-- in --
+<body><svg><g></body> <!-- a --> </html><!-- b -->
+-- out --
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><g> <!-- a --> <!-- b --></g></svg></body></html>
+-- EndTagAfterBodyInForeign --
+In SVG and MathML elements left open by a body end tag, HTML parsers apply
+an end tag of one of them to it and the elements inside it, and keep the
+insertion mode: the whitespace and comments after it go in the elements
+still open, or the comments after the body end tag once only HTML elements
+are open.
+-- in --
+<body><svg><g></body> </g> <!-- a --> </svg> <!-- b -->
+-- out --
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><g> </g> <!-- a --> </svg> </body><!-- b --></html>
+-- EndTagAfterBodyInForeignInP --
+-- in quoted --
+"<body><p><math><mrow></body></MROW>\x00<!-- a --></math> <!-- b -->"
+-- out --
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p><math xmlns="http://www.w3.org/1998/Math/MathML"><mrow></mrow>�<!-- a --></math> </p></body><!-- b --></html>
+-- warn --
+35: replaced characters XML doesn't allow
 -- ContentAfterBody --
 -- in --
 <body>x</body>y</html>z

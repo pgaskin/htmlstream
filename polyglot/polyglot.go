@@ -213,10 +213,11 @@ type Options struct {
 	// text or the end of the text (up to 64 KiB), the whitespace at the
 	// start of the head, buffered until the next token (up to 256 bytes),
 	// the whitespace and comments between the head end tag and the body,
-	// buffered until the body starts (up to 64 KiB), with [Options.Indent],
-	// the whitespace and comments at block boundaries, buffered until the
-	// next token (up to 64 KiB), the output before the root element with
-	// [KeepXMLDecl], and the output held by [Writer.Hold].
+	// buffered until the body starts (up to 64 KiB), the comments after the
+	// body and html end tags, buffered until Close (up to 64 KiB), with
+	// [Options.Indent], the whitespace and comments at block boundaries,
+	// buffered until the next token (up to 64 KiB), the output before the
+	// root element with [KeepXMLDecl], and the output held by [Writer.Hold].
 	Warn func(w Warning)
 
 	// MaxRawText limits the size of script and style contents, noscript
@@ -844,8 +845,10 @@ const (
 // the head end tag and the body is reported after the tag events of the head
 // content after it, and the whitespace at the start of the head after the
 // head start tag event, before or after the event of the charset meta
-// element (see [Convert]). With [Options.Indent], whitespace replaced by the
-// indentation isn't reported (see there).
+// element (see [Convert]). The comments after the body and html end tags
+// aren't written in the body, so the whitespace around them is one text
+// node. With [Options.Indent], whitespace replaced by the indentation isn't
+// reported (see there).
 //
 // The event is owned by the writer and valid during the call, like [Tag]. Its
 // fields are for reading, like those of Tag, and the bytes of Data must not
@@ -1116,6 +1119,17 @@ const (
 //     in the html element, while they put head content after them in the
 //     head, are written between the head end tag and the body start tag.
 //     Past 64 KiB of them, they are written in the head instead.
+//   - Comments after a body end tag, which HTML parsers put in the html
+//     element after the body, are written after the body end tag, and
+//     comments after an html end tag, which they put after the html
+//     element, after the html end tag. The whitespace around them, which
+//     they put in the body, is written in the body. Comments after content
+//     following these end tags, and after a body end tag HTML parsers
+//     ignore (e.g., in a table cell or a template), are written in place,
+//     and so are those in an SVG or MathML element (left open by the end
+//     tag, see below), where HTML parsers put them. Past 64 KiB of
+//     comments, they and the rest are written in the body where the limit
+//     is reached.
 //   - Implied elements (html, head, body, tbody, tr, colgroup) and implied end
 //     tags are written explicitly.
 //   - In quirks mode documents (no doctype, or a legacy one), HTML parsers
@@ -1197,12 +1211,13 @@ const (
 //   - content after a body or html end tag which closed other elements,
 //     which HTML parsers keep open and put the content in, and likewise
 //     after a noscript end tag which closed a special element, or an end tag
-//     of an element already closed. Whitespace and comments after a body or
-//     html end tag are written in the elements, as HTML parsers put the
-//     whitespace there (they put the comments after the body), up to the
+//     of an element already closed. Whitespace after a body or html end tag
+//     is written in the elements, as HTML parsers put it there, up to the
 //     first other token (e.g., content, or a stray end tag) and 64 KiB of
-//     whitespace in one text; whitespace after that and after the other end
-//     tags isn't reported;
+//     whitespace in one text; whitespace and comments after that and after
+//     the other end tags aren't reported. An end tag of an SVG or MathML
+//     element among them, which HTML parsers apply to it, closes it and the
+//     elements inside it, and the others stay open;
 //   - template contents which HTML parsers parse differently: they parse
 //     them like the contents of a table, a table row, etc., or body content,
 //     depending on the first child element; and template end tags closing a
@@ -1359,7 +1374,8 @@ func Convert(w io.Writer, r io.Reader, opt Options) error {
 // closed by implied end tags before a body or html end tag are closed after
 // the whitespace and comments after the end tag (see [Convert]): the hooks
 // are called, the output written and the errors for the tokens returned when
-// they are converted.
+// they are converted. The comments after body and html end tags are written
+// by Close.
 //
 // When the conversion fails (see [Writer.Err]), the output is incomplete:
 // the destination has the output written before the error, which can end
@@ -1531,9 +1547,11 @@ func (pw *Writer) WriteToken(tok *htmlstream.Token) error {
 // queueToken converts tok, or holds it back: implied end tags are held
 // back until the next token, and if it is a body or html end tag, which
 // doesn't close the elements for HTML parsers, until the next token other
-// than text of whitespace and NUL, comments, and body and html end tags,
+// than text of whitespace and NUL, comments, body and html end tags, and
+// stray end tags of SVG and MathML elements held back (see closesForeign),
 // which are converted inside the elements, where HTML parsers put them.
 func (p *polyglot) queueToken(tok *htmlstream.Token) {
+	p.afterBodyToken(tok)
 	k := tok.Kind()
 	switch {
 	case k == htmlstream.EndTag && tok.Implied():
@@ -1549,6 +1567,23 @@ func (p *polyglot) queueToken(tok *htmlstream.Token) {
 		p.keptByEnd = true
 		return
 	case p.keptByEnd && (k == htmlstream.Comment || k == htmlstream.ProcInst):
+		p.convert(tok)
+		return
+	case p.keptByEnd && k == htmlstream.EndTag && tok.Stray() && p.closesForeign(tok) != 0:
+		// HTML parsers close the SVG or MathML elements up to the one it
+		// matches, and keep the elements around it open (the end tags
+		// after them are moved to the start of p.afterEnd, which is empty
+		// between tokens)
+		n := p.closesForeign(tok)
+		for i := range p.implied.Len() {
+			if t := p.implied.At(i); i < n {
+				p.convert(t)
+			} else {
+				p.afterEnd.Append(t)
+			}
+		}
+		p.implied.Reset()
+		p.implied, p.afterEnd = p.afterEnd, p.implied
 		p.convert(tok)
 		return
 	case p.keptByEnd && k == htmlstream.Text:
@@ -1587,6 +1622,26 @@ func (p *polyglot) closesKept() bool {
 		}
 	}
 	return false
+}
+
+// closesForeign returns the number of implied end tags held back after a
+// body or html end tag (see queueToken) up to and including that of the
+// SVG or MathML element matched by the stray end tag tok, or 0 if an HTML
+// element comes first. HTML parsers apply an end tag in foreign content to
+// the foreign elements open above the first HTML element, which the Reader
+// closed before the body or html end tag.
+func (p *polyglot) closesForeign(tok *htmlstream.Token) int {
+	var a, b [16]byte
+	for i := range p.implied.Len() {
+		t := p.implied.At(i)
+		if !t.Implied() || t.NS() == htmlstream.NamespaceXHTML {
+			break
+		}
+		if bytes.Equal(t.AppendLocalName(a[:0]), tok.AppendLocalName(b[:0])) {
+			return i + 1
+		}
+	}
+	return 0
 }
 
 // flushImplied converts the implied end tags held back by queueToken, and
@@ -1657,9 +1712,14 @@ func (p *polyglot) close() error {
 		p.bodySpace.cutNewline() // written after the html end tag instead
 	}
 	p.bodySpace.write(p)
+	for len(p.out) > 1 {
+		p.popOut()
+	}
+	p.writeAfterBody(false)
 	for len(p.out) > 0 {
 		p.popOut()
 	}
+	p.writeAfterBody(true)
 	p.endText()
 	if p.opt.FinalNewline {
 		p.emitString("\n")
@@ -1683,7 +1743,9 @@ func (p *polyglot) close() error {
 // the head start tag, like those started for the head start tag. A hold
 // started in a Tag hook can end in the same hook: HoldRelease holds back
 // nothing, and HoldDiscard writes raw after the tag and the markup inserted
-// after it. Holds still open at Close are released.
+// after it. Holds still open at Close are released. The comments after body
+// and html end tags are written by Close (see [Convert]), so holds ending
+// before it don't contain them.
 //
 // A hold started while another is open is inside it, and must end first: its
 // output then stays in the enclosing hold. HoldRelease and HoldDiscard of a
@@ -2433,6 +2495,17 @@ type polyglot struct {
 	// token, for a line break at its end (see bodySpaceToken)
 	bodySpace heldSpace
 
+	// the insertion mode of HTML parsers after body and html end tags, in
+	// the order of the input (see afterBodyToken): afterBodyMode,
+	// afterHTMLMode, or 0, and whether the text being converted started in
+	// foreign content, which keeps the mode
+	afterBody        uint8
+	afterBodyForeign bool
+	// the comments after the body and html end tags, written after them by
+	// close, or in place once they exceed maxAfterBody (afterBodyFull)
+	afterBodyComments heldSpace
+	afterBodyFull     bool
+
 	// with Indent and IndentPrefix (see layoutTag)
 	lay struct {
 		edge   bool      // the output is at a block boundary
@@ -3068,6 +3141,120 @@ func (p *polyglot) holdAfterHead(tok *htmlstream.Token, b []byte, first, last bo
 	return true
 }
 
+// The insertion modes of HTML parsers after body and html end tags.
+const (
+	afterBodyMode = 1 + iota // "after body": comments go in the html element, after the body
+	afterHTMLMode            // "after after body": comments go after the html element
+)
+
+// afterBodyToken updates p.afterBody for tok, the next token of the input.
+// HTML parsers switch to the "after body" insertion mode at a body end tag
+// which they apply (see bodyInScope), and to "after after body" at an html
+// end tag, and back to "in body" at a token other than whitespace,
+// comments, doctypes, html start tags and body and html end tags, except
+// in foreign content (SVG and MathML elements left open by the end tag),
+// where text and the end tags of these elements keep the mode. It is
+// called before the token, and the implied end tags before it, are
+// converted, since the implied end tags and body and html end tags can be
+// held back (see queueToken).
+func (p *polyglot) afterBodyToken(tok *htmlstream.Token) {
+	switch k := tok.Kind(); {
+	case k == htmlstream.EndTag && tok.Implied():
+		// before the token which implies them
+	case k == htmlstream.EndTag && (tok.Is("body") || tok.Is("html")) && (tok.Stray() || tok.NS() == htmlstream.NamespaceXHTML):
+		if p.afterBody == 0 && !p.bodyInScope() {
+			break // ignored by HTML parsers
+		}
+		p.afterBody = afterBodyMode
+		if tok.Is("html") {
+			p.afterBody = afterHTMLMode
+		}
+	case p.afterBody == 0:
+	case k == htmlstream.Comment, k == htmlstream.ProcInst, k == htmlstream.Doctype:
+	case k == htmlstream.StartTag && tok.NS() == htmlstream.NamespaceXHTML && tok.Is("html"):
+	case k == htmlstream.EndTag && p.keptByEnd && tok.Stray() && p.closesForeign(tok) != 0:
+		// closes SVG or MathML elements left open by the end tag, which
+		// HTML parsers do in foreign content, without changing the mode
+	case k == htmlstream.Text, k == htmlstream.CDATA:
+		if !tok.Continued() {
+			// decided at the first part, before the text closes the
+			// elements held back (see queueToken)
+			t := p.top()
+			p.afterBodyForeign = t != nil && t.ns != "" && !t.integration
+		}
+		if p.afterBodyForeign {
+			break // inserted in foreign content, without changing the mode
+		}
+		// (NUL isn't whitespace in HTML content)
+		p.sbuf = tok.AppendText(p.sbuf[:0])
+		if !ascii.IsBlank(p.sbuf) {
+			p.afterBody = 0
+		}
+	default:
+		p.afterBody = 0
+	}
+}
+
+// bodyInScope reports whether HTML parsers apply a body or html end tag at
+// the elements open in the output: whether the body is in scope, or isn't
+// open yet (they start it first), except in a noscript in the head. They
+// ignore it in a table, a select or a template, and when another element
+// limiting the scope is open (e.g., object, or SVG foreignObject).
+func (p *polyglot) bodyInScope() bool {
+	noscript := false
+	for i := len(p.out) - 1; i >= 0; i-- {
+		switch e := &p.out[i]; {
+		case e.ns == htmlstream.NamespaceSVG:
+			if e.name == "foreignObject" || e.name == "desc" || e.name == "title" {
+				return false
+			}
+		case e.ns == htmlstream.NamespaceMathML:
+			switch e.name {
+			case "mi", "mo", "mn", "ms", "mtext", "annotation-xml":
+				return false
+			}
+		case e.ns != "":
+		case e.name == "body" || e.name == "html":
+			return true
+		case e.name == "head":
+			return !noscript
+		case e.name == "noscript":
+			noscript = true
+		case internal.HTMLElem([]byte(e.name))&internal.Scope != 0:
+			// (including select)
+			return false
+		}
+	}
+	return true
+}
+
+// holdAfterBody holds back a comment (markup b, first and last as for
+// commentPart) after a body or html end tag, which HTML parsers put after
+// the body or after the html element, to be written there by close. It
+// reports whether b was held back: past maxAfterBody bytes, the comments
+// held back are written in place instead, and so are b and the rest.
+func (p *polyglot) holdAfterBody(b []byte, first, last bool) bool {
+	h := &p.afterBodyComments
+	if h.size()+len(b) > maxAfterBody {
+		p.afterBodyFull = true
+		h.write(p)
+		return false
+	}
+	h.add(nil, b, first, last)
+	h.parts[len(h.parts)-1].afterHTML = p.afterBody == afterHTMLMode
+	return true
+}
+
+// writeAfterBody writes the comments held back by holdAfterBody after the
+// html end tag if afterHTML is set, or else after the body end tag.
+func (p *polyglot) writeAfterBody(afterHTML bool) {
+	for part, b := range p.afterBodyComments.all() {
+		if part.afterHTML == afterHTML {
+			p.emit(b)
+		}
+	}
+}
+
 // bodySpaceToken reports whether tok is whitespace directly in the body held
 // back with FinalNewline, in case it ends the body: its last line break is
 // then written after the html end tag. Whitespace before which formatting
@@ -3092,11 +3279,13 @@ func (p *polyglot) inHeadTop() bool {
 }
 
 // maxHeadSpace is the size of the whitespace at the start of the head held
-// back by placeCharset, and maxAfterHead that of the whitespace and comments
-// after the head held back by holdAfterHead.
+// back by placeCharset, maxAfterHead that of the whitespace and comments
+// after the head held back by holdAfterHead, and maxAfterBody that of the
+// comments after the body held back by holdAfterBody.
 const (
 	maxHeadSpace = 256
 	maxAfterHead = 64 << 10
+	maxAfterBody = 64 << 10
 )
 
 // heldSpace is whitespace and comments written later. Its memory is reused.
@@ -3113,6 +3302,7 @@ type heldPart struct {
 	tok         int // the index of the token in toks, or -1 for a comment
 	end         int
 	first, last bool
+	afterHTML   bool // a comment after the html end tag (see holdAfterBody)
 }
 
 func (h *heldSpace) size() int { return len(h.data) }
@@ -3126,7 +3316,7 @@ func (h *heldSpace) add(tok *htmlstream.Token, b []byte, first, last bool) {
 		i = h.toks.Len() - 1
 	}
 	h.data = append(h.data, b...)
-	h.parts = append(h.parts, heldPart{i, len(h.data), first, last})
+	h.parts = append(h.parts, heldPart{tok: i, end: len(h.data), first: first, last: last})
 }
 
 // all returns the parts held back: the token (nil for a comment) and the
@@ -3888,6 +4078,9 @@ func (p *polyglot) commentPart(b []byte, first, last bool) {
 	}
 	p.buf = out
 	if p.doc.Part() == htmlutil.AfterHead && p.inHeadTop() && !p.afterHeadFull && p.holdAfterHead(nil, out, first, last) {
+		return
+	}
+	if t := p.top(); p.afterBody != 0 && !p.afterBodyFull && (t == nil || t.ns == "") && p.holdAfterBody(out, first, last) {
 		return
 	}
 	p.writeComment(out, first, last)

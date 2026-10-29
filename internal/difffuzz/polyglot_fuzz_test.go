@@ -353,6 +353,8 @@ var writerFound = []modeSeed{
 	{"<teXtAreA><![CDATA[\x00]]>", '?'},
 	{"<heAd/><nosCript>0", 0x01},
 	{"<title><![CDATA[0\r]]>\n", '\r'},
+	{"</BodY><!DOCTYPE><!0", '`'}, // a known difference (rewritten by specDoctypes)
+	{"<<!DOCTYPE>A", '\\'},
 }
 
 // hooksFound are inputs and modes which found bugs with FuzzPolyglotHooks.

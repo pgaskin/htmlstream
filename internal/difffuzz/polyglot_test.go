@@ -227,7 +227,9 @@ func domDiff(a, b string) string {
 	return s.String()
 }
 
-// The DOMs are compared as indented text, ignoring comments, doctypes,
+// The DOMs are compared as indented text, ignoring comments other than
+// those in the root element and after it (without their data, and except
+// empty ones, since x/net reads </> as one), doctypes,
 // whitespace-only text (unless space is set: the HTML and XML DOMs of the
 // output are compared with it), namespace declarations, xml:lang, charset
 // declarations, and the CDATA wrappers in scripts and styles. An HTML element
@@ -256,9 +258,17 @@ func htmlDOMScripting(t *testing.T, s string, scripting, space bool) string {
 			text.Reset()
 		}
 		defer flush()
+		root := n.Type == html.ElementNode && n.Parent != nil && n.Parent.Type == html.DocumentNode
+		after := false // after the root element
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
 			switch c.Type {
+			case html.CommentNode:
+				if (root || after) && c.Data != "" {
+					flush()
+					domComment(&b, depth)
+				}
 			case html.ElementNode:
+				after = n.Type == html.DocumentNode
 				if dropCharsetDecl(c) {
 					continue
 				}
@@ -290,12 +300,18 @@ func htmlDOMScripting(t *testing.T, s string, scripting, space bool) string {
 	return b.String()
 }
 
-// specDoctypes replaces the doctypes in s with <!DOCTYPE html> or <!DOCTYPE
-// quirks>, as htmlutil.Document decides the document is in no-quirks or
-// quirks mode. x/net's choice differs from the HTML5 spec: it compares the
-// name "html" case-sensitively and selects quirks mode for any public
-// identifier without a system identifier. Only the first doctype before
-// other content sets the mode, and doctypes aren't part of the compared DOM.
+// specDoctypes replaces the first doctype in s, if only comments and
+// whitespace precede it, with <!DOCTYPE html> or <!DOCTYPE quirks>, as
+// htmlutil.Document decides the document is in no-quirks or quirks mode, and
+// removes the other doctypes, unless they follow text not ending in
+// whitespace, which could join what follows them (e.g., <<!DOCTYPE>a); those
+// are replaced like the first. x/net's choice of mode differs from the HTML5
+// spec: it compares the name "html" case-sensitively and selects quirks mode
+// for any public identifier without a system identifier. The spec ignores
+// doctypes in all insertion modes but the initial one, while x/net returns to
+// the "in body" insertion mode for a doctype after a body end tag, which
+// moves a comment after it from the html element into the body (e.g.,
+// </body><!DOCTYPE><!--x-->). Doctypes aren't part of the compared DOM.
 // Document's choice is checked against the spec by TestDocumentQuirks in
 // htmlutil.
 func specDoctypes(s string) string {
@@ -304,12 +320,29 @@ func specDoctypes(s string) string {
 	}
 	r := htmlstream.NewReader(strings.NewReader(s))
 	var d htmlutil.Document
-	var doctypes [][2]int // start and end
+	var doctypes [][3]int // start, end, and 1 if replaced rather than removed
+	first := -1           // the index of the doctype which sets the mode
+	content := false      // a token other than a comment, a doctype or whitespace was read
+	afterText := false    // the last token was text not ending in whitespace
 	for r.Next() {
 		tok := r.Token()
 		d.Update(tok)
-		if tok.Kind() == htmlstream.Doctype {
-			doctypes = append(doctypes, [2]int{int(tok.Pos()), int(tok.Pos()) + len(tok.Raw())})
+		prevText := afterText
+		afterText = tok.Kind() == htmlstream.Text && len(tok.Raw()) != 0 && !strings.ContainsRune(" \t\n\f\r", rune(tok.Raw()[len(tok.Raw())-1]))
+		switch {
+		case tok.Kind() == htmlstream.Doctype:
+			replace := 0
+			if !content && first < 0 {
+				first = len(doctypes)
+			}
+			if prevText {
+				replace = 1
+			}
+			doctypes = append(doctypes, [3]int{int(tok.Pos()), int(tok.Pos()) + len(tok.Raw()), replace})
+		case tok.Kind() == htmlstream.Comment, len(tok.Raw()) == 0:
+		case tok.Kind() == htmlstream.Text && strings.Trim(string(tok.Raw()), " \t\n\f\r") == "":
+		default:
+			content = true
 		}
 	}
 	if r.Err() != nil {
@@ -321,9 +354,11 @@ func specDoctypes(s string) string {
 	}
 	var b strings.Builder
 	last := 0
-	for _, dt := range doctypes {
+	for i, dt := range doctypes {
 		b.WriteString(s[last:dt[0]])
-		b.WriteString(doctype)
+		if i == first || dt[2] == 1 {
+			b.WriteString(doctype)
+		}
 		last = dt[1]
 	}
 	b.WriteString(s[last:])
@@ -336,9 +371,10 @@ func specDoctypes(s string) string {
 // return from a character reference (<pre>&#13;x). The HTML5 spec drops a
 // line feed only directly after the start tag, while x/net drops a carriage
 // return and a line feed at the start of any text while the element has no
-// children, and the comment is a child. Comments aren't part of the compared
-// DOM. It also removes </> after the start tag, which x/net reads as an
-// empty comment, a child, while the HTML5 spec ignores it (<pre></>\nx).
+// children, and the comment is a child. Comments in the element aren't part
+// of the compared DOM. It also removes </> after the start tag, which x/net
+// reads as an empty comment, a child, while the HTML5 spec ignores it
+// (<pre></>\nx).
 func specPreNewlines(s string) string {
 	if l := strings.ToLower(s); !strings.Contains(l, "<pre") && !strings.Contains(l, "<listing") {
 		return s
@@ -529,6 +565,12 @@ func domText(b *strings.Builder, depth int, text string, space bool) {
 	fmt.Fprintf(b, "%s%q\n", strings.Repeat("  ", depth), text)
 }
 
+// domComment writes a comment, without its data, which polyglot.Convert
+// changes (e.g., "--" becomes "- -").
+func domComment(b *strings.Builder, depth int) {
+	fmt.Fprintf(b, "%s<!---->\n", strings.Repeat("  ", depth))
+}
+
 // xmlNSCheck checks the namespace constraints of Namespaces in XML 1.0,
 // which encoding/xml doesn't check: prefixes are declared (except xml and
 // xmlns) and not undeclared, the xml prefix is only bound to the XML
@@ -633,6 +675,7 @@ func xmlDOM(s string, space bool) (string, error) {
 	var text strings.Builder
 	var stack []bool // whether each open element is skipped
 	var names []string
+	after := false         // after the root element
 	var defaultNS []string // the default namespace in each open element
 	depth := 0
 	flush := func() {
@@ -708,6 +751,12 @@ func xmlDOM(s string, space bool) (string, error) {
 			stack = stack[:len(stack)-1]
 			names = names[:len(names)-1]
 			defaultNS = defaultNS[:len(defaultNS)-1]
+			after = len(names) == 0
+		case xml.Comment:
+			if (len(names) == 1 || after) && len(tok) != 0 {
+				flush()
+				domComment(&b, depth)
+			}
 		case xml.CharData:
 			text.Write(tok)
 		}
