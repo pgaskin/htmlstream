@@ -142,6 +142,8 @@
 // well-formedness: malformed markup is read like other markup, without an
 // error (e.g., an end tag which doesn't match an open element is stray), and
 // edits don't add or check namespace declarations (see [Transformer.Rename]).
+// [github.com/pgaskin/htmlstream/xmlutil.CheckWellFormed] checks a document
+// separately.
 // XML documents in UTF-16 or other encodings in which ASCII characters
 // don't have their ASCII bytes must be decoded first (see Input).
 //
@@ -582,7 +584,9 @@ func (r *Reader) untrackedLimit() error {
 // returns one in strict mode when an operation depends on structurally
 // unsound markup (see [Reader.SetStrict]); other packages also use it in
 // their strict modes, e.g., for input they would drop (see
-// [github.com/pgaskin/htmlstream/sax.Reader.SetStrict]).
+// [github.com/pgaskin/htmlstream/sax.Reader.SetStrict]), and for XML which
+// isn't well-formed (see
+// [github.com/pgaskin/htmlstream/xmlutil.CheckWellFormed]).
 type SyntaxError struct {
 	Pos Pos    // the position of the token
 	Msg string // the problem, e.g., why the token is unsound

@@ -5,9 +5,16 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"errors"
+	"fmt"
+	"io"
 	"os"
+	"regexp"
+	"strings"
 	"testing"
 	"unicode/utf16"
+
+	"github.com/pgaskin/htmlstream"
+	xmltest_testdata "github.com/pgaskin/htmlstream/testdata/xmltest"
 )
 
 func TestParseDecl(t *testing.T) {
@@ -249,6 +256,195 @@ func FuzzParseDecl(f *testing.F) {
 		}
 		if e := DetectEncoding(b); e.Declared != d.Encoding {
 			t.Fatalf("%q: declared encoding %q, ParseDecl read %q", b, e.Declared, d.Encoding)
+		}
+	})
+}
+
+func TestCheckWellFormed(t *testing.T) {
+	for _, tc := range []struct {
+		in  string
+		err string // a part of the message, or empty for none
+	}{
+		{`<a/>`, ""},
+		{"\xef\xbb\xbf<?xml version=\"1.0\"?>\n<a/>\n", ""},
+		{`<?xml version="1.0" encoding="ISO-8859-1" standalone="yes"?><!DOCTYPE a><a/>`, ""},
+		{`<!DOCTYPE a [<!ENTITY e "x">]><a b="&e;">&e;</a>`, ""},
+		{`<!DOCTYPE a SYSTEM "a.dtd"><a>&e;</a>`, ""},
+		{"<!DOCTYPE a PUBLIC \"-//A//EN\" 'a.dtd' [\n]\n><a/>", ""},
+		{`<!-- c --><?pi data?><a xmlns="u" xmlns:p="v" p:b="1" b="2" xml:lang="en"><p:c/><![CDATA[<&]]>&lt;&#60;&#x3C;&#x10FFFF;</a><!-- c -->`, ""},
+		{"<a b = '1'\tc=\"2\" ></a >", ""},
+		{`<a xmlns:p="u" xmlns:q="v" p:b="1" q:b="2"><?pi?><?pix?></a>`, ""},
+
+		// document
+		{``, "no root element"},
+		{`<!-- c -->`, "no root element"},
+		{`<a/><b/>`, "second root element"},
+		{`x<a/>`, "text outside the root element"},
+		{`<a/>&amp;`, "text outside the root element"},
+		{`<a/><![CDATA[x]]>`, "CDATA section outside the root element"},
+		{"<a>\x01</a>", "character not allowed in XML"},
+		{"<a>\xff</a>", "invalid UTF-8"},
+
+		// elements
+		{`<a></b></a>`, "end tag b without a start tag"},
+		{`<a><b></a>`, "no end tag for b"},
+		{`<a>`, "no end tag for a"},
+		{`<a><b`, "StartTag cut off by the end of the input"},
+		{`<a></a b>`, "malformed end tag"},
+		{`<a><b:c:d/></a>`, `malformed element name "b:c:d"`},
+		{`<a b="1" b="2"/>`, "duplicate attribute b"},
+		{`<a b=1/>`, "attribute b without a quoted value"},
+		{`<a b/>`, "attribute b without a quoted value"},
+		{`<a b="1"c="2"/>`, "malformed start tag"},
+		{`<a/ >`, "malformed start tag"},
+		{`<a b="<"/>`, `"<" in the value of the attribute b`},
+		{`<a b="&"/>`, `"&" not starting a reference`},
+
+		// text and references
+		{`<a>&e;</a>`, "reference to the undeclared entity e"},
+		{`<?xml version="1.0" standalone="yes"?><!DOCTYPE a SYSTEM "a.dtd"><a>&e;</a>`, "reference to the undeclared entity e"},
+		{`<a>&#0;</a>`, "malformed character reference &#0;"},
+		{`<a>&#X41;</a>`, "malformed character reference &#X41;"},
+		{`<a>&#xD800;</a>`, "malformed character reference &#xD800;"},
+		{`<a>& b</a>`, `"&" not starting a reference`},
+		{`<a>&b c;</a>`, "malformed reference &b c;"},
+		{`<a>]]></a>`, `"]]>" in text`},
+		{`<a>a < b</a>`, `"<" in text`},
+
+		// comments and processing instructions
+		{`<!-- a -- b --><a/>`, `"--" in a comment`},
+		{`<a><!-- a ---></a>`, `"--" in a comment`},
+		{`<!--><a/>`, "Comment cut off by the end of the input"},
+		{` <?xml version="1.0"?><a/>`, "reserved target xml"},
+		{`<?XML version="1.0"?><a/>`, "reserved target XML"},
+		{`<?xml encoding="UTF-8"?><a/>`, "XML declaration without a version"},
+		{`<?xml version="1.0" a="b"?><a/>`, "malformed XML declaration"},
+		{`<?p:i?><a/>`, `malformed processing instruction target "p:i"`},
+		{`<? pi?><a/>`, `malformed processing instruction target ""`},
+		{`<a/><!a>`, "malformed markup"},
+
+		// doctypes
+		{`<a/><!DOCTYPE a>`, "doctype after the root element"},
+		{`<!DOCTYPE a><!DOCTYPE a><a/>`, "second doctype"},
+		{`<!DOCTYPE><a/>`, "malformed doctype name"},
+		{`<!DOCTYPE a SYSTEM><a/>`, "malformed doctype"},
+		{`<!DOCTYPE a PUBLIC "{" "x"><a/>`, "malformed doctype"},
+		{`<!DOCTYPE a [<!ENTITY e "x">] x><a/>`, "malformed doctype internal subset"},
+
+		// namespaces
+		{`<p:a/>`, "element p:a with the undeclared prefix p"},
+		{`<xmlns:a/>`, "reserved prefix xmlns"},
+		{`<a p:b="1"/>`, "attribute p:b with the undeclared prefix p"},
+		{`<a xmlns:p="u" xmlns:q="u" p:b="1" q:b="2"/>`, "duplicate attribute b in the namespace u"},
+		{`<a xmlns:xmlns="u"/>`, "declaration of the reserved prefix xmlns"},
+		{`<a xmlns:xml="u"/>`, "declaration of the reserved prefix xml"},
+		{`<a xmlns:p="http://www.w3.org/XML/1998/namespace"/>`, "declaration of the prefix p with a reserved namespace"},
+		{`<a xmlns:p=""/>`, "declaration of the prefix p with an empty namespace"},
+		{`<a xmlns="http://www.w3.org/2000/xmlns/"/>`, "default namespace declared as a reserved namespace"},
+	} {
+		err := CheckWellFormed(strings.NewReader(tc.in))
+		if tc.err == "" && err != nil || tc.err != "" && (err == nil || !strings.Contains(err.Error(), tc.err)) {
+			t.Errorf("%q: got %v, want %q", tc.in, err, tc.err)
+		}
+		if _, ok := err.(*htmlstream.SyntaxError); err != nil && !ok {
+			t.Errorf("%q: %T, want a *htmlstream.SyntaxError", tc.in, err)
+		}
+	}
+
+	// elements nested past the stack limits
+	if err := CheckWellFormed(strings.NewReader(strings.Repeat("<a>", htmlstream.DefaultMaxDepth+1))); err == nil || !strings.Contains(err.Error(), "nested past the stack limits") {
+		t.Errorf("past the stack limits: got %v", err)
+	}
+
+	// text and comments split into several tokens (see
+	// htmlstream.Token.Partial) at each offset around the chunk size
+	for _, tc := range []struct {
+		in, err string
+	}{
+		{"<a>%s&amp;&#x10FFFF;]]&gt;</a>", ""},
+		{"<!DOCTYPE a [ ]><a>%s&a" + strings.Repeat("b", 100) + ";</a>", ""},
+		{"<!DOCTYPE a [ ]><a>%s&a" + strings.Repeat("b", 100) + " c;</a>", "reference"},
+		{"<a>%s]]></a>", `"]]>" in text`},
+		{"<a>%s&ab c;</a>", "malformed reference"},
+		{"<!--%s- -  -- --><a/>", `"--" in a comment`},
+		{"<!--%s- - -  - --><a/>", ""},
+		{"<!--%s-  - --><a/>", ""},
+		{"<a><!--%s---></a>", `"--" in a comment`},
+	} {
+		for n := htmlstream.DefaultChunkSize - 128; n < htmlstream.DefaultChunkSize+4; n++ {
+			in := fmt.Sprintf(tc.in, strings.Repeat("x", n))
+			err := CheckWellFormed(strings.NewReader(in))
+			if tc.err == "" && err != nil || tc.err != "" && (err == nil || !strings.Contains(err.Error(), tc.err)) {
+				t.Errorf("%q with %d bytes of padding: got %v, want %q", tc.in, n, err, tc.err)
+			}
+		}
+	}
+}
+
+// TestCheckWellFormedXMLTest checks CheckWellFormed with the documents of
+// James Clark's XML test cases: well-formed documents (valid and invalid) are
+// accepted, decoding UTF-16 documents first, except for a document which
+// isn't namespace-well-formed, and documents which aren't well-formed are
+// rejected, except those whose error is in the doctype's internal subset or
+// in an external entity or DTD, which aren't checked.
+func TestCheckWellFormedXMLTest(t *testing.T) {
+	var unchecked int
+	for d := range xmltest_testdata.Documents() {
+		in := d.Data
+		if b := []byte(in); len(b) >= 2 && b[0] == 0xFF && b[1] == 0xFE {
+			u := make([]uint16, len(b)/2-1)
+			for i := range u {
+				u[i] = binary.LittleEndian.Uint16(b[2+2*i:])
+			}
+			in = string(utf16.Decode(u))
+		}
+		err := CheckWellFormed(strings.NewReader(in))
+		switch {
+		case d.Kind != "not-wf" && d.Name == "xmltest/valid/sa/012.xml":
+			// an attribute named ":"
+			if err == nil {
+				t.Errorf("%s: not namespace-well-formed, but accepted", d.Name)
+			}
+		case d.Kind != "not-wf" && err != nil:
+			t.Errorf("%s: %v", d.Name, err)
+		case d.Kind == "not-wf" && err == nil:
+			unchecked++
+			if !regexp.MustCompile(`<!DOCTYPE[^>\[]*(\[|SYSTEM|PUBLIC)`).MatchString(in) {
+				t.Errorf("%s: accepted, without an internal subset or an external DTD", d.Name)
+			}
+		}
+	}
+	if want := 85; unchecked != want {
+		t.Errorf("%d documents which aren't well-formed accepted, want %d", unchecked, want)
+	}
+}
+
+// FuzzCheckWellFormed checks that CheckWellFormed doesn't panic, and that
+// encoding/xml reads XML 1.0 documents without a doctype which it accepts.
+func FuzzCheckWellFormed(f *testing.F) {
+	f.Add(`<?xml version="1.0"?><!-- c --><a xmlns:p="u" p:b="&amp;">x<![CDATA[y]]><p:c/><?pi?></a>`)
+	f.Add(`<a b="1" b="2">]]></b>`)
+	for d := range xmltest_testdata.Documents() {
+		f.Add(d.Data)
+	}
+	f.Fuzz(func(t *testing.T, in string) {
+		if CheckWellFormed(strings.NewReader(in)) != nil || strings.Contains(in, "<!DOCTYPE") {
+			return
+		}
+		if d, _, err := ParseDecl([]byte(in)); err == nil && d.Version != "1.0" {
+			return
+		}
+		dec := xml.NewDecoder(strings.NewReader(in))
+		dec.Strict = true
+		dec.CharsetReader = func(label string, r io.Reader) (io.Reader, error) { return r, nil }
+		for {
+			_, err := dec.Token()
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				t.Fatalf("%q: accepted, but encoding/xml: %v", in, err)
+			}
 		}
 	})
 }

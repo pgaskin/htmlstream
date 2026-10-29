@@ -29,7 +29,9 @@
 // in strict mode: references to entities other than the named character
 // references of HTML are left as they are (see [htmlstream.XML]), and
 // duplicate attributes, unbound namespace prefixes, several root elements
-// and text outside the root element aren't errors.
+// and text outside the root element aren't errors (see
+// [github.com/pgaskin/htmlstream/xmlutil.CheckWellFormed] for a separate
+// check).
 //
 // # Elements
 //

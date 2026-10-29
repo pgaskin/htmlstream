@@ -11,17 +11,20 @@
 // requires UTF-8 input, or input in another encoding in which ASCII characters
 // have their ASCII bytes, so documents in other encodings (e.g., UTF-16) must
 // be decoded first (see Input in the htmlstream package documentation).
+// [CheckWellFormed] checks that a document is well-formed, which the Reader
+// doesn't.
 package xmlutil
 
 import (
 	"bytes"
 	"errors"
+	"fmt"
+	"io"
 	"strconv"
 
+	"github.com/pgaskin/htmlstream"
 	"github.com/pgaskin/htmlstream/internal"
 )
-
-// TODO: maybe add a checker for xml well-formedness
 
 // AppendEscape appends s to dst, escaped for use as text or as a
 // double-quoted attribute value in XML: &, <, >, " and tabs, newlines and
@@ -132,6 +135,450 @@ func AppendDecl(dst []byte, d Decl) []byte {
 		}
 	}
 	return append(dst, "?>"...)
+}
+
+// CheckWellFormed reads an XML document from r and checks that it is
+// [well-formed] and [namespace-well-formed]. It returns nil if it is, a
+// [*htmlstream.SyntaxError] at the first token which isn't, or an error from
+// r or the Reader (e.g., [htmlstream.ErrTokenTooLarge]).
+//
+// It reads the document with an [htmlstream.Reader] in [htmlstream.XML] mode
+// with the default limits, and checks each token as it is read: the syntax
+// of tags, references, comments, processing instructions, the XML
+// declaration and the doctype, the characters (see
+// [htmlstream.ValidXMLChars]) and names (see [htmlstream.ValidXMLName]), the
+// nesting of the elements, that there is a single root element, with only
+// whitespace, comments, processing instructions and a doctype around it,
+// and the namespace constraints. An element nested past the Reader's stack
+// limits ([htmlstream.DefaultMaxDepth] and [htmlstream.DefaultMaxStackBytes])
+// is an error, since its end tag isn't matched with its start tag.
+//
+// The doctype isn't processed: its internal subset isn't checked, and with
+// an internal subset, or an external ID without standalone="yes" in the XML
+// declaration, references to entities other than lt, gt, amp, apos and quot
+// are accepted without checking that the entities are declared and that
+// their replacement text is well-formed. External entities aren't read.
+// Names follow the Fourth Edition of XML 1.0, like ValidXMLName, so names
+// with characters only allowed since the Fifth Edition are errors. XML 1.1
+// documents are checked with the rules of XML 1.0.
+//
+// The input must be UTF-8 (see the package documentation): documents in
+// other encodings must be decoded first, and the encoding declaration isn't
+// checked against the input.
+//
+// [well-formed]: https://www.w3.org/TR/2006/REC-xml-20060816/#sec-well-formed
+// [namespace-well-formed]: https://www.w3.org/TR/2006/REC-xml-names-20060816/#Conformance
+func CheckWellFormed(r io.Reader) error {
+	rd := htmlstream.NewReader(r)
+	rd.SetMode(htmlstream.XML)
+	c := wfChecker{r: rd}
+	var end htmlstream.Pos
+	for rd.Next() {
+		tok := rd.Token()
+		if err := c.token(tok); err != nil {
+			return err
+		}
+		if tok.Unsound() {
+			return tok.UnsoundError()
+		}
+		end = tok.Pos() + htmlstream.Pos(len(tok.Raw()))
+	}
+	if err := rd.Err(); err != nil {
+		return err
+	}
+	if c.root == 0 {
+		return &htmlstream.SyntaxError{Pos: end, Msg: "no root element"}
+	}
+	return nil
+}
+
+// wfChecker checks the tokens of a document for [CheckWellFormed].
+type wfChecker struct {
+	r          *htmlstream.Reader
+	root       int                 // 0 before the root element, 1 in it, 2 after it
+	bom        bool                // the input starts with a byte order mark
+	standalone bool                // the XML declaration has standalone="yes"
+	doctype    bool                // a doctype was read
+	dtd        bool                // entities other than the predefined ones can be declared
+	split      []byte              // the end of the previous part of a text or comment split into several tokens
+	seen       map[string]struct{} // the attribute names and expanded names of the start tag
+}
+
+func wfError(tok *htmlstream.Token, format string, args ...any) error {
+	return &htmlstream.SyntaxError{Pos: tok.Pos(), Msg: fmt.Sprintf(format, args...)}
+}
+
+// token checks the current token tok.
+func (c *wfChecker) token(tok *htmlstream.Token) error {
+	switch {
+	case tok.Incomplete():
+		return wfError(tok, "%s cut off by the end of the input", tok.Kind())
+	case tok.Bogus():
+		return wfError(tok, "malformed markup")
+	case !htmlstream.ValidXMLChars(tok.Raw()):
+		return wfError(tok, "character not allowed in XML, or invalid UTF-8")
+	}
+	switch tok.Kind() {
+	case htmlstream.Text:
+		return c.text(tok)
+	case htmlstream.CDATA:
+		if c.r.Depth() == 0 {
+			return wfError(tok, "CDATA section outside the root element")
+		}
+	case htmlstream.Comment:
+		// after a "-" ending the previous part of a comment split into
+		// several tokens
+		d := tok.Data()
+		if len(c.split) != 0 {
+			c.split = append(c.split, d...)
+			d = c.split
+		}
+		if bytes.Contains(d, []byte("--")) || !tok.Partial() && bytes.HasSuffix(d, []byte("-")) {
+			return wfError(tok, `"--" in a comment`)
+		}
+		dash := tok.Partial() && bytes.HasSuffix(d, []byte("-"))
+		c.split = c.split[:0]
+		if dash {
+			c.split = append(c.split, '-')
+		}
+	case htmlstream.ProcInst:
+		return c.procInst(tok)
+	case htmlstream.Doctype:
+		return c.doctypeDecl(tok)
+	case htmlstream.StartTag:
+		return c.startTag(tok)
+	case htmlstream.EndTag:
+		switch {
+		case tok.Stray():
+			return wfError(tok, "end tag %s without a start tag", tok.Name())
+		case tok.Implied():
+			return wfError(tok, "no end tag for %s", tok.Name())
+		}
+		if rest := tok.Raw()[2+len(tok.Name()):]; string(bytes.TrimLeft(rest, xmlSpace)) != ">" {
+			return wfError(tok, "malformed end tag")
+		}
+		if c.r.Depth() == 1 {
+			c.root = 2
+		}
+	}
+	return nil
+}
+
+// xmlSpace is the XML whitespace.
+const xmlSpace = " \t\n\r"
+
+// text checks the text token tok.
+func (c *wfChecker) text(tok *htmlstream.Token) error {
+	s := tok.Raw()
+	if tok.Pos() == 0 {
+		var ok bool
+		if s, ok = bytes.CutPrefix(s, []byte("\xef\xbb\xbf")); ok {
+			c.bom = len(s) == 0
+		}
+	}
+	if c.r.Depth() == 0 {
+		if len(bytes.TrimLeft(s, xmlSpace)) != 0 {
+			return wfError(tok, "text outside the root element")
+		}
+		return nil
+	}
+	// after the end of the previous part of a text split into several
+	// tokens, which can be in a reference or "]]>"
+	if len(c.split) != 0 {
+		c.split = append(c.split, s...)
+		s = c.split
+	}
+	if bytes.Contains(s, []byte("]]>")) {
+		return wfError(tok, `"]]>" in text`)
+	}
+	if bytes.IndexByte(s, '<') >= 0 {
+		return wfError(tok, `"<" in text`)
+	}
+	n, err := c.refs(tok, s, tok.Partial())
+	if err != nil {
+		return err
+	}
+	if !tok.Partial() {
+		c.split = c.split[:0]
+		return nil
+	}
+	if n == len(s) {
+		n = max(n-2, 0) // "]]" followed by ">" in the next part
+	} else if len(s)-n > htmlstream.DefaultMaxTokenSize {
+		return fmt.Errorf("xmlutil: reference at offset %d: %w", tok.Pos(), htmlstream.ErrTokenTooLarge)
+	}
+	c.split = append(c.split[:0], s[n:]...)
+	return nil
+}
+
+// refs checks the references in text or an attribute value s. If partial,
+// it returns the offset of a reference cut off by the end of s, or else
+// len(s).
+func (c *wfChecker) refs(tok *htmlstream.Token, s []byte, partial bool) (int, error) {
+	for off := 0; ; {
+		i := bytes.IndexByte(s[off:], '&')
+		if i < 0 {
+			return len(s), nil
+		}
+		start := off + i
+		ref, _, ok := bytes.Cut(s[start+1:], []byte(";"))
+		if !ok {
+			if partial && refPrefix(ref) {
+				return start, nil
+			}
+			return 0, wfError(tok, `"&" not starting a reference`)
+		}
+		off = start + len(ref) + 2
+		if num, ok := bytes.CutPrefix(ref, []byte("#")); ok {
+			base := 10
+			if hex, ok := bytes.CutPrefix(num, []byte("x")); ok {
+				num, base = hex, 16
+			}
+			v, err := strconv.ParseUint(string(num), base, 32)
+			if err != nil || !xmlChar(v) {
+				return 0, wfError(tok, "malformed character reference &%s;", ref)
+			}
+			continue
+		}
+		switch string(ref) {
+		case "lt", "gt", "amp", "apos", "quot":
+		default:
+			if !ncName(ref) {
+				return 0, wfError(tok, "malformed reference &%s;", ref)
+			}
+			if !c.dtd {
+				return 0, wfError(tok, "reference to the undeclared entity %s", ref)
+			}
+		}
+	}
+}
+
+// refPrefix reports whether s, after a "&", can be the start of a
+// reference.
+func refPrefix(s []byte) bool {
+	if num, ok := bytes.CutPrefix(s, []byte("#")); ok {
+		num, _ = bytes.CutPrefix(num, []byte("x"))
+		return len(bytes.TrimLeft(num, "0123456789abcdefABCDEF")) == 0
+	}
+	return len(s) == 0 || ncName(append([]byte("a"), s...))
+}
+
+// xmlChar reports whether c is allowed in XML 1.0 documents (the Char
+// production).
+func xmlChar(c uint64) bool {
+	return c == '\t' || c == '\n' || c == '\r' || c >= 0x20 && c <= 0xD7FF || c >= 0xE000 && c <= 0xFFFD || c >= 0x10000 && c <= 0x10FFFF
+}
+
+// ncName reports whether s is an XML name without a colon (an NCName in
+// Namespaces in XML 1.0).
+func ncName(s []byte) bool {
+	return bytes.IndexByte(s, ':') < 0 && htmlstream.ValidXMLName(string(s))
+}
+
+// procInst checks the processing instruction tok.
+func (c *wfChecker) procInst(tok *htmlstream.Token) error {
+	target := tok.Name()
+	if len(target) == 3 && target[0]|0x20 == 'x' && target[1]|0x20 == 'm' && target[2]|0x20 == 'l' {
+		if string(target) != "xml" || !(tok.Pos() == 0 || tok.Pos() == 3 && c.bom) {
+			return wfError(tok, "processing instruction with the reserved target %s", target)
+		}
+		d, n, err := ParseDecl(tok.Raw())
+		var de *DeclError
+		switch {
+		case errors.As(err, &de):
+			return wfError(tok, "malformed XML declaration: %s at offset %d", de.Msg, de.Offset)
+		case err != nil || n != len(tok.Raw()):
+			return wfError(tok, "malformed XML declaration")
+		case d.Version == "":
+			return wfError(tok, "XML declaration without a version")
+		}
+		c.standalone = d.Standalone == "yes"
+		return nil
+	}
+	if !ncName(target) {
+		return wfError(tok, "malformed processing instruction target %q", target)
+	}
+	if d := tok.Data(); len(d) != 0 && bytes.IndexByte([]byte(xmlSpace), d[0]) < 0 {
+		return wfError(tok, "no whitespace after the processing instruction target")
+	}
+	return nil
+}
+
+// doctypeDecl checks the doctype tok.
+func (c *wfChecker) doctypeDecl(tok *htmlstream.Token) error {
+	switch {
+	case c.root != 0:
+		return wfError(tok, "doctype after the root element")
+	case c.doctype:
+		return wfError(tok, "second doctype")
+	case !bytes.HasPrefix(tok.Raw(), []byte("<!DOCTYPE")):
+		return wfError(tok, "malformed doctype")
+	}
+	c.doctype = true
+	// "<!DOCTYPE" S Name (S ExternalID)? S? ("[" intSubset "]" S?)? ">"
+	s, sp := skipSpace(tok.Data())
+	n := bytes.IndexAny(s, xmlSpace+"[")
+	if n < 0 {
+		n = len(s)
+	}
+	if !sp || !htmlstream.ValidXMLName(string(s[:n])) {
+		return wfError(tok, "malformed doctype name")
+	}
+	s, sp = skipSpace(s[n:])
+	if id, ok := bytes.CutPrefix(s, []byte("SYSTEM")); ok && sp {
+		s, ok = literal(id, false)
+		if !ok {
+			return wfError(tok, "malformed doctype external ID")
+		}
+		s, _ = skipSpace(s)
+		c.dtd = !c.standalone
+	} else if id, ok := bytes.CutPrefix(s, []byte("PUBLIC")); ok && sp {
+		if s, ok = literal(id, true); ok {
+			s, ok = literal(s, false)
+		}
+		if !ok {
+			return wfError(tok, "malformed doctype external ID")
+		}
+		s, _ = skipSpace(s)
+		c.dtd = !c.standalone
+	}
+	if subset, ok := bytes.CutPrefix(s, []byte("[")); ok {
+		s = bytes.TrimRight(subset, xmlSpace)
+		if !bytes.HasSuffix(s, []byte("]")) {
+			return wfError(tok, "malformed doctype internal subset")
+		}
+		c.dtd, s = true, nil
+	}
+	if len(s) != 0 {
+		return wfError(tok, "malformed doctype")
+	}
+	return nil
+}
+
+// skipSpace returns s without leading XML whitespace, and whether there was
+// any.
+func skipSpace(s []byte) ([]byte, bool) {
+	t := bytes.TrimLeft(s, xmlSpace)
+	return t, len(t) != len(s)
+}
+
+// literal reads the whitespace and the system literal, or the public ID
+// literal if pubid, at the start of s, and returns the rest of s after it,
+// and whether it was read.
+func literal(s []byte, pubid bool) ([]byte, bool) {
+	s, sp := skipSpace(s)
+	if !sp || len(s) == 0 || s[0] != '"' && s[0] != '\'' {
+		return s, false
+	}
+	lit, rest, ok := bytes.Cut(s[1:], s[:1])
+	if !ok {
+		return s, false
+	}
+	if pubid {
+		for _, b := range lit {
+			if !('a' <= b && b <= 'z' || 'A' <= b && b <= 'Z' || '0' <= b && b <= '9' || bytes.IndexByte([]byte(" \r\n-'()+,./:=?;!*#@$_%"), b) >= 0) {
+				return s, false
+			}
+		}
+	}
+	return rest, true
+}
+
+// startTag checks the start tag tok.
+func (c *wfChecker) startTag(tok *htmlstream.Token) error {
+	if tok.Untracked() {
+		return fmt.Errorf("xmlutil: element at offset %d nested past the stack limits (DefaultMaxDepth or DefaultMaxStackBytes)", tok.Pos())
+	}
+	if c.r.Depth() == 1 {
+		if c.root != 0 {
+			return wfError(tok, "second root element")
+		}
+		c.root = 1
+		if !tok.Opens() {
+			c.root = 2
+		}
+	}
+	name := tok.Name()
+	if !htmlstream.ValidXMLName(string(name)) {
+		return wfError(tok, "malformed element name %q", name)
+	}
+	if p := tok.Prefix(); string(p) == "xmlns" {
+		return wfError(tok, "element %s with the reserved prefix xmlns", name)
+	} else if _, ok := c.r.LookupPrefix(string(p)); p != nil && !ok {
+		return wfError(tok, "element %s with the undeclared prefix %s", name, p)
+	}
+	// "<" Name (S Attribute)* S? "/"? ">", with the attributes in the order
+	// of Attrs
+	s := tok.Raw()[1+len(name):]
+	if c.seen == nil {
+		c.seen = make(map[string]struct{})
+	}
+	clear(c.seen)
+	for a := range tok.Attrs() {
+		var sp bool
+		s, sp = skipSpace(s)
+		name := a.Name()
+		switch {
+		case !sp || !bytes.HasPrefix(s, a.Raw()):
+			return wfError(tok, "malformed start tag")
+		case !htmlstream.ValidXMLName(string(name)):
+			return wfError(tok, "malformed attribute name %q", name)
+		case a.Quote() == 0:
+			return wfError(tok, "attribute %s without a quoted value", name)
+		case bytes.IndexByte(a.RawValue(), '<') >= 0:
+			return wfError(tok, `"<" in the value of the attribute %s`, name)
+		}
+		if _, err := c.refs(tok, a.RawValue(), false); err != nil {
+			return err
+		}
+		if _, ok := c.seen[string(name)]; ok {
+			return wfError(tok, "duplicate attribute %s", name)
+		}
+		c.seen[string(name)] = struct{}{}
+		if err := c.attrNS(tok, a); err != nil {
+			return err
+		}
+		s = s[len(a.Raw()):]
+	}
+	if s = bytes.TrimLeft(s, xmlSpace); string(s) != ">" && string(s) != "/>" {
+		return wfError(tok, "malformed start tag")
+	}
+	return nil
+}
+
+// attrNS checks the namespace constraints for the attribute a of the start
+// tag tok, after the attributes before it.
+func (c *wfChecker) attrNS(tok *htmlstream.Token, a htmlstream.Attr) error {
+	p, local := a.Prefix(), a.Local()
+	switch {
+	case string(p) == "xmlns":
+		switch v := a.Value(); {
+		case string(local) == "xmlns":
+			return wfError(tok, "declaration of the reserved prefix xmlns")
+		case string(local) == "xml" && v != htmlstream.NamespaceXML:
+			return wfError(tok, "declaration of the reserved prefix xml with another namespace")
+		case string(local) != "xml" && (v == htmlstream.NamespaceXML || v == htmlstream.NamespaceXMLNS):
+			return wfError(tok, "declaration of the prefix %s with a reserved namespace", local)
+		case v == "":
+			return wfError(tok, "declaration of the prefix %s with an empty namespace", local)
+		}
+	case p == nil && string(local) == "xmlns":
+		if v := a.Value(); v == htmlstream.NamespaceXML || v == htmlstream.NamespaceXMLNS {
+			return wfError(tok, "default namespace declared as a reserved namespace")
+		}
+	case p != nil:
+		ns := tok.AttrNamespace(a)
+		if ns == "" {
+			return wfError(tok, "attribute %s with the undeclared prefix %s", a.Name(), p)
+		}
+		// the expanded name, unlike the attribute names, with a "{"
+		k := "{" + ns + "}" + string(local)
+		if _, ok := c.seen[k]; ok {
+			return wfError(tok, "duplicate attribute %s in the namespace %s", local, ns)
+		}
+		c.seen[k] = struct{}{}
+	}
+	return nil
 }
 
 // Encoding is the character encoding of an XML document detected by
