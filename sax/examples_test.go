@@ -49,7 +49,7 @@ func Example() {
 			fmt.Printf("%s: %s\n", name, text)
 		case sax.Name{Space: nsOPF, Local: "item"}:
 			path := s.Path()
-			if path[len(path)-2] != (sax.Name{Space: nsOPF, Local: "manifest"}) {
+			if len(path) < 2 || path[len(path)-2] != (sax.Name{Space: nsOPF, Local: "manifest"}) {
 				break
 			}
 			id, _ := ev.Attr("id")

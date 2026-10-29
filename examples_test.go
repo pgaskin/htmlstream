@@ -19,6 +19,7 @@ func Example() {
 <!-- unclosed <b>bold`
 
 	x := htmlstream.NewTransformer(os.Stdout, strings.NewReader(page))
+	x.SetMaxTokenSize(64 << 10) // a lower limit for untrusted input
 	for x.Find(htmlstream.Tag("a", htmlstream.AttrFunc("href", func(v []byte) bool {
 		return bytes.HasPrefix(v, []byte("https://"))
 	}))) {
@@ -127,7 +128,7 @@ func ExampleReader_Skip() {
 }
 
 // Children iterates over the tokens inside an element, including those of
-// nested elements. Depth gives the nesting level.
+// nested elements. Depth gives the nesting level of the current token.
 func ExampleReader_Children() {
 	const page = `<nav><ul>
 <li><a href=/>Home</a>
@@ -143,7 +144,7 @@ func ExampleReader_Children() {
 	for tok := range r.Children() {
 		if tok.Kind() == htmlstream.StartTag && tok.Is("a") {
 			href, _ := tok.Attr("href")
-			fmt.Printf("level %d: %s\n", (r.Depth()-depth)/2, href.Value())
+			fmt.Printf("depth %d: %s\n", r.Depth()-depth, href.Value())
 		}
 	}
 	if err := r.Err(); err != nil {
@@ -151,10 +152,10 @@ func ExampleReader_Children() {
 	}
 	fmt.Println(r.Token().Kind(), string(r.Token().Raw()))
 	// Output:
-	// level 1: /
-	// level 1: /docs
-	// level 2: /docs/api
-	// level 1: /blog
+	// depth 2: /
+	// depth 2: /docs
+	// depth 4: /docs/api
+	// depth 2: /blog
 	// EndTag </ul>
 }
 
@@ -187,7 +188,7 @@ func ExampleReader_Stack() {
 // Long text is split into several tokens at about the chunk size. ReadText
 // reads the decoded text of all of them, up to a limit.
 func ExampleReader_ReadText() {
-	const page = `<p>Fish &amp; chips, ` + `fish &amp; chips, ` + `fish &amp; chips.</p><p>Next</p>`
+	const page = `<p>Fish &amp; chips, fish &amp; chips, fish &amp; chips.</p><p>Next</p>`
 
 	r := htmlstream.NewReader(strings.NewReader(page))
 	r.SetChunkSize(16)
@@ -205,6 +206,34 @@ func ExampleReader_ReadText() {
 	// Output:
 	// "Fish & chips, fish & chi" partial=true truncated=true
 	// "Next" partial=false truncated=false
+}
+
+// HTML mode reads XHTML like browsers read text/html: the self-closed script
+// element here contains the rest of the document. With SetXMLSyntax,
+// self-closing tags are read as XML parsers read them, as needed for EPUB
+// content documents.
+func ExampleReader_SetXMLSyntax() {
+	const page = `<?xml version="1.0"?>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><script src="a.js"/></head>
+<body><p>Hello<br/>world</p><![CDATA[x < y]]></body></html>`
+
+	for _, xmlSyntax := range []bool{false, true} {
+		r := htmlstream.NewReader(strings.NewReader(page))
+		r.SetXMLSyntax(xmlSyntax)
+		var names []string
+		for r.Next() {
+			if tok := r.Token(); tok.Kind() == htmlstream.StartTag {
+				names = append(names, string(tok.Name()))
+			}
+		}
+		if err := r.Err(); err != nil {
+			panic(err)
+		}
+		fmt.Printf("xml syntax=%t: %s\n", xmlSyntax, strings.Join(names, " "))
+	}
+	// Output:
+	// xml syntax=false: html head script
+	// xml syntax=true: html head script body p br
 }
 
 // The modes read the same markup differently. In HTML mode, title contents
@@ -477,8 +506,8 @@ func ExampleTransformer_Wrap() {
 }
 
 // InsertBefore and InsertAfter write markup around a token. Markup written
-// after a start tag is inside the element. InsertAtEnd writes markup at the end of the
-// output.
+// after a start tag is inside the element. InsertAtEnd writes markup at the
+// end of the output.
 func ExampleTransformer_InsertBefore() {
 	const page = `<h1>Title</h1><p>Text<br>more text.</p>`
 

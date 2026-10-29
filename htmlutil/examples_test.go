@@ -10,6 +10,50 @@ import (
 	"github.com/pgaskin/htmlstream/htmlutil"
 )
 
+// Make the URLs of a document absolute, as when saving or embedding a page.
+// BaseURL tracks the base element, URLAttrs finds the attributes with URLs,
+// and a srcset attribute has a list of them. URLs which can't be resolved are
+// left as they are.
+func Example() {
+	const page = `<base href="/docs/"><a href=intro.html>Intro</a> <a href="http://[bad">Bad</a> <img src=a.png srcset="a-2x.png 2x, http://[bad 3x" alt="A">`
+
+	doc, err := url.Parse("https://example.com/en/index.html")
+	if err != nil {
+		panic(err)
+	}
+	base := htmlutil.NewBaseURL(doc)
+	x := htmlstream.NewTransformer(os.Stdout, strings.NewReader(page))
+	for x.Next() {
+		tok := x.Token()
+		base.Update(tok)
+		for name, a := range htmlutil.URLAttrs(tok) {
+			var value string
+			if htmlutil.IsSrcset(a) {
+				var cs []string
+				for c := range htmlutil.ParseSrcset(a.Value()) {
+					if u, err := base.Resolve(c.URL); err == nil {
+						c.URL = u.String()
+					}
+					cs = append(cs, strings.TrimSpace(c.URL+" "+c.Descriptor))
+				}
+				value = strings.Join(cs, ", ")
+			} else if u, err := base.Resolve(a.Value()); err == nil {
+				value = u.String()
+			} else {
+				continue
+			}
+			if err := x.SetAttr(name, value); err != nil {
+				panic(err)
+			}
+		}
+	}
+	if err := x.Close(); err != nil {
+		panic(err)
+	}
+	// Output:
+	// <base href="https://example.com/docs/"><a href="https://example.com/docs/intro.html">Intro</a> <a href="http://[bad">Bad</a> <img src="https://example.com/docs/a.png" srcset="https://example.com/docs/a-2x.png 2x, http://[bad 3x" alt="A">
+}
+
 // The element categories classify start and end tags of HTML elements. The
 // title in svg is an SVG element.
 func ExampleIsBlock() {
@@ -45,6 +89,9 @@ func ExampleIsBlock() {
 		}
 		fmt.Printf("%-8s %s\n", tok.Raw(), strings.Join(cats, " "))
 	}
+	if err := r.Err(); err != nil {
+		panic(err)
+	}
 	// Output:
 	// <p>      block text-break special
 	// <b>      formatting
@@ -70,6 +117,9 @@ func ExampleHTMLName() {
 				fmt.Printf("%s preformatted: %v\n", e.Name(), htmlutil.IsPreformatted(e))
 			}
 		}
+	}
+	if err := r.Err(); err != nil {
+		panic(err)
 	}
 	// Output:
 	// true false
@@ -102,6 +152,9 @@ func ExampleStack() {
 			}
 		}
 	}
+	if err := r.Err(); err != nil {
+		panic(err)
+	}
 	// Output:
 	// "Hello, " (en)
 	// "bonjour " (fr)
@@ -128,6 +181,9 @@ func ExampleDocument() {
 				}
 				fmt.Printf("%s: %v, now %v\n", raw, ev, doc.Part())
 			}
+		}
+		if err := r.Err(); err != nil {
+			panic(err)
 		}
 		if ev := doc.End(); ev != 0 {
 			fmt.Printf("at the end: %v\n", ev)
@@ -209,95 +265,47 @@ func ExampleTextBuilder() {
 			b.Break()
 		}
 	}
+	if err := r.Err(); err != nil {
+		panic(err)
+	}
 	fmt.Printf("%q\n", b.String())
 	// Output:
 	// "One Two lines"
 }
 
-// BaseURL tracks the base element, and URLAttrs finds the attributes with
-// URLs to resolve against it.
+// BaseURL tracks the base element, which applies to the URLs after it.
 func ExampleBaseURL() {
 	const page = `<head><base href="/docs/"><link rel=stylesheet href=style.css></head>
 <body background=bg.png><a href="../about#team">About</a>
-<img src=a.png srcset="a-2x.png 2x, //cdn.example.com/a-3x.png 3x">
 <svg><a href="b.svg"><image xlink:href=c.png /></a></svg>`
 
-	doc, _ := url.Parse("https://example.com/en/index.html")
+	doc, err := url.Parse("https://example.com/en/index.html")
+	if err != nil {
+		panic(err)
+	}
 	base := htmlutil.NewBaseURL(doc)
 	r := htmlstream.NewReader(strings.NewReader(page))
 	for r.Next() {
 		tok := r.Token()
 		base.Update(tok)
 		for name, a := range htmlutil.URLAttrs(tok) {
-			if htmlutil.IsSrcset(a) {
-				for c := range htmlutil.ParseSrcset(a.Value()) {
-					u, err := base.Resolve(c.URL)
-					if err != nil {
-						panic(err)
-					}
-					fmt.Printf("%s %s: %s %s\n", tok.Name(), name, u, c.Descriptor)
-				}
-				continue
-			}
 			u, err := base.Resolve(a.Value())
 			if err != nil {
-				panic(err)
+				continue
 			}
 			fmt.Printf("%s %s: %s\n", tok.Name(), name, u)
 		}
+	}
+	if err := r.Err(); err != nil {
+		panic(err)
 	}
 	// Output:
 	// base href: https://example.com/docs/
 	// link href: https://example.com/docs/style.css
 	// body background: https://example.com/docs/bg.png
 	// a href: https://example.com/about#team
-	// img src: https://example.com/docs/a.png
-	// img srcset: https://example.com/docs/a-2x.png 2x
-	// img srcset: https://cdn.example.com/a-3x.png 3x
 	// a href: https://example.com/docs/b.svg
 	// image xlink:href: https://example.com/docs/c.png
-}
-
-// URLAttrs finds the attributes with URLs, here to make them absolute with a
-// Transformer. A srcset attribute has a list of URLs.
-func ExampleURLAttrs() {
-	const page = `<base href="/docs/"><a href=intro.html>Intro</a> <img src=a.png srcset="a-2x.png 2x, a-3x.png 3x" alt="A">`
-
-	doc, _ := url.Parse("https://example.com/en/index.html")
-	base := htmlutil.NewBaseURL(doc)
-	x := htmlstream.NewTransformer(os.Stdout, strings.NewReader(page))
-	for x.Next() {
-		tok := x.Token()
-		base.Update(tok)
-		for name, a := range htmlutil.URLAttrs(tok) {
-			var value string
-			if htmlutil.IsSrcset(a) {
-				var cs []string
-				for c := range htmlutil.ParseSrcset(a.Value()) {
-					u, err := base.Resolve(c.URL)
-					if err != nil {
-						panic(err)
-					}
-					cs = append(cs, strings.TrimSpace(u.String()+" "+c.Descriptor))
-				}
-				value = strings.Join(cs, ", ")
-			} else {
-				u, err := base.Resolve(a.Value())
-				if err != nil {
-					panic(err)
-				}
-				value = u.String()
-			}
-			if err := x.SetAttr(name, value); err != nil {
-				panic(err)
-			}
-		}
-	}
-	if err := x.Close(); err != nil {
-		panic(err)
-	}
-	// Output:
-	// <base href="https://example.com/docs/"><a href="https://example.com/docs/intro.html">Intro</a> <img src="https://example.com/docs/a.png" srcset="https://example.com/docs/a-2x.png 2x, https://example.com/docs/a-3x.png 3x" alt="A">
 }
 
 // ParseSrcset splits a srcset attribute into image candidates, leaving out
@@ -350,6 +358,9 @@ func ExampleScriptType() {
 		t := htmlutil.ScriptType(r.Token())
 		fmt.Printf("%-33q js=%-5t json=%t\n", t, htmlutil.IsJavaScriptType(t), htmlutil.IsJSONType(t))
 	}
+	if err := r.Err(); err != nil {
+		panic(err)
+	}
 	// Output:
 	// "text/javascript"                 js=true  json=false
 	// "module"                          js=true  json=false
@@ -375,6 +386,9 @@ func ExampleMetaCharset() {
 	for r.Find(htmlstream.Tag("meta")) {
 		name, ok := htmlutil.MetaCharset(r.Token())
 		fmt.Printf("%q %t\n", name, ok)
+	}
+	if err := r.Err(); err != nil {
+		panic(err)
 	}
 	// Output:
 	// "UTF-8" true
