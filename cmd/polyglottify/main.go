@@ -31,14 +31,14 @@ func main() {
 }
 
 // config is the conversion configured by the flags. It reads the input with
-// its own Reader rather than with polyglot.Convert for the Reader limits,
-// which polyglot.Options doesn't have.
+// a Reader from polyglot.Options.NewReader rather than with polyglot.Convert
+// for the Reader limits, which polyglot.Options doesn't have.
 type config struct {
 	opt   polyglot.Options
 	quiet bool
 
 	// Reader limits, applied if set
-	maxTokenSize, maxDepth, maxStackBytes *int
+	maxTokenSize, maxStackBytes *int
 
 	stderr io.Writer
 }
@@ -62,7 +62,7 @@ func run(name string, args []string, stdin io.Reader, stdout, stderr io.Writer) 
 	xmlSyntax := fset.Bool("xml-syntax", false, "accept CDATA sections, processing instructions, self-closing tags on non-void elements, end tags of void elements (<br></br> is one br), and doctypes with an internal subset, for documents written as XHTML (e.g., EPUB content) (it may slightly change the meaning of looser HTML documents if used for them)")
 	scripting := fset.Bool("scripting", false, "read noscript contents as raw text rather than descending into it (like browsers with js enabled) (you probably DO NOT want this as it will result in contents containing markup being written as escaped text)")
 	maxTokenSize := fset.Int("max-token-size", htmlstream.DefaultMaxTokenSize, "maximum size of a tag, doctype or processing instruction, in `bytes`")
-	maxDepth := fset.Int("max-depth", htmlstream.DefaultMaxDepth, "maximum `depth` of nested elements, in the input and in the output (where formatting elements reopened after misnested end tags can nest deeper); the tags of deeper ones are dropped, keeping their contents")
+	maxDepth := fset.Int("max-depth", htmlstream.DefaultMaxDepth, "maximum `depth` of nested elements, in the input and in the output (where formatting elements reopened after misnested end tags can nest deeper), at least 3; the tags of deeper ones are dropped, keeping their contents")
 	maxStackBytes := fset.Int("max-stack-bytes", htmlstream.DefaultMaxStackBytes, "maximum size of the names and namespace declarations kept for the open elements, in `bytes`")
 	maxRawText := fset.Int("max-raw-text", polyglot.DefaultMaxRawText, "maximum size of script and style contents, noscript contents with -scripting, title and textarea contents starting with a CDATA section with -xml-syntax, and the output before the root element with -xmldecl keep, in `bytes`")
 	if err := fset.Parse(args); err != nil {
@@ -122,8 +122,7 @@ func run(name string, args []string, stdin io.Reader, stdout, stderr io.Writer) 
 		case "max-token-size":
 			p, v = &c.maxTokenSize, *maxTokenSize
 		case "max-depth":
-			p, v = &c.maxDepth, *maxDepth
-			c.opt.MaxDepth = v
+			c.opt.MaxDepth, v = *maxDepth, *maxDepth
 		case "max-stack-bytes":
 			p, v = &c.maxStackBytes, *maxStackBytes
 		case "max-raw-text":
@@ -273,15 +272,9 @@ func (c *config) convert(w io.Writer, r io.Reader, name string) error {
 			fmt.Fprintf(c.stderr, "%s: %s\n", lr.position(name, w.Pos), w.Msg)
 		}
 	}
-	rd := htmlstream.NewReader(lr)
-	rd.SetScripting(opt.Scripting)
-	rd.SetStrict(opt.Strict)
-	rd.SetXMLSyntax(opt.XMLSyntax)
+	rd := opt.NewReader(lr)
 	if c.maxTokenSize != nil {
 		rd.SetMaxTokenSize(*c.maxTokenSize)
-	}
-	if c.maxDepth != nil {
-		rd.SetMaxDepth(*c.maxDepth)
 	}
 	if c.maxStackBytes != nil {
 		rd.SetMaxStackBytes(*c.maxStackBytes)

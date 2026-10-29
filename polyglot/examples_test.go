@@ -106,14 +106,16 @@ func ExampleConvert_script() {
 	// <script type="application/ld+json">{"name": "\u003cFish \u0026 chips\u003e"}</script></head><body></body></html>
 }
 
-// A Writer converts the tokens of the caller's Reader. Leaving out all the
-// tokens of an element removes it, and leaving out its start and end tags
-// keeps the contents.
+// A Writer converts the tokens of the caller's Reader, here set up like the
+// Reader of Convert by Options.NewReader. Leaving out all the tokens of an
+// element removes it, and leaving out its start and end tags keeps the
+// contents.
 func ExampleWriter() {
 	const page = `<p>Text<script>track()</script> with <font color=red>red</font> and <span>spans<span>.`
 
-	r := htmlstream.NewReader(strings.NewReader(page))
-	pw := polyglot.NewWriter(os.Stdout, polyglot.Options{DoctypeMode: polyglot.NoDoctype})
+	opt := polyglot.Options{DoctypeMode: polyglot.NoDoctype}
+	r := opt.NewReader(strings.NewReader(page))
+	pw := polyglot.NewWriter(os.Stdout, opt)
 	var unwrapped htmlutil.Stack[struct{}]
 	for r.Next() {
 		tok := r.Token()

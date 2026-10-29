@@ -193,9 +193,9 @@ type Options struct {
 	Strict bool
 
 	// XMLSyntax and Scripting enable XML syntax and scripting in the Reader
-	// of [Convert] (see [htmlstream.Reader.SetXMLSyntax] and
-	// [htmlstream.Reader.SetScripting]). A [Writer] ignores them: its
-	// caller's Reader decides them.
+	// of [Options.NewReader], which [Convert] uses (see
+	// [htmlstream.Reader.SetXMLSyntax] and [htmlstream.Reader.SetScripting]).
+	// A [Writer] ignores them: its caller's Reader decides them.
 	XMLSyntax, Scripting bool
 
 	// Warn, if not nil, is called for input which can't be represented
@@ -241,8 +241,9 @@ type Options struct {
 	// input (e.g., <div><b></div>x repeated nests a b in the b before it),
 	// and XML parsers often limit the depth (e.g., to 256). If zero,
 	// [htmlstream.DefaultMaxDepth] is used, and values below 3 (the charset
-	// meta element in the head) are treated as 3. [Convert] also limits the
-	// depth of the input to it.
+	// meta element in the head) are treated as 3. The Reader of
+	// [Options.NewReader], which [Convert] uses, also limits the depth of the
+	// input to it.
 	MaxDepth int
 
 	// MaxHold limits the size of the output held back by [Writer.Hold]:
@@ -323,6 +324,29 @@ type Options struct {
 	// text escaped, or written as contents when Raw); the methods of the
 	// event change what is written.
 	OnText func(t *Text)
+}
+
+// NewReader returns an [htmlstream.Reader] reading r as [Convert] does: in
+// HTML mode with the Reader's defaults, the maximum depth of MaxDepth (with
+// the same default and minimum as the output depth), strict mode with
+// Strict, and XML syntax and scripting with XMLSyntax and Scripting. Other
+// options can be set on it before reading, e.g., to pass its tokens to a
+// [Writer] created with opt, which needs a maximum depth of at least 3.
+func (opt Options) NewReader(r io.Reader) *htmlstream.Reader {
+	rd := htmlstream.NewReader(r)
+	rd.SetStrict(opt.Strict)
+	rd.SetXMLSyntax(opt.XMLSyntax)
+	rd.SetScripting(opt.Scripting)
+	rd.SetMaxDepth(opt.maxDepth())
+	return rd
+}
+
+// maxDepth returns MaxDepth with its default and minimum applied.
+func (opt Options) maxDepth() int {
+	if opt.MaxDepth == 0 {
+		return htmlstream.DefaultMaxDepth
+	}
+	return max(opt.MaxDepth, 3)
 }
 
 // Warning describes input which can't be represented exactly as polyglot
@@ -1014,13 +1038,14 @@ const (
 // documents in other encodings to UTF-8 first (see Encodings in the package
 // documentation).
 //
-// Convert reads the input with an [htmlstream.Reader] in HTML mode with the
-// Reader's defaults, the maximum depth of Options.MaxDepth, strict mode with
-// Options.Strict, and XML syntax and scripting with Options.XMLSyntax and
-// Options.Scripting. Without Options.Scripting, noscript contents are
-// converted as markup, as XML parsers read them. To use other Reader options
-// (e.g., lower limits for untrusted input), pass the tokens of a Reader to a
-// [Writer].
+// Convert reads the input with the [htmlstream.Reader] of
+// [Options.NewReader]: in HTML mode with the Reader's defaults, the maximum
+// depth of Options.MaxDepth, strict mode with Options.Strict, and XML syntax
+// and scripting with Options.XMLSyntax and Options.Scripting. Without
+// Options.Scripting, noscript contents are converted as markup, as XML
+// parsers read them. To use other Reader options (e.g., lower limits for
+// untrusted input), set them on a Reader from Options.NewReader and pass its
+// tokens to a [Writer].
 //
 // Besides its size, converting a token takes time proportional to at most
 // the number of elements open in the output, for the formatting elements
@@ -1284,11 +1309,7 @@ const (
 // [the id attribute]: https://www.w3.org/TR/html-polyglot/#id-attribute
 func Convert(w io.Writer, r io.Reader, opt Options) error {
 	pw := NewWriter(w, opt)
-	rd := htmlstream.NewReader(r)
-	rd.SetStrict(opt.Strict)
-	rd.SetXMLSyntax(opt.XMLSyntax)
-	rd.SetScripting(opt.Scripting)
-	rd.SetMaxDepth(pw.p.opt.MaxDepth)
+	rd := opt.NewReader(r)
 	for rd.Next() {
 		if err := pw.WriteToken(rd.Token()); err != nil {
 			return err
@@ -1303,8 +1324,9 @@ func Convert(w io.Writer, r io.Reader, opt Options) error {
 // Writer converts a document to polyglot markup like [Convert], one token at
 // a time: the caller reads the document with its own [htmlstream.Reader],
 // with the options it needs (e.g., [htmlstream.Reader.SetXMLSyntax], which
-// the Reader of Convert takes from Options.XMLSyntax), and passes the tokens
-// to WriteToken, leaving out those it wants removed.
+// the Reader of Convert takes from Options.XMLSyntax; [Options.NewReader]
+// returns a Reader set up like Convert's), and passes the tokens to
+// WriteToken, leaving out those it wants removed.
 // Warnings have the positions of the tokens in the caller's input.
 //
 // The tokens must be from one Reader in [htmlstream.HTML] mode, in order.
@@ -1408,7 +1430,10 @@ func Convert(w io.Writer, r io.Reader, opt Options) error {
 //
 // [Options.MaxDepth] limits the depth of the output, and the Reader's
 // maximum depth ([htmlstream.Reader.SetMaxDepth]) that of the input; see
-// [Convert] for the time a token takes and the size of the output.
+// [Convert] for the time a token takes and the size of the output. The
+// Reader's maximum depth must be at least 3, which [Options.NewReader]
+// ensures: below that, the Reader leaves out the head and body or the
+// elements in them, and HTML and XML parsers read the output differently.
 //
 // A Writer isn't safe for concurrent use, and converts a single document.
 type Writer struct {
@@ -1437,10 +1462,7 @@ func NewWriter(w io.Writer, opt Options) *Writer {
 	if p.opt.MaxHold == 0 {
 		p.opt.MaxHold = htmlstream.DefaultMaxHold
 	}
-	if p.opt.MaxDepth == 0 {
-		p.opt.MaxDepth = htmlstream.DefaultMaxDepth
-	}
-	p.opt.MaxDepth = max(p.opt.MaxDepth, 3)
+	p.opt.MaxDepth = opt.maxDepth()
 	if strings.Trim(p.opt.Indent, " \t") != "" || strings.Trim(p.opt.IndentPrefix, " \t") != "" {
 		p.fail("Indent and IndentPrefix must contain only spaces and tabs")
 	}

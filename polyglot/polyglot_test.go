@@ -2419,17 +2419,30 @@ func FuzzConvert(f *testing.F) {
 	})
 }
 
-// writerWarnings converts the input from r with a Writer given the tokens of
-// a Reader with the chunk size (0 for the default), the scripting and XML
-// syntax options of opt, and its maximum depth if set, returning the output
-// and the warnings like convertWarnings.
-func writerWarnings(r io.Reader, chunk int, opt Options) (string, string, error) {
-	rd := htmlstream.NewReader(r)
-	rd.SetScripting(opt.Scripting)
-	rd.SetXMLSyntax(opt.XMLSyntax)
-	if opt.MaxDepth != 0 {
-		rd.SetMaxDepth(opt.MaxDepth)
+// TestOptionsNewReader checks that a Writer given the tokens of the Reader of
+// Options.NewReader writes what Convert writes, with the same warnings and
+// errors.
+func TestOptionsNewReader(t *testing.T) {
+	for _, in := range []string{
+		`<p>a<div/>b<noscript><b>c</b></noscript>`,
+		`<b><b><b><b><b>x`,
+		`<p a="b>c`,
+	} {
+		for _, opt := range []Options{{}, {XMLSyntax: true}, {Scripting: true}, {Strict: true}, {MaxDepth: 1}, {MaxDepth: 4}} {
+			out, warnings, err := convertWarnings(strings.NewReader(in), opt)
+			wout, wwarnings, werr := writerWarnings(strings.NewReader(in), 0, opt)
+			if wout != out || wwarnings != warnings || fmt.Sprint(werr) != fmt.Sprint(err) {
+				t.Errorf("%q %+v: got %q (%v)\nwarnings:\n%s\nwant %q (%v)\nwarnings:\n%s", in, opt, wout, werr, wwarnings, out, err, warnings)
+			}
+		}
 	}
+}
+
+// writerWarnings converts the input from r with a Writer given the tokens of
+// the Reader of opt.NewReader with the chunk size (0 for the default),
+// returning the output and the warnings like convertWarnings.
+func writerWarnings(r io.Reader, chunk int, opt Options) (string, string, error) {
+	rd := opt.NewReader(r)
 	if chunk > 0 {
 		rd.SetChunkSize(chunk)
 	}

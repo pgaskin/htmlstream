@@ -414,6 +414,7 @@ func TestReaderFlags(t *testing.T) {
 		{"scripting off", nil, `<p><noscript><i>a</i></noscript>`, `<p><noscript><i>a</i></noscript></p>`, 0, ""},
 		{"scripting", []string{"-scripting"}, `<p><noscript><i>a</i></noscript>`, `<p><noscript>&lt;i&gt;a&lt;/i&gt;</noscript></p>`, 0, "stdin:1:14: escaped raw text noscript contents"},
 		{"max-depth", []string{"-max-depth", "4"}, `<html><body><div><div><p>x</div></div>`, `<div><div>x</div></div>`, 0, "stdin:1:23: dropped p nested past the stack limits (MaxDepth or MaxStackBytes)\n"},
+		{"max-depth minimum", []string{"-max-depth", "1"}, `<html><body><div>x`, `<div>x</div>`, 0, ""},
 		{"max-depth output", []string{"-max-depth", "4"}, `<div><b></div>x<div><b></div>y`, `<div><b></b></div><b>x<div></div>y</b>`, 0, "stdin:1:21: dropped b nested past the output depth limit (Options.MaxDepth)\n"},
 		{"max-stack-bytes", []string{"-max-stack-bytes", "3"}, `<div><p>x</div>`, `<div>x</div>`, 0, "stdin:1:6: dropped p nested past the stack limits (MaxDepth or MaxStackBytes)\n"},
 		{"max-token-size", []string{"-max-token-size", "100"}, `<p class="` + strings.Repeat("a", 200) + `">x`, "polyglottify: stdin: htmlstream: token too large (MaxTokenSize is 100 bytes)\n", 1, ""},
