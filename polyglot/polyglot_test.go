@@ -2393,6 +2393,9 @@ func FuzzConvert(f *testing.F) {
 	// scripts of another type with markup, written unchanged
 	f.Add("<sCript tYpe=0><A>", byte(0), byte(0x09))
 	f.Add("<sCript tYpe=0><b></b >", byte(0), byte(0x09))
+	// a self-closing textarea start tag before a leading newline and
+	// whitespace, with the newline and the whitespace in tokens of their own
+	f.Add("<teXtAreA />\n\n0", byte('A'), byte(0))
 	f.Fuzz(func(t *testing.T, in string, chunk, opts byte) {
 		var opt Options
 		if opts&4 != 0 {

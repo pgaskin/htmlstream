@@ -4129,7 +4129,12 @@ func (p *polyglot) writeComment(b []byte, first, last bool) {
 func (p *polyglot) textToken(tok *htmlstream.Token, start, end int) {
 	f, ok := p.frames.Top()
 	if ok && f.selfClosed != "" {
-		p.selfClosedText(tok, f)
+		switch {
+		case f.name == "noscript" && !tok.InRawText():
+			f.selfClosed = "" // markup, as XML parsers read it
+		case !p.space(tok):
+			p.selfClosedText(f)
+		}
 	}
 	if ok && f.out >= 0 && f.out < len(p.out) && (f.name == "script" || f.name == "style") && p.out[f.out].ns == "" {
 		p.rawText(tok, f)
@@ -4249,6 +4254,9 @@ func (p *polyglot) textToken(tok *htmlstream.Token, start, end int) {
 		// CDATA section
 		p.stripNL = false
 		if (p.keptNL || xmlSyntax) && bytes.HasPrefix(b, []byte("\n")) && !p.removing() {
+			if ok && f.selfClosed != "" {
+				p.selfClosedText(f)
+			}
 			p.nlWarned = true
 			p.warn(p.pos, "leading newline in pre, textarea or listing can't be represented")
 		}
@@ -4356,17 +4364,12 @@ func cutCDATA(b, data []byte) ([]byte, bool) {
 // selfClosedText warns about the contents of a raw text or RCDATA element
 // (script, style, title, textarea, etc., and noscript read as raw text)
 // whose start tag is self-closing, at the first text token which isn't
-// whitespace. Without XML syntax, HTML parsers ignore the slash, so the
-// contents run to the end tag or the end of the input, which happens with
-// XHTML read as HTML (e.g., <script src="a.js"/>).
-func (p *polyglot) selfClosedText(tok *htmlstream.Token, f *frame) {
-	if f.name == "noscript" && !tok.InRawText() {
-		f.selfClosed = "" // markup, as XML parsers read it
-		return
-	}
-	if p.space(tok) {
-		return
-	}
+// whitespace, or before a warning about a leading newline in the contents
+// (which can be whitespace only), so that it comes first however the text
+// is split into tokens. Without XML syntax, HTML parsers ignore the slash,
+// so the contents run to the end tag or the end of the input, which happens
+// with XHTML read as HTML (e.g., <script src="a.js"/>).
+func (p *polyglot) selfClosedText(f *frame) {
 	p.warn(f.pos, "read self-closing <%s/> as a start tag, with the input up to </%s> or the end of the input as its contents (to match HTML parsers, which ignore the slash)", f.selfClosed, f.selfClosed)
 	f.selfClosed = ""
 }
@@ -4440,6 +4443,9 @@ func (p *polyglot) textPart(tok *htmlstream.Token, b []byte, unchanged bool) {
 	}
 	if p.written() == p.preEnd && bytes.HasPrefix(b, []byte("\n")) && !p.removing() && !p.nlWarned {
 		// HTML parsers would drop it
+		if f, ok := p.frames.Top(); ok && f.selfClosed != "" {
+			p.selfClosedText(f)
+		}
 		p.nlWarned = true
 		p.warn(p.pos, "leading newline in pre, textarea or listing can't be represented")
 	}

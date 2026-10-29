@@ -155,6 +155,30 @@ as its contents.
 &lt;/textarea&gt;&lt;p&gt;x&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</title></head><body></body></html>
 -- warn --
 87: read self-closing <title/> as a start tag, with the input up to </title> or the end of the input as its contents (to match HTML parsers, which ignore the slash)
+-- SelfClosingRawTextNewline htmldiff nonidempotent --
+A leading newline which can't be represented in self-closed textarea and
+xmp elements: the warning about the self-closing tag comes first, also for
+whitespace contents, and with the text split into tokens.
+-- in --
+<textarea/>
+
+a</textarea><textarea/>
+
+</textarea><xmp/>
+</xmp>
+-- out --
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><textarea>
+a</textarea><textarea>
+</textarea><pre></pre></body></html>
+-- warn --
+0: read self-closing <textarea/> as a start tag, with the input up to </textarea> or the end of the input as its contents (to match HTML parsers, which ignore the slash)
+11: leading newline in pre, textarea or listing can't be represented
+25: read self-closing <textarea/> as a start tag, with the input up to </textarea> or the end of the input as its contents (to match HTML parsers, which ignore the slash)
+36: leading newline in pre, textarea or listing can't be represented
+49: converted xmp to pre
+49: read self-closing <xmp/> as a start tag, with the input up to </xmp> or the end of the input as its contents (to match HTML parsers, which ignore the slash)
+55: leading newline in pre, textarea or listing can't be represented
 -- ScriptEndTagCutOff htmldiff --
 -- in --
 <script>a</SCRIPT
