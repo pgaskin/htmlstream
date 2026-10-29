@@ -840,7 +840,6 @@ func TestTransformInvalidOp(t *testing.T) {
 		"RemoveAttrs":       func(x *Transformer) error { return x.RemoveAttrs(func(Attr) bool { return true }) },
 	}
 	anyOps := map[string]func(x *Transformer) error{
-		"Hold":         func(x *Transformer) error { _, err := x.Hold(); return err },
 		"Remove":       (*Transformer).Remove,
 		"Replace":      func(x *Transformer) error { return x.Replace([]byte("R")) },
 		"InsertBefore": func(x *Transformer) error { return x.InsertBefore([]byte("B")) },
@@ -922,8 +921,6 @@ func TestTransformInvalidOpMessages(t *testing.T) {
 		}
 	}
 	want(x.Remove(), "removal with no current token")
-	_, err := x.Hold()
-	want(err, "Hold called with no current token")
 	want(x.HoldRelease(Hold{}), "HoldRelease called with the zero Hold")
 	x.Next()
 	want(x.HoldDiscard(Hold{}, nil), "HoldDiscard called with the zero Hold")
@@ -1302,8 +1299,8 @@ func TestTransformHold(t *testing.T) {
 		{"Release", `<p>a<b>b</b>c`, `<p>a<b>b</b>c`, each(func(x *Transformer, tok *Token) (err error) {
 			switch {
 			case tok.Kind() == StartTag && tok.Is("b"):
-				h, err = x.Hold()
-				return err
+				h = x.Hold()
+				return nil
 			case tok.Kind() == Text && string(tok.Raw()) == "c":
 				if string(x.Held(h)) != "<b>b</b>" {
 					return errors.New("held " + string(x.Held(h)))
@@ -1315,8 +1312,8 @@ func TestTransformHold(t *testing.T) {
 		{"Discard", `<p>a<b>b</b>c`, `<p>a[b]c`, each(func(x *Transformer, tok *Token) (err error) {
 			switch {
 			case tok.Kind() == StartTag && tok.Is("b"):
-				h, err = x.Hold()
-				return err
+				h = x.Hold()
+				return nil
 			case tok.Kind() == Text && string(tok.Raw()) == "c":
 				return x.HoldDiscard(h, []byte("[b]"))
 			}
@@ -1328,8 +1325,8 @@ func TestTransformHold(t *testing.T) {
 				if x.Holding() != 0 {
 					return x.HoldRelease(h)
 				}
-				h, err = x.Hold()
-				return err
+				h = x.Hold()
+				return nil
 			case EndTag:
 				if x.Holding() != 0 {
 					if err := x.Remove(); err != nil {
@@ -1347,9 +1344,7 @@ func TestTransformHold(t *testing.T) {
 		{"Edits", `<p a=1>x<i>y</i>`, `<p a="2">!x<b>y</b>`, each(func(x *Transformer, tok *Token) (err error) {
 			switch {
 			case tok.Kind() == StartTag && tok.Is("p"):
-				if h, err = x.Hold(); err != nil {
-					return err
-				}
+				h = x.Hold()
 				if err := x.InsertAfter([]byte("!")); err != nil {
 					return err
 				}
@@ -1370,16 +1365,16 @@ func TestTransformHold(t *testing.T) {
 				var err error
 				switch string(x.Token().Raw()) {
 				case "a":
-					outer, err = x.Hold()
+					outer = x.Hold()
 				case "b":
-					inner, err = x.Hold()
+					inner = x.Hold()
 				case "c":
 					// "b" is held back by both holds
 					if string(x.Held(outer)) != "ab" || string(x.Held(inner)) != "b" {
 						return errors.New("held " + string(x.Held(outer)))
 					}
 					if err = x.HoldDiscard(inner, append(append([]byte("["), x.Held(inner)...), ']')); err == nil {
-						inner, err = x.Hold()
+						inner = x.Hold()
 					}
 				case "d":
 					if err = x.HoldDiscard(inner, nil); err == nil {
@@ -1398,9 +1393,7 @@ func TestTransformHold(t *testing.T) {
 		{"Remove", `<p>a<b>b</b>c</p>d`, `[]d`, each(func(x *Transformer, tok *Token) (err error) {
 			switch {
 			case tok.Kind() == StartTag && tok.Is("p"):
-				if h, err = x.Hold(); err != nil {
-					return err
-				}
+				h = x.Hold()
 				return x.Remove()
 			case tok.Kind() == Text && string(tok.Raw()) == "d":
 				if string(x.Held(h)) != "" {
@@ -1413,9 +1406,7 @@ func TestTransformHold(t *testing.T) {
 		{"Skip", `<p>a<b>b<i>c</i></b>d</p>`, `<p>a<!--s--><b>b<i>c</i></b>d</p>`, each(func(x *Transformer, tok *Token) (err error) {
 			switch {
 			case tok.Kind() == StartTag && tok.Is("b"):
-				if h, err = x.Hold(); err != nil {
-					return err
-				}
+				h = x.Hold()
 				return x.Skip()
 			case tok.Kind() == Text && string(tok.Raw()) == "d":
 				return x.HoldDiscard(h, append([]byte("<!--s-->"), x.Held(h)...))
@@ -1425,13 +1416,22 @@ func TestTransformHold(t *testing.T) {
 		{"Close", `<p>a`, `<p>a<!--end-->`, func(x *Transformer) (err error) {
 			x.Next()
 			x.InsertAtEnd([]byte("<!--end-->"))
-			_, err = x.Hold()
-			return err
+			x.Hold() // released by Close
+			return nil
+		}},
+		{"BeforeFirst", `<p>a</p>`, `[]a</p>`, func(x *Transformer) (err error) {
+			h = x.Hold() // from the first token on
+			x.Next()
+			x.Next()
+			if string(x.Held(h)) != "<p>" {
+				return errors.New("held " + string(x.Held(h)))
+			}
+			return x.HoldDiscard(h, []byte("[]"))
 		}},
 		{"AfterEnd", `<p>a</p><p> `, `<p>a</p><!--e-->`, func(x *Transformer) (err error) {
 			if err := each(func(x *Transformer, tok *Token) (err error) {
 				if tok.Kind() == StartTag && x.Holding() == 0 {
-					h, err = x.Hold()
+					h = x.Hold()
 				} else if tok.Kind() == Text && strings.TrimSpace(string(tok.Raw())) != "" {
 					err = x.HoldRelease(h)
 				}
@@ -1442,6 +1442,10 @@ func TestTransformHold(t *testing.T) {
 			// the empty p at the end of the input
 			if string(x.Held(h)) != "<p> " {
 				return errors.New("held " + string(x.Held(h)))
+			}
+			// a hold started after the end of the input holds nothing
+			if e := x.Hold(); len(x.Held(e)) != 0 || x.HoldRelease(e) != nil {
+				return errors.New("hold after the end of the input")
 			}
 			return x.HoldDiscard(h, []byte("<!--e-->"))
 		}},
@@ -1475,15 +1479,9 @@ func TestTransformHoldErrors(t *testing.T) {
 			x := NewTransformer(&b, strings.NewReader(`<div><p>a<b>b</b>c</p></div>`))
 			x.SetMaxDepth(depth) // 1: the p is untracked
 			x.Next()
-			outer, err := x.Hold()
-			if err != nil {
-				t.Fatal(err)
-			}
+			outer := x.Hold()
 			x.Next()
-			h, err := x.Hold()
-			if err != nil {
-				t.Fatal(err)
-			}
+			h := x.Hold()
 			if err := op(x); err != nil {
 				t.Fatal(err)
 			}
@@ -1491,7 +1489,7 @@ func TestTransformHoldErrors(t *testing.T) {
 			if err := x.HoldDiscard(h, nil); err != nil {
 				t.Fatal(err)
 			}
-			h, _ = x.Hold()
+			h = x.Hold()
 			x.Next()
 			if err := x.HoldDiscard(h, nil); err != ErrHeldOpen {
 				t.Errorf("HoldDiscard: got %v, want ErrHeldOpen", err)
@@ -1525,6 +1523,8 @@ func TestTransformHoldErrors(t *testing.T) {
 		t.Errorf("got %q, want %q", err, want)
 	} else if n := b.Len(); x.Close() != err || b.Len() != n {
 		t.Error("second Close: other result or more output than the first")
+	} else if h := x.Hold(); h != (Hold{}) {
+		t.Errorf("Hold after an error: got %v, want the zero Hold", h)
 	}
 
 	// raw of HoldDiscard counts toward the limit only inside another hold
@@ -1534,11 +1534,11 @@ func TestTransformHoldErrors(t *testing.T) {
 		x := NewTransformer(&b, strings.NewReader(`<p>abc</p><div>d</div>`))
 		x.SetMaxHold(30)
 		x.Next()
-		outer, _ := x.Hold()
+		outer := x.Hold()
 		if !nested {
 			x.HoldRelease(outer)
 		}
-		h, _ := x.Hold()
+		h := x.Hold()
 		for x.Next() && !x.Token().Is("div") {
 		}
 		err := x.HoldDiscard(h, raw)
@@ -1556,7 +1556,7 @@ func TestTransformHoldErrors(t *testing.T) {
 	// of the Transformer return an error and change nothing
 	other := NewTransformer(io.Discard, strings.NewReader(`x`))
 	other.Next()
-	foreign, _ := other.Hold()
+	foreign := other.Hold()
 	for _, tc := range []struct {
 		name string
 		hold func(outer, released, discarded Hold) Hold
@@ -1576,15 +1576,15 @@ func TestTransformHoldErrors(t *testing.T) {
 			err := each(func(x *Transformer, tok *Token) (err error) {
 				switch string(tok.Raw()) {
 				case "<p>":
-					outer, err = x.Hold()
+					outer = x.Hold()
 				case "a":
-					released, _ = x.Hold()
-					discarded, _ = x.Hold()
+					released = x.Hold()
+					discarded = x.Hold()
 					if err = x.HoldDiscard(discarded, x.Held(discarded)); err == nil {
 						err = x.HoldRelease(released)
 					}
 				case "<b>":
-					inner, err = x.Hold()
+					inner = x.Hold()
 				case "b":
 					h := tc.hold(outer, released, discarded)
 					if op == "HoldRelease" {
@@ -1636,7 +1636,7 @@ func FuzzTransformHold(f *testing.F) {
 		}
 		other := NewTransformer(io.Discard, strings.NewReader("x"))
 		other.Next()
-		foreign, _ := other.Hold()
+		foreign := other.Hold()
 		run := func(holds bool) (string, error) {
 			var b bytes.Buffer
 			x := NewTransformer(&b, strings.NewReader(in))
@@ -1679,7 +1679,7 @@ func FuzzTransformHold(f *testing.F) {
 					discard := h&8 != 0
 					switch h % 8 {
 					case 1:
-						if h, err := x.Hold(); err == nil {
+						if h := x.Hold(); h != (Hold{}) {
 							hs = append(hs, h)
 						}
 					case 2:

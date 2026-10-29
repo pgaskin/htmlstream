@@ -573,7 +573,7 @@ func ExampleTransformer_Hold() {
 		var err error
 		switch {
 		case tok.Kind() == htmlstream.StartTag && tok.Is("p"):
-			h, err = x.Hold()
+			h = x.Hold()
 		case h == htmlstream.Hold{}:
 		case tok.Kind() == htmlstream.Text && len(bytes.TrimSpace(tok.Raw())) != 0:
 			err = x.HoldRelease(h)
@@ -623,7 +623,7 @@ func ExampleTransformer_HoldDiscard() {
 		switch {
 		case tok.Kind() == htmlstream.StartTag && tok.Is("img"):
 			if images == 0 {
-				h, err = x.Hold()
+				h = x.Hold()
 			}
 			images++
 		case images == 0:
@@ -662,10 +662,7 @@ func ExampleTransformer_ReadText() {
 		if x.Token().Kind() != htmlstream.Text {
 			continue
 		}
-		h, err := x.Hold()
-		if err != nil {
-			panic(err)
-		}
+		h := x.Hold()
 		text, _ := x.ReadText(nil, 0) // the current token is now the last one
 		if err := x.Replace(htmlstream.AppendEscapeText(nil, bytes.ToUpper(text))); err != nil {
 			panic(err)

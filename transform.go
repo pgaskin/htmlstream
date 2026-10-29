@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"iter"
+	"math"
 	"slices"
 	"strconv"
 	"sync/atomic"
@@ -328,7 +329,10 @@ func (t *Transformer) InsertAtEnd(raw []byte) {
 // otherwise, but to a buffer instead of the output, until the hold ends with
 // [Transformer.HoldRelease] or [Transformer.HoldDiscard]. The output of
 // element operations (Remove, Empty, Skip, Children) on held tokens is held
-// too.
+// too. Before the first token, the hold starts at the first token, and after
+// the end of the input (when Next returns false), it holds nothing. After an
+// error, Hold returns the zero Hold, and HoldRelease and HoldDiscard return
+// the error.
 //
 // A hold started while another is open is inside it, and must end first: its
 // output then stays in the enclosing hold. HoldRelease and HoldDiscard of a
@@ -348,19 +352,22 @@ func (t *Transformer) InsertAtEnd(raw []byte) {
 // [Transformer.SetMaxHold]): exceeding it is an error ([ErrHoldLimit]). To
 // give up on a hold at a smaller size instead, check the size of
 // [Transformer.Held] and end the hold with HoldRelease or HoldDiscard.
-//
-// The current token can be of any kind.
-func (t *Transformer) Hold() (Hold, error) {
-	c, err := t.current("Hold called")
-	if err != nil {
-		return Hold{}, err
+func (t *Transformer) Hold() Hold {
+	if t.r.err != nil {
+		return Hold{}
+	}
+	var pos Pos // before the first token
+	if c := t.r.cur; c != nil {
+		pos = c.pos
+	} else if t.r.started {
+		pos = math.MaxInt64 // after the end of the input
 	}
 	if t.holdID == 0 {
 		t.holdID = holdIDs.Add(1)
 	}
 	t.holdSeq++
-	t.holds = append(t.holds, hold{off: len(t.hbuf), pos: c.pos, seq: t.holdSeq})
-	return Hold{t.holdID, t.holdSeq}, nil
+	t.holds = append(t.holds, hold{off: len(t.hbuf), pos: pos, seq: t.holdSeq})
+	return Hold{t.holdID, t.holdSeq}
 }
 
 // Holding returns the number of holds which haven't ended.
