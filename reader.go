@@ -4549,8 +4549,8 @@ func AttrEquals(name, value string) Matcher {
 // AttrFunc matches tags with an attribute named name whose decoded value
 // matches fn. The value is only valid during the call. It is in a buffer of
 // the token shared with the other matchers of decoded values ([AttrEquals],
-// [AttrHasWord], [HasClass], [AttrNSFunc] and [HasAttrNS]), so fn must not
-// call them on the same token.
+// [AttrHasWord], [HasClass], [AttrNSEquals], [AttrNSFunc] and [HasAttrNS]),
+// so fn must not call them on the same token.
 func AttrFunc(name string, fn func(value []byte) bool) Matcher {
 	return func(t *Token) bool {
 		a, ok := t.Attr(name)
@@ -4591,6 +4591,15 @@ func hasWord(v []byte, word string) bool {
 // namespace ns (see [Token.AttrNamespace]).
 func HasAttrNS(ns, local string) Matcher {
 	return AttrNSFunc(ns, local, func([]byte) bool { return true })
+}
+
+// AttrNSEquals matches tags with an attribute with the local name local
+// (compared like [Attr.Is]) in the namespace ns (see [Token.AttrNamespace])
+// whose decoded value is value.
+func AttrNSEquals(ns, local, value string) Matcher {
+	return AttrNSFunc(ns, local, func(v []byte) bool {
+		return string(v) == value
+	})
 }
 
 // AttrNSFunc matches tags with an attribute with the local name local

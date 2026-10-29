@@ -2043,8 +2043,8 @@ func TestAttrNSCase(t *testing.T) {
 	if a, ok := tok.AttrNS(NamespaceXLink, "href"); !ok || a.Value() != "#a" {
 		t.Errorf("AttrNS: %v %v", a, ok)
 	}
-	if !HasAttrNS(NamespaceXLink, "href")(tok) || !AttrNSFunc(NamespaceXLink, "HREF", func(v []byte) bool { return string(v) == "#a" })(tok) {
-		t.Errorf("HasAttrNS/AttrNSFunc")
+	if !HasAttrNS(NamespaceXLink, "href")(tok) || !AttrNSFunc(NamespaceXLink, "HREF", func(v []byte) bool { return string(v) == "#a" })(tok) || !AttrNSEquals(NamespaceXLink, "HREF", "#a")(tok) || AttrNSEquals(NamespaceXLink, "href", "#b")(tok) {
+		t.Errorf("HasAttrNS/AttrNSFunc/AttrNSEquals")
 	}
 	// exact in XML mode
 	r = NewReader(strings.NewReader(`<svg xmlns:xlink="` + NamespaceXLink + `"><use xlink:HREF="#a"/></svg>`))
@@ -2053,6 +2053,16 @@ func TestAttrNSCase(t *testing.T) {
 	r.Next()
 	if _, ok := r.Token().AttrNS(NamespaceXLink, "href"); ok {
 		t.Errorf("AttrNS folded in XML mode")
+	}
+	if AttrNSEquals(NamespaceXLink, "href", "#a")(r.Token()) || !AttrNSEquals(NamespaceXLink, "HREF", "#a")(r.Token()) {
+		t.Errorf("AttrNSEquals folded in XML mode")
+	}
+	// by namespace, not prefix
+	r = NewReader(strings.NewReader(`<p xmlns:o="urn:o" xmlns:x="urn:x" o:role="a" x:role="b"/>`))
+	r.SetMode(XML)
+	r.Next()
+	if tok := r.Token(); !AttrNSEquals("urn:o", "role", "a")(tok) || AttrNSEquals("urn:o", "role", "b")(tok) || !AttrNSEquals("urn:x", "role", "b")(tok) {
+		t.Errorf("AttrNSEquals by namespace")
 	}
 }
 
