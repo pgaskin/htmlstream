@@ -1937,6 +1937,9 @@ func TestQuirksTableInP(t *testing.T) {
 		{Options{DoctypeMode: NoDoctype}, `<p>a<table></table><head><noscript><div>b`, `<p>a<table></table></p><noscript></noscript><div>b</div>`, "25: closed p at <noscript> after a table in it (HTML parsers would have kept the p open in quirks mode)\n35: closed noscript after a misplaced <head> at the content after it (HTML parsers would have kept it open as body content)"},
 		{Options{DoctypeMode: NoDoctype}, `<span><p>a<table></table>b</span>c`, `<span><p>a<table></table>b</p></span>c`, "26: closed p at </span> (HTML parsers would have ignored the end tag)"},
 		{Options{DoctypeMode: NoDoctype}, `<b><p>a<table></table>b</b>c`, `<b><p>a<table></table>b</p></b>c`, "23: closed p at </b> (HTML parsers would have kept p open and cloned b into it)"},
+		// HTML parsers reopen the b in the p, like an element whose start tag
+		// is after the table
+		{Options{DoctypeMode: NoDoctype}, `<p><b>x<p><table></table>y<br>z`, `<p><b>x</b></p><p><table></table></p><b>y<br />z</b>`, "25: closed p before reopening b after a table in it (HTML parsers would have reopened it in the p in quirks mode)"},
 		// HTML parsers put the table in the b, which the Reader closes too
 		{Options{DoctypeMode: NoDoctype}, `<p><b>a<table></table>b`, `<p><b>a</b></p><table></table><b>b</b>`, "7: closed p before table (HTML parsers would have put the table in the p in quirks mode)"},
 	} {
@@ -2368,6 +2371,8 @@ func FuzzConvert(f *testing.F) {
 	f.Add("<p><tABle><td><p><tABle>", byte(3), byte(0x26))
 	// a misplaced html start tag after a table in a p kept open
 	f.Add("<p><tABle></tABle><html><A>", byte('Q'), byte(0x05))
+	// a formatting element reopened after a table in a p kept open
+	f.Add("<p><A><p><tABle></tABle>0", byte('K'), byte('|'))
 	// the last chunk of a bogus comment has the Raw of </>
 	f.Add("</00</>", byte(5), byte(0x26))
 	// invalid UTF-8 around a dropped NUL

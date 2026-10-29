@@ -1140,7 +1140,8 @@ const (
 //     until the end tag of an element around it, a p end tag, or a start
 //     tag which closes a p, as in HTML parsers. Only the start tags of void
 //     elements, tables and elements whose contents are text (e.g., script
-//     and title) keep it open: before other start tags, it is closed with a
+//     and title) keep it open: before other start tags, and before
+//     formatting elements reopened after the table, it is closed with a
 //     warning, since HTML parsers would put the element in the p.
 //   - HTML element and attribute names are lowercased, and SVG and MathML
 //     names get the case HTML parsers give them. The tags of elements whose
@@ -1259,9 +1260,9 @@ const (
 //     put the table in the p (or in the elements open in it), unless the
 //     output is in quirks mode too and only the p is open (see above): the
 //     output closes the p before the table explicitly; and with the p kept
-//     open, start tags of other elements after the table, and end tags of
-//     elements around the p which HTML parsers ignore or apply differently
-//     with the p open;
+//     open, start tags of other elements and formatting elements reopened
+//     after the table, and end tags of elements around the p which HTML
+//     parsers ignore or apply differently with the p open;
 //   - script and style contents containing "]]>", which is written as
 //     "]]]]><![CDATA[>" to keep the CDATA section open, which changes the
 //     contents for HTML parsers ("]]]]><![CDATA[>" in a CDATA wrapper of the
@@ -3785,6 +3786,17 @@ func (p *polyglot) reconstruct() {
 	if t := p.top(); t != nil && t.ns != "" && !t.integration {
 		return // HTML parsers don't reconstruct in foreign content
 	}
+	if p.inKeptP() {
+		for _, r := range p.pending {
+			if r.marker == p.markers {
+				// like the start tag of an element, which can contain a
+				// start tag closing the p (see keepP)
+				p.warn(p.pos, "closed p before reopening %s after a table in it (HTML parsers would have reopened it in the p in quirks mode)", r.name)
+				p.popTo(p.keptP)
+				break
+			}
+		}
+	}
 	// in the order they were opened (the list of active formatting elements)
 	slices.SortStableFunc(p.pending, func(a, b reopen) int { return cmp.Compare(a.seq, b.seq) })
 	// the declarations of a start tag being written don't apply to the
@@ -5579,7 +5591,9 @@ func (p *polyglot) keepOpen(tok *htmlstream.Token) {
 // another element which can contain elements, which would be in the p for
 // HTML parsers, with a warning: such an element can contain a start tag
 // which closes the p for HTML parsers, and the elements open in it, which
-// the Reader keeps open.
+// the Reader keeps open. Formatting elements reopened after the table are
+// written with start tags too, so it is closed before them (see
+// reconstruct).
 func (p *polyglot) keepP(tok *htmlstream.Token) {
 	if p.pClose >= 0 {
 		if tok.Kind() == htmlstream.StartTag && tok.NS() == htmlstream.NamespaceXHTML && tok.Is("table") && !tok.Untracked() {
