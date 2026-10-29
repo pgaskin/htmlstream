@@ -5375,7 +5375,7 @@ func (p *polyglot) endTag(tok *htmlstream.Token) {
 			} else {
 				p.tagString("<br />", br)
 			}
-		case tok.Is("p") && p.keptP >= 0 && p.frames.Len() <= p.keptDepth:
+		case tok.Is("p") && p.inKeptP():
 			// closes the p kept open around a table (see keepP)
 			p.popTo(p.keptP)
 		case tok.Is("p") && (p.doc.Part() == htmlutil.InBody || p.ctx().templates != 0):
@@ -5593,7 +5593,7 @@ func (p *polyglot) keepP(tok *htmlstream.Token) {
 		}
 		p.pClose = -1
 	}
-	if p.keptP < 0 || p.frames.Len() > p.keptDepth {
+	if !p.inKeptP() {
 		return
 	}
 	if tok.Kind() == htmlstream.EndTag && !tok.Implied() && !tok.Stray() && !tok.Is("body") && !tok.Is("html") && p.closed.special == "" {
@@ -5620,6 +5620,22 @@ func (p *polyglot) keepP(tok *htmlstream.Token) {
 	}
 	p.warn(tok.Pos(), "closed p at <%s> after a table in it (HTML parsers would have kept the p open in quirks mode)", htmlName(tok))
 	p.popTo(p.keptP)
+}
+
+// inKeptP reports whether a p is kept open around a table (see keepP), and
+// the input elements opened after the table, if any, aren't written (e.g., a
+// misplaced html start tag, which HTML parsers ignore), so HTML parsers put
+// the next token in the p.
+func (p *polyglot) inKeptP() bool {
+	if p.keptP < 0 {
+		return false
+	}
+	for i := p.keptDepth; i < p.frames.Len(); i++ {
+		if p.frames.At(i).out >= 0 {
+			return false
+		}
+	}
+	return true
 }
 
 // impliedTableEnd handles a stray tbody, tr or colgroup end tag, which HTML

@@ -1930,6 +1930,11 @@ func TestQuirksTableInP(t *testing.T) {
 		{Options{DoctypeMode: NoDoctype}, `<p>a<table><tr><td><p>b<table></table></table>d<span>e`, `<p>a<table><tbody><tr><td><p>b<table></table></p></td></tr></tbody></table>d</p><span>e</span>`, "47: closed p at <span> after a table in it (HTML parsers would have kept the p open in quirks mode)"},
 		// other elements would be in the p for HTML parsers
 		{Options{DoctypeMode: NoDoctype}, `<p>a<table></table>b<span>c</span>`, `<p>a<table></table>b</p><span>c</span>`, "20: closed p at <span> after a table in it (HTML parsers would have kept the p open in quirks mode)"},
+		// misplaced html, head and body start tags, which HTML parsers ignore,
+		// don't change where the content after them goes
+		{Options{DoctypeMode: NoDoctype}, `<p>a<table></table>b<html><span>c</span>`, `<p>a<table></table>b</p><span>c</span>`, "26: closed p at <span> after a table in it (HTML parsers would have kept the p open in quirks mode)"},
+		{Options{DoctypeMode: NoDoctype}, `<p>a<table></table><html>b<br>c</p>d<p>e<table></table><body><div>f`, `<p>a<table></table>b<br />c</p>d<p>e<table></table></p><div>f</div>`, ""},
+		{Options{DoctypeMode: NoDoctype}, `<p>a<table></table><head><noscript><div>b`, `<p>a<table></table></p><noscript></noscript><div>b</div>`, "25: closed p at <noscript> after a table in it (HTML parsers would have kept the p open in quirks mode)\n35: closed noscript after a misplaced <head> at the content after it (HTML parsers would have kept it open as body content)"},
 		{Options{DoctypeMode: NoDoctype}, `<span><p>a<table></table>b</span>c`, `<span><p>a<table></table>b</p></span>c`, "26: closed p at </span> (HTML parsers would have ignored the end tag)"},
 		{Options{DoctypeMode: NoDoctype}, `<b><p>a<table></table>b</b>c`, `<b><p>a<table></table>b</p></b>c`, "23: closed p at </b> (HTML parsers would have kept p open and cloned b into it)"},
 		// HTML parsers put the table in the b, which the Reader closes too
@@ -2361,6 +2366,8 @@ func FuzzConvert(f *testing.F) {
 	f.Add(`<b><p>a<table></table>b</b>c<div><p>d<table></table>e</div>`, byte(5), byte(5))
 	// a p kept open around a table in a table in a p kept open
 	f.Add("<p><tABle><td><p><tABle>", byte(3), byte(0x26))
+	// a misplaced html start tag after a table in a p kept open
+	f.Add("<p><tABle></tABle><html><A>", byte('Q'), byte(0x05))
 	// the last chunk of a bogus comment has the Raw of </>
 	f.Add("</00</>", byte(5), byte(0x26))
 	// invalid UTF-8 around a dropped NUL
