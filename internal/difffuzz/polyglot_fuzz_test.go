@@ -596,20 +596,23 @@ func xmlSyntaxInput(t *testing.T, in string, scripting bool) string {
 // end tag which closed other elements from in. HTML parsers keep elements
 // left open before these end tags open, and append the whitespace after them
 // to the elements (e.g., the text of an unclosed p), while the Reader closes
-// them, and the polyglot package writes the whitespace after them. It only
-// reports other content after them, since unclosed elements before </body>
-// and a newline before </html> are common (the warning for the whitespace is
-// disabled in the polyglot package's token method). NUL counts as
-// whitespace, as in the polyglot package: HTML parsers ignore it in body
-// text, and the polyglot package drops it. Leading whitespace which the
-// Reader gives as a token of its own (with only html open) is kept with the
-// text after it, unless that is whitespace too. Whitespace after a body or
-// html end tag which closed nothing else is body text for both, so it is
-// kept (see keepOpen in the polyglot package).
+// them. The polyglot package writes the whitespace after them in them up to
+// the first token other than whitespace, comments and body and html end tags
+// (e.g., content, which it reports, or a stray end tag), and doesn't report
+// the whitespace after that (see its token method), which is removed. NUL
+// counts as whitespace, as in the polyglot package: in the elements, HTML
+// parsers ignore it in HTML elements and replace it with U+FFFD in SVG and
+// MathML elements, as the polyglot package does, and after them, HTML
+// parsers ignore it in body text, and the polyglot package drops it.
+// Leading whitespace which the Reader gives as a token of its own (with
+// only html open) is kept with the text after it, unless that is whitespace
+// too. Whitespace after a body or html end tag which closed nothing else is
+// body text for both, so it is kept (see keepOpen in the polyglot package).
 func dropSpaceAfterBody(in string) string {
 	r := htmlstream.NewReader(strings.NewReader(in))
 	var drop [][2]int
 	after := false
+	other := false          // a token other than whitespace, comments and body and html end tags came after it
 	closed := ""            // the first element closed by the implied end tags before the token
 	space := [2]int{-1, -1} // the last whitespace text token, until the next token
 	for r.Next() {
@@ -628,6 +631,10 @@ func dropSpaceAfterBody(in string) string {
 			continue
 		case !after && tok.Kind() == htmlstream.EndTag && !tok.Stray() && (tok.Is("body") || tok.Is("html")):
 			after = closed != "" && closed != "body"
+		case after && !other:
+			blank := tok.Kind() == htmlstream.Text && strings.TrimLeft(string(tok.AppendText(nil)), " \t\n\f\r\x00") == ""
+			k := tok.Kind()
+			other = !blank && k != htmlstream.Comment && !(k == htmlstream.EndTag && (tok.Is("body") || tok.Is("html")))
 		case after && tok.Kind() == htmlstream.Text && strings.TrimLeft(string(tok.AppendText(nil)), " \t\n\f\r\x00") == "":
 			space = [2]int{pos, pos + len(tok.Raw())}
 			if prev[0] >= 0 && pos == prev[1] {

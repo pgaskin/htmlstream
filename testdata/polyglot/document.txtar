@@ -191,12 +191,43 @@ the head.
   <title>t</title>
   
 </head><body></body></html>
+-- SpaceAfterBodyInElement --
+Whitespace and comments after a body end tag which closed other elements
+are written in them, as HTML parsers keep them open and put the whitespace
+in them.
+-- in --
+<body><div><p>x</body>
+<!-- c -->
+</html>
+-- out --
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><div><p>x
+<!-- c -->
+</p></div></body></html>
 -- ContentAfterBody --
 -- in --
 <body>x</body>y</html>z
 -- out --
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body>xyz</body></html>
+-- NULAfterBodyInElement --
+NUL after a body end tag which closed other elements is written in them
+with the whitespace around it, and HTML parsers ignore it there.
+-- in quoted --
+"<body><p>x</body> \x00 "
+-- out --
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p>x  </p></body></html>
+-- NULAfterBodyInForeign --
+In an SVG or MathML element left open by a body end tag, HTML parsers
+replace NUL with U+FFFD.
+-- in quoted --
+"<body><svg><g></body> \x00 "
+-- out --
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><g> � </g></svg></body></html>
+-- warn --
+22: replaced characters XML doesn't allow
 -- EndTagAfterBodyInElement htmldiff --
 -- in --
 <body><a><div></body></a>

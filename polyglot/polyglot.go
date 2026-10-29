@@ -1106,9 +1106,14 @@ const (
 //   - misnested formatting elements where the adoption agency algorithm
 //     restructures the elements, and end tags HTML parsers ignore;
 //   - content after a body or html end tag which closed other elements,
-//     which HTML parsers keep open and put the content in (whitespace after
-//     them isn't reported), and likewise after a noscript end tag which
-//     closed a special element, or an end tag of an element already closed;
+//     which HTML parsers keep open and put the content in, and likewise
+//     after a noscript end tag which closed a special element, or an end tag
+//     of an element already closed. Whitespace and comments after a body or
+//     html end tag are written in the elements, as HTML parsers put the
+//     whitespace there (they put the comments after the body), up to the
+//     first other token (e.g., content, or a stray end tag) and 64 KiB of
+//     whitespace in one text; whitespace after that and after the other end
+//     tags isn't reported;
 //   - template contents which HTML parsers parse differently: they parse
 //     them like the contents of a table, a table row, etc., or body content,
 //     depending on the first child element; and template end tags closing a
@@ -1264,6 +1269,12 @@ func Convert(w io.Writer, r io.Reader, opt Options) error {
 // renames (restricted to elements HTML parsers handle the same way), removals
 // and inserted markup are done on the output, through the hooks (see below).
 //
+// Implied end tags are converted with the token after them, and the elements
+// closed by implied end tags before a body or html end tag are closed after
+// the whitespace and comments after the end tag (see [Convert]): the hooks
+// are called, the output written and the errors for the tokens returned when
+// they are converted.
+//
 // When the conversion fails (see [Writer.Err]), the output is incomplete:
 // the destination has the output written before the error, which can end
 // anywhere (e.g., in a tag), and Close doesn't flush the rest.
@@ -1418,14 +1429,90 @@ func (pw *Writer) WriteToken(tok *htmlstream.Token) error {
 		p.err = tok.UnsoundError()
 		return p.err
 	}
-	p.token(tok)
-	if p.err != nil {
-		return p.err
+	p.queueToken(tok)
+	return p.err
+}
+
+// queueToken converts tok, or holds it back: implied end tags are held
+// back until the next token, and if it is a body or html end tag, which
+// doesn't close the elements for HTML parsers, until the next token other
+// than text of whitespace and NUL, comments, and body and html end tags,
+// which are converted inside the elements, where HTML parsers put them.
+func (p *polyglot) queueToken(tok *htmlstream.Token) {
+	k := tok.Kind()
+	switch {
+	case k == htmlstream.EndTag && tok.Implied():
+		if p.keptByEnd {
+			p.flushImplied()
+		}
+		p.implied.Append(tok)
+		return
+	case p.implied.Len() == 0:
+	case k == htmlstream.EndTag && (tok.Is("body") || tok.Is("html")) && (tok.Stray() && p.keptByEnd || tok.NS() == htmlstream.NamespaceXHTML && (p.keptByEnd || p.closesKept())):
+		// (a stray one after the first one, which HTML parsers ignore)
+		p.implied.Append(tok)
+		p.keptByEnd = true
+		return
+	case p.keptByEnd && (k == htmlstream.Comment || k == htmlstream.ProcInst):
+		p.convert(tok)
+		return
+	case p.keptByEnd && k == htmlstream.Text:
+		// held back until it is known to be whitespace or NUL (up to
+		// maxSpaceHold bytes): in the elements, HTML parsers ignore NUL in
+		// HTML content and replace it with U+FFFD in foreign content, as
+		// converting it in them does
+		p.afterEnd.Append(tok)
+		p.sbuf = tok.AppendText(p.sbuf[:0])
+		blank := !slices.ContainsFunc(p.sbuf, func(c byte) bool { return c != 0 && !ascii.IsSpace(c) })
+		p.afterEndText = p.afterEndText || !blank || p.afterEnd.Size() > maxSpaceHold
+		if !p.afterEndText && tok.Partial() {
+			return
+		}
+		if p.afterEndText {
+			p.flushImplied()
+		}
+		for t := range p.afterEnd.All() {
+			p.convert(t)
+		}
+		p.afterEnd.Reset()
+		p.afterEndText = false
+		return
 	}
+	p.flushImplied()
+	p.convert(tok)
+}
+
+// closesKept reports whether the implied end tags held back close an
+// element other than body and html, which HTML parsers keep open after a
+// body or html end tag.
+func (p *polyglot) closesKept() bool {
+	for t := range p.implied.All() {
+		if !t.Is("body") && !t.Is("html") {
+			return true
+		}
+	}
+	return false
+}
+
+// flushImplied converts the implied end tags held back by queueToken, and
+// the body and html end tags after them.
+func (p *polyglot) flushImplied() {
+	for t := range p.implied.All() {
+		p.convert(t)
+	}
+	p.implied.Reset()
+	p.keptByEnd = false
+}
+
+// convert converts tok.
+func (p *polyglot) convert(tok *htmlstream.Token) {
+	if p.err != nil || p.checkNesting(tok) != nil {
+		return
+	}
+	p.token(tok)
 	if !tok.Implied() {
 		p.closed = closed{names: p.closed.names[:0]}
 	}
-	return nil
 }
 
 // Close ends the document: it writes the end tags of the elements still open
@@ -1457,6 +1544,9 @@ func (pw *Writer) Close() error {
 func (p *polyglot) close() error {
 	if p.partial {
 		return p.fail("Close called without the rest of the last token (the caller left out its continuation)")
+	}
+	if p.flushImplied(); p.err != nil {
+		return p.err
 	}
 	if f, ok := p.frames.Top(); ok {
 		return p.fail("Close called with " + f.name + " open (the caller wrote its start tag but left out its end tag)")
@@ -1944,7 +2034,17 @@ func (p *polyglot) check(tok *htmlstream.Token) error {
 			return p.fail(fmt.Sprintf("token at %d doesn't continue the previous one", pos))
 		}
 		return p.fail(fmt.Sprintf("token at %d continues a token the caller left out", pos))
-	case tok.Kind() == htmlstream.EndTag && !tok.Stray() && tok.StartPos() >= 0 && !p.frames.Closes(tok):
+	}
+	p.fed, p.last, p.lastImplied, p.partial = true, tok.Pos(), tok.Implied(), tok.Partial()
+	return nil
+}
+
+// checkNesting checks that tok keeps the stream nested (see Writer), before
+// it is converted (which can be after later tokens are written, see
+// queueToken).
+func (p *polyglot) checkNesting(tok *htmlstream.Token) error {
+	if tok.Kind() == htmlstream.EndTag && !tok.Stray() && tok.StartPos() >= 0 && !p.frames.Closes(tok) {
+		pos := tok.Pos()
 		if f, ok := p.frames.Top(); ok && tok.StartPos() < f.pos {
 			return p.fail(fmt.Sprintf("end tag at %d with %s open inside its element (the caller left out the end tag of %s)", pos, f.name, f.name))
 		}
@@ -1955,7 +2055,6 @@ func (p *polyglot) check(tok *htmlstream.Token) error {
 			return p.fail(msg)
 		}
 	}
-	p.fed, p.last, p.lastImplied, p.partial = true, tok.Pos(), tok.Implied(), tok.Partial()
 	return nil
 }
 
@@ -2208,6 +2307,14 @@ type polyglot struct {
 	afterHead     heldSpace
 	afterHeadFull bool
 
+	// implied end tags held back until the next token, followed by body and
+	// html end tags if keptByEnd (see queueToken), and the text after them,
+	// held back while it is whitespace (afterEndText is set once it isn't)
+	implied      htmlstream.TokenBuffer
+	keptByEnd    bool
+	afterEnd     htmlstream.TokenBuffer
+	afterEndText bool
+
 	// the last start tag event, kept with the element by pushOut
 	startNS   string // the namespace reported
 	startName string // the name written (see Tag.Rename)
@@ -2413,10 +2520,10 @@ func (p *polyglot) token(tok *htmlstream.Token) {
 			k == htmlstream.EndTag && tok.Stray() && (tok.Is("p") || tok.Is("br")): // written as elements
 			p.warn(p.pos, "wrote content after </%s> outside the %s it closed (HTML parsers would have kept %s open and put the content in it)", p.keptBy, p.keptOpen, p.keptOpen)
 			p.keptOpen = ""
-		// Whitespace is written after the closed elements, while HTML
-		// parsers append it to them. This isn't reported: it is very common
-		// in real documents (e.g., <p>x</body>\n</html>), and only
-		// whitespace differs.
+		// Whitespace after a body or html end tag is written in the
+		// elements, like HTML parsers append it to them (see queueToken).
+		// Whitespace written after them (after content, or longer than
+		// maxSpaceHold) isn't reported: only whitespace differs.
 		// case k == htmlstream.Text || k == htmlstream.CDATA:
 		// 	if p.firstWarning(onceKey{kind: "space after", prefix: p.keptBy}) {
 		// 		p.warn(tok.Pos(), "wrote whitespace after </%s> outside the %s it closed (HTML parsers would have kept %s open and put the whitespace in it)", p.keptBy, p.keptOpen, p.keptOpen)
