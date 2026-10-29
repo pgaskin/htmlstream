@@ -993,12 +993,22 @@ func (r *Reader) All() iter.Seq[*Token] {
 }
 
 // Depth returns the number of open elements, including the current start or
-// end tag's element. A stray end tag (see [Token.Stray]) has the same depth as
-// the enclosing element's end tag would; use [Token.StartPos] to identify the
+// end tag's element. The element of a start tag is counted whether the tag
+// opens it or not (e.g., a void or self-closed element, see [Token.Opens]),
+// so sibling elements have the same depth, and a start tag has Depth()-1
+// ancestors. A stray end tag (see [Token.Stray]) has the same depth as the
+// enclosing element's end tag would; use [Token.StartPos] to identify the
 // element an end tag closes.
 func (r *Reader) Depth() int {
-	return len(r.stack) + r.untracked
+	d := r.depth()
+	if t := r.cur; t != nil && t.kind == StartTag && !t.Opens() {
+		d++ // the element of a start tag which doesn't open one
+	}
+	return d
 }
+
+// depth returns the number of open elements, tracked or not.
+func (r *Reader) depth() int { return len(r.stack) + r.untracked }
 
 // Next advances to the next token. It returns false at the end of the input
 // or on error.
@@ -1240,7 +1250,7 @@ func (r *Reader) deliverImplied() {
 		if r.voidOpen {
 			// a void element under XML rules (see Reader.next)
 			t.flags &^= tokUnsound
-		} else if n := len(r.watched); r.strict && n != 0 && r.watched[n-1] == r.Depth() {
+		} else if n := len(r.watched); r.strict && n != 0 && r.watched[n-1] == r.depth() {
 			// Whether its end tag may be omitted isn't known.
 			r.err = t.UnsoundError()
 		}
@@ -1319,7 +1329,7 @@ func (r *Reader) untrackedAbove() int {
 // popTop closes the innermost open element, tracked or not.
 func (r *Reader) popTop() {
 	if r.untrackedAbove() > 0 {
-		if n := len(r.watched); n != 0 && r.watched[n-1] == r.Depth() {
+		if n := len(r.watched); n != 0 && r.watched[n-1] == r.depth() {
 			r.watched = r.watched[:n-1]
 		}
 		r.untracked--
@@ -4388,7 +4398,7 @@ func (r *Reader) elementStart() (int, error) {
 	if r.strict && t.flags&tokUnsound != 0 {
 		return 0, t.UnsoundError()
 	}
-	depth := r.Depth()
+	depth := r.depth()
 	if t.flags&tokUntracked != 0 {
 		if n := len(r.watched); r.strict && (n == 0 || r.watched[n-1] != depth) {
 			if n >= r.maxDepth {
@@ -4407,7 +4417,7 @@ func (r *Reader) elementStart() (int, error) {
 // the first one at that depth closes it.
 func (r *Reader) atEnd(depth int) bool {
 	t := r.cur
-	return t != nil && t.kind == EndTag && t.flags&tokStray == 0 && r.Depth() == depth
+	return t != nil && t.kind == EndTag && t.flags&tokStray == 0 && r.depth() == depth
 }
 
 // Skip advances to the end tag of the element opened by the current start

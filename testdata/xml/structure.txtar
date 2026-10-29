@@ -23,14 +23,14 @@ root element.
 </x><a/></a>
 -- tokens --
 0 EndTag x [stray] "</x>"
-0 StartTag a [self-closing] "<a/>"
+1 StartTag a [self-closing] "<a/>"
 0 EndTag a [stray] "</a>"
 -- MultipleRoots --
 -- in --
 x<a/>y<b>z</b>
 -- tokens --
 0 Text "x" text="x"
-0 StartTag a [self-closing] "<a/>"
+1 StartTag a [self-closing] "<a/>"
 0 Text "y" text="y"
 1 StartTag b "<b>"
 1 Text "z" text="z"
@@ -42,22 +42,22 @@ x<a/>y<b>z</b>
 
 -- tokens --
 0 Text "\n" text="\n"
-0 StartTag a [self-closing] "<a/>"
+1 StartTag a [self-closing] "<a/>"
 0 Text "\n" text="\n"
 -- StructureByteOrderMark --
 -- in quoted --
 "\xef\xbb\xbf<a/>"
 -- tokens --
 0 Text "\ufeff" text="\ufeff"
-0 StartTag a [self-closing] "<a/>"
+1 StartTag a [self-closing] "<a/>"
 -- SelfClosing --
 -- in --
 <a/><b /><c
 />
 -- tokens --
-0 StartTag a [self-closing] "<a/>"
-0 StartTag b [self-closing] "<b />"
-0 StartTag c [self-closing] "<c\n/>"
+1 StartTag a [self-closing] "<a/>"
+1 StartTag b [self-closing] "<b />"
+1 StartTag c [self-closing] "<c\n/>"
 -- SlashSpace --
 -- in --
 <a/ >x</a>
@@ -85,5 +85,5 @@ x<a/>y<b>z</b>
 <a><b c="x
 -- tokens --
 1 StartTag a "<a>"
-1 StartTag b [incomplete] [unsound] "<b c=\"x"
+2 StartTag b [incomplete] [unsound] "<b c=\"x"
 1 EndTag a [implied] [unsound] ""

@@ -34,7 +34,7 @@ CDATA sections.
 <![CDATA[x]]><a/><![CDATA[y]]>
 -- tokens --
 0 CDATA "<![CDATA[x]]>" text="x"
-0 StartTag a [self-closing] "<a/>"
+1 StartTag a [self-closing] "<a/>"
 0 CDATA "<![CDATA[y]]>" text="y"
 -- CDATAUnterminated --
 -- in --
@@ -55,7 +55,7 @@ Not a CDATA section.
 -- in --
 <a b="<![CDATA[x]]>"/>
 -- tokens --
-0 StartTag a [self-closing] "<a b=\"<![CDATA[x]]>\"/>" b="<![CDATA[x]]>"
+1 StartTag a [self-closing] "<a b=\"<![CDATA[x]]>\"/>" b="<![CDATA[x]]>"
 -- EndInText --
 -- in --
 <a>]]></a>

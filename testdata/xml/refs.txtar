@@ -31,7 +31,7 @@ Character and entity references.
 -- in quoted --
 "<a b=\"&#10;&#9;x&#13;\" c=\"\tx\r\ny\n\"/>"
 -- tokens --
-0 StartTag a [self-closing] "<a b=\"&#10;&#9;x&#13;\" c=\"\tx\r\ny\n\"/>" b="\n\tx\r" c=" x y "
+1 StartTag a [self-closing] "<a b=\"&#10;&#9;x&#13;\" c=\"\tx\r\ny\n\"/>" b="\n\tx\r" c=" x y "
 -- PrefixUniversal universal --
 In documents read as HTML, elements with a prefix are read like in HTML mode,
 declared or not: references don't need a semicolon, and attribute values

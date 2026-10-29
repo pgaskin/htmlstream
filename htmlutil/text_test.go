@@ -58,6 +58,8 @@ func TestText(t *testing.T) {
 		{`<div>a<details open><summary>S</summary>x</details>b</div>`, TextOptions{}, "a\nS\nx\nb", false},
 		{`<div>a<details><summary>S</summary>x</details>b</div>`, TextOptions{Hidden: true}, "a\nS\nx\nb", false},
 		{`<details>t<summary>S</summary>x</details>`, TextOptions{}, "S", false},
+		{`<div>a<details><br>x<img alt=A><summary>S</summary>y</details>b</div>`, TextOptions{AltText: true}, "a\nS\nb", false},
+		{`<div>a<math><semantics><mi/><mo>+</mo></semantics></math>b</div>`, TextOptions{}, "ab", false},
 		{`<div>a<svg><text>t</text><style>s{}</style><script>sc</script><title>ti</title><desc>d</desc><metadata>m</metadata></svg>b</div>`, TextOptions{}, "atb", false},
 		{`<div>a<svg><g><title>ti</title><text>t</text></g><defs><text>dt</text></defs><symbol><text>st</text></symbol><switch><text>t1</text><text>t2</text></switch></svg>b</div>`, TextOptions{}, "att1t2b", false},
 		{`<div>a<svg><foreignObject><div>f<svg><title>t</title></svg>g</div></foreignObject><defs><foreignObject><div>d</div></foreignObject></defs></svg>b</div>`, TextOptions{}, "a\nfg\nb", false},

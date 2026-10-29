@@ -1837,7 +1837,7 @@ func TestUntracked(t *testing.T) {
 		{`<ul><li><b xmlns:p="` + long + `"><i>a<li>b`, 10, 50, `<ul1 <li2 <b*3 <i4 #a </i?122 </?-1 </li?4 <li2 #b </li?126 </ul?0`},
 		// html, head and body are misplaced (not opened) inside untracked
 		// elements too
-		{`<a><b><html><body>x`, 1, 0, `<a1 <b*2 <html2 <body2 #x </?-1 </a?0`},
+		{`<a><b><html><body>x`, 1, 0, `<a1 <b*2 <html3 <body3 #x </?-1 </a?0`},
 	} {
 		r := NewReader(strings.NewReader(tc.in))
 		r.SetMaxDepth(tc.depth)
@@ -1918,7 +1918,7 @@ func TestUntracked(t *testing.T) {
 		depth, maxStack int
 		out             string
 	}{
-		{`<p><br>x<br/><br></br><BR></br></p>`, 2, 0, `<html1 <p2 <br*3 </?-1 #x <br2 <br*3 </br-1 <BR*3 </br-1 </p64 </html21`},
+		{`<p><br>x<br/><br></br><BR></br></p>`, 2, 0, `<html1 <p2 <br*3 </?-1 #x <br3 <br*3 </br-1 <BR*3 </br-1 </p64 </html21`},
 		{`<p><b><br></br>x</b></p>`, 2, 0, `<html1 <p2 <b*3 <br*4 </br-1 #x </b-1 </p64 </html21`},
 		{`<p><br a="` + long + `"></br><br a="` + long + `">x</p>`, 10, 150, `<html1 <p2 <br*3 </br-1 <br*3 </?-1 #x </p64 </html21`},
 		{`<p><br>`, 2, 0, `<html1 <p2 <br*3 </?-1 </p?64 </html21`},
@@ -1945,13 +1945,14 @@ func TestUntracked(t *testing.T) {
 		t.Errorf("strict Skip on an untracked void element: %v, stopped at %v", err, r.Token())
 	}
 	// Depth counts the untracked elements, and drops after their end tags.
-	r = NewReader(strings.NewReader(`<a><b></b></a>`))
+	// A void sibling of an untracked element has the same depth.
+	r = NewReader(strings.NewReader(`<a><b></b><br></a>`))
 	r.SetMaxDepth(1)
 	var depths []int
 	for r.Next() {
 		depths = append(depths, r.Depth())
 	}
-	if want := []int{1, 2, 2, 1}; fmt.Sprint(depths) != fmt.Sprint(want) {
+	if want := []int{1, 2, 2, 2, 1}; fmt.Sprint(depths) != fmt.Sprint(want) {
 		t.Errorf("depths %v, want %v", depths, want)
 	}
 }

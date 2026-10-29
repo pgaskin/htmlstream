@@ -4,7 +4,7 @@ Doctypes, with internal subsets.
 <!DOCTYPE a SYSTEM "a.dtd"><a/>
 -- tokens --
 0 Doctype "<!DOCTYPE a SYSTEM \"a.dtd\">"
-0 StartTag a [self-closing] "<a/>"
+1 StartTag a [self-closing] "<a/>"
 -- Public --
 -- in --
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
@@ -12,7 +12,7 @@ Doctypes, with internal subsets.
 -- tokens --
 0 Doctype "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Strict//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd\">"
 0 Text "\n" text="\n"
-0 StartTag html [self-closing] "<html xmlns=\"http://www.w3.org/1999/xhtml\"/>" ns="http://www.w3.org/1999/xhtml" xmlns="http://www.w3.org/1999/xhtml"
+1 StartTag html [self-closing] "<html xmlns=\"http://www.w3.org/1999/xhtml\"/>" ns="http://www.w3.org/1999/xhtml" xmlns="http://www.w3.org/1999/xhtml"
 -- Subset --
 -- in --
 <!DOCTYPE a [
@@ -38,19 +38,19 @@ Conditional sections are only allowed in the external subset.
 <!DOCTYPE a [<![INCLUDE[<!ENTITY a "]]>">]]><![IGNORE[<![ x ]]>]]>]><a/>
 -- tokens --
 0 Doctype "<!DOCTYPE a [<![INCLUDE[<!ENTITY a \"]]>\">]]><![IGNORE[<![ x ]]>]]>]>"
-0 StartTag a [self-closing] "<a/>"
+1 StartTag a [self-closing] "<a/>"
 -- QuoteOutsideDeclaration --
 -- in --
 <!DOCTYPE a [ ' ]><a/>
 -- tokens --
 0 Doctype "<!DOCTYPE a [ ' ]>"
-0 StartTag a [self-closing] "<a/>"
+1 StartTag a [self-closing] "<a/>"
 -- BracketInLiteral --
 -- in --
 <!DOCTYPE a SYSTEM "x[y" [<!ENTITY a "b">]><a/>
 -- tokens --
 0 Doctype "<!DOCTYPE a SYSTEM \"x[y\" [<!ENTITY a \"b\">]>"
-0 StartTag a [self-closing] "<a/>"
+1 StartTag a [self-closing] "<a/>"
 -- DoctypeUnterminated --
 -- in --
 <!DOCTYPE a [<!ENTITY a "b">
@@ -134,10 +134,10 @@ After an XML declaration, later doctypes end at the first ">".
 <!doctype a><a/>
 -- tokens --
 0 Doctype "<!doctype a>"
-0 StartTag a [self-closing] "<a/>"
+1 StartTag a [self-closing] "<a/>"
 -- AfterRoot --
 -- in --
 <a/><!DOCTYPE b>
 -- tokens --
-0 StartTag a [self-closing] "<a/>"
+1 StartTag a [self-closing] "<a/>"
 0 Doctype "<!DOCTYPE b>"

@@ -56,7 +56,7 @@ Comments.
 <!-- before --><a/><!-- after -->
 -- tokens --
 0 Comment "<!-- before -->" text=" before "
-0 StartTag a [self-closing] "<a/>"
+1 StartTag a [self-closing] "<a/>"
 0 Comment "<!-- after -->" text=" after "
 -- CommentUnterminated --
 -- in --
@@ -71,5 +71,5 @@ Markup declarations outside a doctype are bogus comments.
 <!ELEMENT a ANY><a/><!>
 -- tokens --
 0 Comment [bogus] "<!ELEMENT a ANY>" text="ELEMENT a ANY"
-0 StartTag a [self-closing] "<a/>"
+1 StartTag a [self-closing] "<a/>"
 0 Comment [bogus] "<!>" text=""

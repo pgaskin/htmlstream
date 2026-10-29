@@ -588,8 +588,8 @@ func (s *Reader) start() {
 		s.starts[i], s.starts[j] = s.starts[j], s.starts[i]
 	}
 	depth := s.r.Depth()
-	if opens {
-		depth--
+	if t.Kind() == htmlstream.StartTag {
+		depth-- // Depth includes the element of the start tag
 	}
 	s.untracked = max(depth-len(s.path), 0)
 	if t.Kind() != htmlstream.Comment || t.Continued() || string(t.Raw()) != "</>" {

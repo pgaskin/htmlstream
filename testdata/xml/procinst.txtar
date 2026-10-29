@@ -6,19 +6,19 @@ Processing instructions, including the XML declaration, with any target.
 -- tokens --
 0 ProcInst xml "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>" data=" version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\""
 0 Text "\n" text="\n"
-0 StartTag a [self-closing] "<a/>"
+1 StartTag a [self-closing] "<a/>"
 -- XMLDeclSingleQuotes --
 -- in --
 <?xml version='1.0' encoding='ISO-8859-1'?><a/>
 -- tokens --
 0 ProcInst xml "<?xml version='1.0' encoding='ISO-8859-1'?>" data=" version='1.0' encoding='ISO-8859-1'"
-0 StartTag a [self-closing] "<a/>"
+1 StartTag a [self-closing] "<a/>"
 -- Stylesheet --
 -- in --
 <?xml-stylesheet type="text/xsl" href="a.xsl"?><a/>
 -- tokens --
 0 ProcInst xml-stylesheet "<?xml-stylesheet type=\"text/xsl\" href=\"a.xsl\"?>" data=" type=\"text/xsl\" href=\"a.xsl\""
-0 StartTag a [self-closing] "<a/>"
+1 StartTag a [self-closing] "<a/>"
 -- Targets --
 -- in --
 <a><?pi?><?pi  data ?><?pi	x?><?x?y?><?pi a?b>c??></a>
@@ -43,7 +43,7 @@ Processing instructions, including the XML declaration, with any target.
 <?pi before?><a/><?pi after?>
 -- tokens --
 0 ProcInst pi "<?pi before?>" data=" before"
-0 StartTag a [self-closing] "<a/>"
+1 StartTag a [self-closing] "<a/>"
 0 ProcInst pi "<?pi after?>" data=" after"
 -- InEndTag --
 Not a processing instruction.

@@ -5,8 +5,8 @@ Element and attribute names, namespaces and attribute syntax.
 	d="3"><b/><y:c xmlns:y="urn:y"/></x:a>
 -- tokens --
 1 StartTag x:a "<x:a xmlns:x=\"urn:x\" xmlns=\"urn:d\" x:b='1'  c = \"2\"\n\td=\"3\">" ns="urn:x" xmlns:x="urn:x" xmlns="urn:d" x:b="1" c="2" d="3"
-1 StartTag b [self-closing] "<b/>" ns="urn:d"
-1 StartTag y:c [self-closing] "<y:c xmlns:y=\"urn:y\"/>" ns="urn:y" xmlns:y="urn:y"
+2 StartTag b [self-closing] "<b/>" ns="urn:d"
+2 StartTag y:c [self-closing] "<y:c xmlns:y=\"urn:y\"/>" ns="urn:y" xmlns:y="urn:y"
 1 EndTag x:a "</x:a>"
 -- Case --
 -- in --
@@ -25,17 +25,17 @@ Element and attribute names, namespaces and attribute syntax.
 -- in --
 <p:a q:b="1"/>
 -- tokens --
-0 StartTag p:a [self-closing] "<p:a q:b=\"1\"/>" q:b="1"
+1 StartTag p:a [self-closing] "<p:a q:b=\"1\"/>" q:b="1"
 -- DuplicateAttributes --
 -- in --
 <a b="1" b='2' B="3"/>
 -- tokens --
-0 StartTag a [self-closing] "<a b=\"1\" b='2' B=\"3\"/>" b="1" b="2" B="3"
+1 StartTag a [self-closing] "<a b=\"1\" b='2' B=\"3\"/>" b="1" b="2" B="3"
 -- NoSpaceBetweenAttributes --
 -- in --
 <a b="1"c='2'/>
 -- tokens --
-0 StartTag a [self-closing] "<a b=\"1\"c='2'/>" b="1" c="2"
+1 StartTag a [self-closing] "<a b=\"1\"c='2'/>" b="1" c="2"
 -- WhitespaceInTags --
 -- in --
 <a
@@ -43,7 +43,7 @@ Element and attribute names, namespaces and attribute syntax.
 /><c	></c
 >
 -- tokens --
-0 StartTag a [self-closing] "<a\n  b=\"1\"\n/>" b="1"
+1 StartTag a [self-closing] "<a\n  b=\"1\"\n/>" b="1"
 1 StartTag c "<c\t>"
 1 EndTag c "</c\n>"
 -- NonASCII --
@@ -58,7 +58,7 @@ Element and attribute names, namespaces and attribute syntax.
 <_a :b="1" c-d.e="2"><a:b:c/></_a>
 -- tokens --
 1 StartTag _a "<_a :b=\"1\" c-d.e=\"2\">" :b="1" c-d.e="2"
-1 StartTag a:b:c [self-closing] "<a:b:c/>"
+2 StartTag a:b:c [self-closing] "<a:b:c/>"
 1 EndTag _a "</_a>"
 -- Unquoted --
 -- in --
@@ -70,7 +70,7 @@ Element and attribute names, namespaces and attribute syntax.
 -- in --
 <a b="x>y" c='"' d="'"/>
 -- tokens --
-0 StartTag a [self-closing] "<a b=\"x>y\" c='\"' d=\"'\"/>" b="x>y" c="\"" d="'"
+1 StartTag a [self-closing] "<a b=\"x>y\" c='\"' d=\"'\"/>" b="x>y" c="\"" d="'"
 -- NotNames --
 -- in --
 <a><1/>< b/><-c/></a>
