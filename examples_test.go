@@ -649,6 +649,74 @@ func ExampleTransformer_HoldDiscard() {
 	// <img src=c.png></div><p>Two</p><img src=d.png><p>Three</p><div class="gallery"><img src=e.png><img src=f.png></div>
 }
 
+// Removing an element with the whitespace before it (its indentation), or
+// adding one before the whitespace at the end of its parent, needs the
+// whitespace held back until the token after it decides what to do with it,
+// here to remove a meta element of an EPUB package document, and to add a
+// manifest item with the indentation of the one before it.
+func ExampleTransformer_Hold_indentation() {
+	const opf = `<package>
+  <metadata>
+    <meta name="calibre:timestamp" content="2020-01-01"/>
+    <meta name="cover" content="cover"/>
+  </metadata>
+  <manifest>
+    <item id="a" href="a.xhtml"/>
+  </manifest>
+</package>
+`
+	x := htmlstream.NewTransformer(os.Stdout, strings.NewReader(opf))
+	x.SetMode(htmlstream.XML)
+	var space htmlstream.Hold // the whitespace before the current token, if not zero
+	var indent []byte         // the whitespace before the last item
+	for x.Next() {
+		tok := x.Token()
+		var err error
+		switch {
+		case htmlstream.Tag("meta", htmlstream.AttrEquals("name", "calibre:timestamp"))(tok):
+			if space != (htmlstream.Hold{}) {
+				err = x.HoldDiscard(space, nil)
+				space = htmlstream.Hold{}
+			}
+			if err == nil {
+				err = x.Remove()
+			}
+		case tok.Kind() == htmlstream.StartTag && tok.Is("item") && space != (htmlstream.Hold{}):
+			indent = append(indent[:0], x.Held(space)...)
+		case tok.Kind() == htmlstream.EndTag && tok.Is("manifest") && space != (htmlstream.Hold{}):
+			// The current token isn't held back: the new item goes
+			// before the held whitespace.
+			item := append(append([]byte(nil), indent...), `<item id="b" href="b.xhtml"/>`...)
+			err = x.HoldDiscard(space, append(item, x.Held(space)...))
+			space = htmlstream.Hold{}
+		}
+		if err == nil && space != (htmlstream.Hold{}) {
+			err = x.HoldRelease(space)
+			space = htmlstream.Hold{}
+		}
+		if err == nil && tok.Kind() == htmlstream.Text && !tok.Partial() && !tok.Continued() && len(bytes.TrimSpace(tok.Raw())) == 0 {
+			// whitespace in one token
+			space = x.Hold()
+		}
+		if err != nil {
+			panic(err)
+		}
+	}
+	if err := x.Close(); err != nil {
+		panic(err)
+	}
+	// Output:
+	// <package>
+	//   <metadata>
+	//     <meta name="cover" content="cover"/>
+	//   </metadata>
+	//   <manifest>
+	//     <item id="a" href="a.xhtml"/>
+	//     <item id="b" href="b.xhtml"/>
+	//   </manifest>
+	// </package>
+}
+
 // Text longer than the chunk size is split into several tokens (see
 // Token.Partial), here with a small chunk size. To replace all of it, hold
 // back the output from the first token, read the text, replace the last
