@@ -1,0 +1,643 @@
+:root {
+	color-scheme: light dark;
+	font: 13px/1.4 system-ui, sans-serif;
+	--bg: light-dark(color-mix(in srgb, var(--text) 7%, var(--canvas)), #0a0a0a);
+	--panel: light-dark(color-mix(in srgb, var(--text) 13%, var(--canvas)), #161616);
+	--field: light-dark(color-mix(in srgb, var(--text) 20%, var(--canvas)), #2a2a2a);
+	--field-hover: light-dark(color-mix(in srgb, var(--text) 28%, var(--canvas)), #383838);
+	--field-active: light-dark(color-mix(in srgb, var(--text) 37%, var(--canvas)), #484848);
+	--chip: light-dark(color-mix(in srgb, var(--text) 17%, var(--canvas)), #1f1f1f);
+	--chip-hover: light-dark(color-mix(in srgb, var(--text) 21%, var(--canvas)), #272727);
+	--muted: light-dark(color-mix(in srgb, var(--text) 60%, var(--canvas)), #a0a0a0);
+	--inset: light-dark(rgb(255 255 255 / .35), rgb(0 0 0 / .4));
+	--editor: var(--panel);
+	--del: light-dark(#d93f3f, #ff6b6b);
+	--add: light-dark(#2e9d4f, #4ade80);
+	--canvas: light-dark(#fff, #121212);
+	--text: light-dark(#000, #fff);
+	--accent: #0075ff;
+	--radius: .6em;
+}
+body {
+	margin: 0;
+	height: 100dvh;
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	grid-template-rows: auto auto minmax(0, 1fr) auto;
+	grid-template-areas: "header" "about" "main" "messages";
+	background: var(--bg);
+	color: var(--text);
+
+	@media (min-width: 1400px) {
+		grid-template-columns: 24em minmax(0, 1fr);
+		grid-template-rows: auto minmax(0, 1fr) auto;
+		grid-template-areas: "header header" "about main" "about messages";
+	}
+}
+
+header, fieldset, #messages {
+	background: var(--panel);
+	border-radius: var(--radius);
+}
+
+header {
+	grid-area: header;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: .4em 1em;
+	margin: .6em .6em 0;
+	padding: .5em .8em;
+
+	h1 {
+		font-size: inherit;
+		margin: 0;
+	}
+
+	#status {
+		margin-left: auto;
+		color: var(--muted);
+	}
+
+	#theme {
+		display: grid;
+		place-content: center;
+		width: 1.7em;
+		height: 1.7em;
+		padding: 0;
+		border-radius: .5em;
+		background: none;
+		cursor: pointer;
+
+		&::before {
+			font-size: 18px;
+		}
+		&:hover {
+			background: var(--field);
+		}
+		&:active {
+			background: var(--field-hover);
+			transform: translateY(1px);
+		}
+	}
+}
+
+#about {
+	grid-area: about;
+	min-height: 0;
+	margin: .6em .6em 0;
+	border-radius: var(--radius);
+	background: var(--panel);
+	color: var(--muted);
+
+	summary {
+		padding: .45em .8em;
+		list-style: none;
+
+		&::-webkit-details-marker {
+			display: none;
+		}
+	}
+	.lead {
+		display: block;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.body {
+		padding: 0 .8em .6em;
+	}
+	p {
+		margin: .5em 0 0;
+	}
+
+	/* In the details element rather than the summary, so it can stay in view
+	 * while the element scrolls. Clicks on it are handled by the script. */
+	&::before {
+		content: attr(data-icon);
+		float: right;
+		position: sticky;
+		top: .45em;
+		z-index: 1;
+		/* Less than the .8em text padding, since the glyph has empty space around the arrow. */
+		margin: .45em 5.4px 0 .5em;
+		font: normal 18px/1 "Material Symbols Rounded";
+		color: light-dark(#0a58ca, #3b82e6);
+		cursor: pointer;
+		transition: transform .15s;
+	}
+
+	&[open] {
+		max-height: 30dvh;
+		overflow-y: auto;
+
+		summary {
+			padding-bottom: 0;
+		}
+		.lead {
+			overflow: visible;
+			white-space: normal;
+		}
+		&::before {
+			transform: rotate(180deg);
+		}
+	}
+
+	/* A permanent sidebar, so there is nothing to collapse. */
+	@media (min-width: 1400px) {
+		&, &[open] {
+			display: block;
+			max-height: none;
+			margin: .6em 0 .6em .6em;
+			overflow-y: auto;
+		}
+		&::details-content {
+			content-visibility: visible;
+		}
+		summary {
+			padding: .6em .8em 0;
+			pointer-events: none;
+		}
+		.lead {
+			overflow: visible;
+			white-space: normal;
+		}
+		&::before {
+			display: none;
+		}
+	}
+}
+
+#main {
+	grid-area: main;
+	min-height: 0;
+	overflow-y: auto;
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	grid-template-rows: auto 1fr;
+	grid-template-areas: "inputControls outputControls" "input output";
+	gap: .6em;
+	padding: .6em;
+
+	@media (max-width: 700px) {
+		grid-template-columns: 1fr;
+		grid-template-rows: none;
+		align-content: start;
+		grid-template-areas: "inputControls" "input" "outputControls" "output";
+	}
+
+	&.failed > :is(#input, #output) {
+		display: none;
+	}
+	> .tools {
+		display: none;
+	}
+
+	#inputControls {
+		grid-area: inputControls;
+	}
+	#outputControls {
+		grid-area: outputControls;
+	}
+
+	#input, #output {
+		position: relative;
+		min-width: 0;
+		overflow: clip;
+		display: flex;
+		flex-direction: column;
+		border-radius: var(--radius);
+
+		/* Reserves the corner of each editor for its overlay buttons, so wrapped text flows around them. */
+		.cm-content::before {
+			content: "";
+			float: right;
+			height: calc(2.2em + 8px);
+		}
+	}
+	#input {
+		grid-area: input;
+
+		.cm-content::before {
+			width: calc(4.4em + 20px);
+		}
+	}
+	#output {
+		grid-area: output;
+
+		.cm-content::before {
+			width: calc(8.8em + 36px);
+		}
+	}
+
+	.cm-editor {
+		flex: 1 0 auto;
+		font-size: 12px;
+		background-color: var(--editor);
+		color: var(--text);
+	}
+	.cm-scroller {
+		flex: 1;
+		font-family: ui-monospace, monospace;
+	}
+	.cm-cursor {
+		border-left-color: var(--text);
+	}
+	.cm-gutters {
+		background-color: var(--editor);
+		color: var(--muted);
+		border-right-color: color-mix(in srgb, var(--text) 10%, transparent);
+	}
+	.cm-activeLine, .cm-activeLineGutter {
+		background-color: color-mix(in srgb, var(--text) 7%, transparent);
+	}
+	.cm-selectionBackground, .cm-editor .cm-selectionLayer .cm-selectionBackground {
+		background-color: color-mix(in srgb, var(--text) 12%, transparent) !important;
+	}
+	.cm-editor.cm-focused .cm-selectionLayer .cm-selectionBackground {
+		background-color: color-mix(in srgb, var(--accent) 30%, transparent) !important;
+	}
+	.cm-matchingBracket, .cm-nonmatchingBracket {
+		background: none !important;
+		text-decoration: underline 2px;
+		text-underline-offset: 3px;
+	}
+	.cm-matchingBracket {
+		text-decoration-color: var(--accent);
+	}
+	.cm-nonmatchingBracket {
+		text-decoration-color: var(--del);
+	}
+
+	/* The merge view's change markers. */
+	.cm-changeGutter {
+		display: none !important;
+	}
+	.cm-gutterElement {
+		&.cm-chg-a {
+			background-color: color-mix(in srgb, var(--del) 22%, transparent);
+		}
+		&.cm-chg-b {
+			background-color: color-mix(in srgb, var(--add) 22%, transparent);
+		}
+	}
+	.cm-merge-a {
+		.cm-changedLine {
+			background-color: color-mix(in srgb, var(--del) 9%, transparent);
+		}
+		.cm-changedText {
+			background: color-mix(in srgb, var(--del) 30%, transparent);
+		}
+	}
+	.cm-merge-b {
+		.cm-changedLine {
+			background-color: color-mix(in srgb, var(--add) 9%, transparent);
+		}
+		.cm-changedText {
+			background: color-mix(in srgb, var(--add) 30%, transparent);
+		}
+	}
+}
+
+#fatal, #loading {
+	grid-area: input-start / input-start / output-end / output-end;
+	padding: .8em 1em;
+	border-radius: var(--radius);
+	background: var(--panel);
+
+	&[hidden] {
+		display: none;
+	}
+
+	@media (max-width: 700px) {
+		grid-area: input;
+	}
+}
+#loading {
+	color: var(--muted);
+}
+#fatal {
+	background: color-mix(in srgb, light-dark(#d32f2f, #ff5555) 7%, var(--panel));
+
+	p {
+		margin: .5em 0 0;
+	}
+	pre {
+		margin: .5em 0;
+		font: 12px/1.4 ui-monospace, monospace;
+		white-space: pre-wrap;
+		overflow-wrap: anywhere;
+	}
+	code {
+		padding: .1em .4em;
+		border-radius: .35em;
+		background: var(--inset);
+		font: 12px ui-monospace, monospace;
+		overflow-wrap: anywhere;
+	}
+}
+
+fieldset {
+	display: flex;
+	flex-wrap: wrap;
+	align-content: start;
+	align-items: center;
+	gap: .4em 1em;
+	min-width: 0;
+	margin: 0;
+	padding: .8em;
+	border: 0;
+	user-select: none;
+
+	input:not([type=checkbox]) {
+		user-select: text;
+	}
+
+	legend {
+		float: left;
+		width: 100%;
+		margin: 0;
+		padding: 0 0 .1em;
+		font-size: .85em;
+		font-weight: 600;
+		letter-spacing: .04em;
+		text-transform: uppercase;
+		color: var(--muted);
+	}
+
+	label {
+		display: inline-flex;
+		align-items: center;
+		gap: .5em;
+		padding: .25em .5em;
+		border-radius: .5em;
+		background: var(--chip);
+		white-space: nowrap;
+
+		&:has(input[type=checkbox]) {
+			cursor: pointer;
+			user-select: none;
+			transition: background-color .1s;
+
+			&:hover {
+				background: var(--chip-hover);
+			}
+		}
+		/* After the hover rule, so a checked label doesn't lose its tint when hovered. */
+		&:has(input[type=checkbox]:checked) {
+			background: color-mix(in srgb, var(--accent) 18%, var(--chip));
+		}
+
+		/* The label shows the focus ring instead of the control inside it. */
+		&:has(:focus-visible) {
+			outline: 2px solid var(--accent);
+			outline-offset: 1px;
+		}
+		:is(input, select):focus-visible {
+			outline: none;
+		}
+
+		:is(input:not([type=checkbox]), select) {
+			padding: .1em .5em;
+			border-radius: .35em;
+			background-color: var(--inset);
+		}
+		select {
+			&:not([multiple]) {
+				padding-right: 1.6em;
+			}
+			&:hover {
+				background-color: var(--inset);
+			}
+		}
+	}
+}
+
+/* Shared by the controls in the fieldsets and by the buttons. */
+:is(input:not([type=checkbox]), select, button) {
+	font: inherit;
+	color: inherit;
+	border: 0;
+	border-radius: .4em;
+	background-color: var(--field);
+}
+input:not([type=checkbox]), select, button {
+	padding: .25em .6em;
+}
+input[type=number] {
+	width: 8em;
+}
+#customDoctype {
+	width: 20em;
+}
+:is(input, select, button):focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 1px;
+}
+
+:root button {
+	color: var(--muted);
+	cursor: pointer;
+
+	&:hover {
+		color: var(--text);
+	}
+}
+button:hover, select:hover {
+	background-color: var(--field-hover);
+}
+button:active:not(:disabled) {
+	background-color: var(--field-active);
+	transform: translateY(1px);
+}
+
+select {
+	appearance: none;
+	padding-right: 1.8em;
+	cursor: pointer;
+	background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
+	background-position: calc(100% - 1em) 55%, calc(100% - .7em) 55%;
+	background-size: .3em .3em;
+	background-repeat: no-repeat;
+
+	option {
+		background-color: light-dark(#e6e6e6, #131313);
+		color: var(--text);
+	}
+}
+
+[data-icon]::before {
+	content: attr(data-icon);
+	font-family: "Material Symbols Rounded";
+	font-size: 20px;
+	line-height: 1;
+	font-weight: normal;
+	user-select: none;
+	-webkit-font-feature-settings: "liga";
+	font-feature-settings: "liga";
+}
+
+.tools {
+	position: absolute;
+	top: 8px;
+	right: 8px;
+	z-index: 10;
+	display: flex;
+	gap: 8px;
+
+	button {
+		--ring: light-dark(rgb(0 0 0 / .16), rgb(0 0 0 / .6));
+		display: grid;
+		place-content: center;
+		width: 2.2em;
+		height: 2.2em;
+		padding: 0;
+		border-radius: .6em;
+		background-color: color-mix(in srgb, var(--field) 85%, transparent);
+		box-shadow: 0 1px 3px light-dark(rgb(0 0 0 / .25), rgb(0 0 0 / .6)), 0 0 0 1px var(--ring);
+
+		&[hidden] {
+			display: none;
+		}
+		&:disabled {
+			opacity: .4;
+			cursor: default;
+			pointer-events: none;
+		}
+		&:hover {
+			background-color: var(--field-hover);
+		}
+		/* Pressed in: no drop shadow, a short inset one instead. */
+		&:active:not(:disabled) {
+			background-color: var(--field-active);
+			box-shadow: inset 0 1px 3px light-dark(rgb(0 0 0 / .2), rgb(0 0 0 / .5)), 0 0 0 1px var(--ring);
+		}
+	}
+}
+
+/* Tooltips shown by a pseudo-element after a short delay, instead of the slow
+ * native ones. The element is its own anchor, and the tip is fixed so the
+ * clipping of the editors can't cut it off. */
+[data-tip] {
+	anchor-name: --tip;
+	anchor-scope: --tip;
+
+	&::after {
+		content: attr(data-tip);
+		position: fixed;
+		position-anchor: --tip;
+		position-area: bottom;
+		position-try-fallbacks: --tip-left, --tip-right;
+		margin-block-start: 6px;
+		z-index: 1000;
+		width: max-content;
+		max-width: min(24em, 90vw);
+		padding: .25em .55em;
+		border-radius: .4em;
+		background: var(--field-active);
+		color: var(--text);
+		font: normal 11px/1.3 system-ui, sans-serif;
+		letter-spacing: normal;
+		text-transform: none;
+		white-space: normal;
+		box-shadow: 0 2px 6px light-dark(rgb(0 0 0 / .25), rgb(0 0 0 / .6));
+		pointer-events: none;
+		opacity: 0;
+		visibility: hidden;
+		transition: opacity .1s, visibility 0s .1s;
+	}
+	&:is(:hover, :focus-visible)::after {
+		opacity: 1;
+		visibility: visible;
+		transition: opacity .1s .3s, visibility 0s .3s;
+	}
+	&:active::after {
+		opacity: 0;
+		visibility: hidden;
+		transition: none;
+	}
+}
+@position-try --tip-left {
+	position-area: bottom span-left;
+}
+@position-try --tip-right {
+	position-area: bottom span-right;
+}
+/* Without anchor positioning: an offset below the element, centered, or
+ * against the right edge for the buttons near the right edge of the page. */
+@supports not (position-anchor: --tip) {
+	[data-tip] {
+		position: relative;
+
+		&::after {
+			position: absolute;
+			top: 100%;
+			left: 50%;
+			translate: -50% 6px;
+		}
+	}
+	#theme::after, .tools button::after {
+		left: auto;
+		right: 0;
+		translate: 0 6px;
+	}
+}
+
+a {
+	color: light-dark(#0a58ca, #3b82e6);
+	font-weight: 500;
+	text-decoration: none;
+
+	&:hover {
+		text-decoration: underline;
+	}
+}
+
+#messages {
+	grid-area: messages;
+	box-sizing: border-box;
+	max-height: 30dvh;
+	overflow: auto;
+	margin: 0 .6em .6em;
+	padding: .4em 0;
+	list-style: none;
+	font: 12px/1.4 ui-monospace, monospace;
+
+	&:empty {
+		display: none;
+	}
+
+	li {
+		display: flex;
+		align-items: center;
+		gap: .5em;
+		padding: .1em .8em;
+
+		&[data-index] {
+			cursor: pointer;
+
+			&:hover {
+				background: #0041c6cc;
+				color: #fff;
+			}
+		}
+	}
+	[data-icon] {
+		flex: none;
+
+		&::before {
+			font-size: 16px;
+		}
+	}
+	.warning [data-icon] {
+		color: light-dark(#b58900, #f5c211);
+	}
+	.error {
+		color: light-dark(#c00, #f66);
+		font-weight: bold;
+
+		[data-icon] {
+			color: light-dark(#c00, #f66);
+		}
+	}
+}

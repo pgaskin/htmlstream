@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>polyglottify</title>
+  <meta name="author" content="Patrick Gaskin">
+  <meta name="description" content="Convert HTML documents to standards-compliant polyglot HTML/XHTML markup which parses and renders the same across browsers and XML parsers. This is a web version of the github.com/pgaskin/htmlstream/polyglot Go library.">
+  <link rel="canonical" href="https://pgaskin.net/htmlstream/polyglottify/">
+  <link rel="stylesheet" href="polyglottify.css">
+</head>
+<body>
+  <noscript><style>#loading, #status { display: none } #fatal[hidden] { display: block }</style></noscript>
+  <header>
+    <h1>polyglottify</h1>
+    <a href="https://github.com/pgaskin/htmlstream" target="_blank" rel="noopener">github</a>
+    <a href="https://pkg.go.dev/github.com/pgaskin/htmlstream/polyglot" target="_blank" rel="noopener">godoc</a>
+    <a href="https://pkg.go.dev/github.com/pgaskin/htmlstream/cmd/polyglottify" target="_blank" rel="noopener">cli</a>
+    <span id="status">loading</span>
+    <button type="button" id="theme" data-tip="switch to dark mode" aria-label="switch to dark mode" data-icon="dark_mode"></button>
+  </header>
+  <details id="about" data-icon="expand_more" open>
+    <summary>
+      <span class="lead">
+        polyglottify converts an HTML document to polyglot markup: well-formed
+        XML (XHTML) which is parsed the same way by browsers and XML parsers
+        whether it is served as text/html or application/xhtml+xml. The
+        differences between the input and output are highlighted, and anything
+        which can't be represented in both formats results in a warning in the
+        bottom panel. The conversion is run locally in your browser without
+        uploading it to any remote servers.
+      </span>
+    </summary>
+    <div class="body">
+      <p>
+        The output mostly follows the format described by the <a
+        href="https://www.w3.org/TR/html-polyglot/">W3C Polyglot Markup</a>
+        note, with a few changes to improve compatibility with modern browsers.
+        In addition, the source document is parsed and normalized mostly
+        according to the <a href="https://html.spec.whatwg.org/">HTML
+        specification</a>, with some changes to allow it to work in a single
+        streaming pass, and be more robust against untrusted input. It handles
+        malformed input (like unclosed tags) more or less the same way as
+        browsers.
+      </p>
+      <p>
+        This is a demo of the <a
+        href="https://pkg.go.dev/github.com/pgaskin/htmlstream/polyglot">polyglot</a>
+        package of <a
+        href="https://pkg.go.dev/github.com/pgaskin/htmlstream">github.com/pgaskin/htmlstream</a>,
+        a Go library for streaming parsing and transformation of HTML, XHTML and
+        XML which passes input through byte for byte unless modified, tolerates
+        malformed input, and uses has bounded resource usage, even on untrusted
+        content.
+      </p>
+      <p>
+        This tool is also available as a <a
+        href="https://pkg.go.dev/github.com/pgaskin/htmlstream/cmd/polyglottify">command-line
+        tool</a>.
+      </p>
+    </div>
+  </details>
+  <div id="main" class="cm-mergeView">
+    <fieldset id="inputControls">
+      <legend>input</legend>
+      <label data-tip="accept CDATA sections, processing instructions, self-closing tags on non-void elements and end tags of void elements, for documents written as XHTML (e.g., EPUB content)"><input type="checkbox" id="xmlSyntax"> xml syntax</label>
+      <label data-tip="read noscript contents as raw text, like browsers with scripting enabled"><input type="checkbox" id="scripting"> scripting</label>
+      <label data-tip="fail if the input is structurally unsound or the output isn't well-formed XML"><input type="checkbox" id="strict"> strict</label>
+      <label data-tip="maximum size of a tag, doctype or processing instruction, in bytes">max token size <input type="number" id="maxTokenSize" min="1"></label>
+      <label data-tip="maximum depth of nested elements, in the input and in the output">max depth <input type="number" id="maxDepth" min="1"></label>
+      <label data-tip="maximum size of the names and namespace declarations kept for the open elements, in bytes">max stack bytes <input type="number" id="maxStackBytes" min="1"></label>
+      <label data-tip="maximum size of script and style contents and other buffered contents, in bytes">max raw text <input type="number" id="maxRawText" min="1"></label>
+      <input type="file" id="file" accept=".html,.htm,.xhtml,.xml,text/html,application/xhtml+xml" hidden>
+    </fieldset>
+    <fieldset id="outputControls">
+      <legend>output</legend>
+      <label>doctype
+        <select id="doctype">
+          <option value="default">&lt;!DOCTYPE html&gt;</option>
+          <option value="keep">keep</option>
+          <option value="none">none</option>
+          <option value="custom">custom</option>
+        </select>
+      </label>
+      <input id="customDoctype" placeholder="<!DOCTYPE ...>" spellcheck="false" hidden>
+      <label>xml declaration
+        <select id="xmlDecl">
+          <option value="none">none</option>
+          <option value="add">add</option>
+          <option value="keep">keep</option>
+        </select>
+      </label>
+      <label data-tip="end the output with a line break after the html end tag"><input type="checkbox" id="finalNewline"> final newline</label>
+      <label data-tip="indent the block-level elements of the output, changing only whitespace which isn't rendered">indent
+        <select id="indent">
+          <option value="">preserve</option>
+          <option value="tab">tab</option>
+          <option value="1">1 space</option>
+          <option value="2">2 spaces</option>
+          <option value="4">4 spaces</option>
+        </select>
+      </label>
+    </fieldset>
+    <div id="loading">Loading the editor and converter...</div>
+    <div id="fatal" hidden>
+      <strong>polyglottify failed to load or crashed</strong>
+      <pre id="fatalMessage">A modern browser with JavaScript and WebAssembly support is required.</pre>
+      <p>You can <a href="https://github.com/pgaskin/htmlstream/issues" target="_blank" rel="noopener">open an issue on GitHub</a> with the message above and your browser version.</p>
+      <p>Alternatively, you can use the command-line version instead if you have <a href="https://go.dev/dl">Go</a> installed: <code>go run github.com/pgaskin/htmlstream/cmd/polyglottify@latest -h</code></p>
+    </div>
+    <div class="tools" id="inputTools">
+      <button type="button" id="copyInput" data-tip="copy input" aria-label="copy input" data-icon="content_copy"></button>
+      <button type="button" id="upload" data-tip="open file" aria-label="open file" data-icon="upload"></button>
+    </div>
+    <div class="tools" id="outputTools">
+      <button type="button" id="collapse" data-tip="collapse unchanged lines" aria-label="collapse unchanged lines" aria-pressed="false" data-icon="compress"></button>
+      <button type="button" id="apply" data-tip="use output as input" aria-label="use output as input" data-icon="arrow_left_alt"></button>
+      <button type="button" id="copy" data-tip="copy output" aria-label="copy output" data-icon="content_copy"></button>
+      <button type="button" id="download" data-tip="download output" aria-label="download output" data-icon="download"></button>
+    </div>
+  </div>
+  <ul id="messages"></ul>
+  <script>
+    function icon(name) { return name; }
+
+    const darkQuery = matchMedia("(prefers-color-scheme: dark)");
+    let themeOverride = null;
+    try {
+      const t = localStorage.getItem("polyglottify_daynight");
+      if (t == "light" || t == "dark") themeOverride = t;
+    } catch { }
+    function isDark() {
+      return themeOverride ? themeOverride == "dark" : darkQuery.matches;
+    }
+    function updateTheme() {
+      document.documentElement.style.colorScheme = themeOverride ?? "";
+      const b = document.getElementById("theme");
+      b.dataset.icon = isDark() ? icon("light_mode") : icon("dark_mode");
+      const tip = isDark() ? "switch to light mode" : "switch to dark mode";
+      b.dataset.tip = tip;
+      b.setAttribute("aria-label", tip);
+      window.dispatchEvent(new Event("themechange"));
+    }
+    darkQuery.addEventListener("change", updateTheme);
+    document.getElementById("theme").addEventListener("click", () => {
+      themeOverride = isDark() ? "light" : "dark";
+      try {
+        localStorage.setItem("polyglottify_daynight", themeOverride);
+      } catch { }
+      updateTheme();
+    });
+    updateTheme();
+
+    function fail(msg) {
+      const main = document.getElementById("main"), fatal = document.getElementById("fatal");
+      if (!fatal.hidden) return;
+      document.getElementById("loading").hidden = true;
+      document.getElementById("fatalMessage").textContent = msg;
+      fatal.hidden = false;
+      main.classList.add("failed");
+      document.getElementById("status").textContent = "failed";
+    }
+
+    globalThis.wasmReady = new Promise((resolve, reject) => {
+      globalThis.wasmResolve = resolve;
+      globalThis.wasmReject = reject;
+    });
+  </script>
+  <script type="module" async src="polyglottify.ts"></script>
+</body>
+</html>

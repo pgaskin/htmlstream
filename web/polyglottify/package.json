@@ -1,0 +1,25 @@
+{
+  "name": "polyglottify-web",
+  "private": true,
+  "dependencies": {
+    "@codemirror/commands": "6.11.1",
+    "@codemirror/lang-html": "6.4.12",
+    "@codemirror/language": "6.13.1",
+    "@codemirror/lint": "6.9.7",
+    "@codemirror/merge": "6.12.3",
+    "@codemirror/search": "6.7.2",
+    "@codemirror/state": "6.7.6",
+    "@codemirror/view": "6.43.15",
+    "@material-symbols/font-400": "0.48.2",
+    "@uiw/codemirror-theme-duotone": "4.25.12"
+  },
+  "overrides": {
+    "@codemirror/language": "6.13.1",
+    "@codemirror/state": "6.7.6",
+    "@codemirror/view": "6.43.15",
+    "@lezer/highlight": "1.2.5"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2"
+  }
+}

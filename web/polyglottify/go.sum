@@ -1,0 +1,9 @@
+github.com/evanw/esbuild v0.28.2 h1:A2uETn4jrQTcXaT/shwTDTYBxDjl7fV7nXmUrJxfA2w=
+github.com/evanw/esbuild v0.28.2/go.mod h1:D2vIQZqV/vIf/VRHtViaUtViZmG7o+kKmlBfVQuRi48=
+github.com/pgaskin/go-hbsubset v0.0.2 h1:t0WuUaYlykQeAQrejFNSmUKtrQfV7JYysYszvJe9B4I=
+github.com/pgaskin/go-hbsubset v0.0.2/go.mod h1:OpdTblVd4x2/ac7gL229nRveyrli0ex+lNK8GnTo84M=
+github.com/pgaskin/go-woff2 v0.0.3 h1:yCZXfAqPsize4pIKEo+35P8l5bTIcXyjYvNkIETKN2M=
+github.com/pgaskin/go-woff2 v0.0.3/go.mod h1:N0+TnYZ+1V+zquEePJ4gnZWIIEBOn5BG3U+OOtum5ds=
+golang.org/x/sys v0.0.0-20220715151400-c0bba94af5f8/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
+golang.org/x/sys v0.49.0 h1:XbzkgYJHdqh/8m2Uu0W/dQv8nktxx4BFHp1M0gROTXA=
+golang.org/x/sys v0.49.0/go.mod h1:hNLxWAXmnKAxqDtdwIYC4bM9oQPEecfsnNMuSxOs3og=
