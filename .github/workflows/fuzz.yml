@@ -1,0 +1,136 @@
+name: Fuzz
+
+on:
+  schedule:
+   - cron: '30 19 * * 4' # Thu 19:30
+  workflow_dispatch:
+    inputs:
+      fuzztime:
+        description: Time per target
+        default: 10m
+      targets:
+        description: Regexp of targets to run
+        default: .
+
+jobs:
+  setup:
+    name: Setup
+    runs-on: ubuntu-latest
+    outputs:
+      targets: ${{ steps.find.outputs.result }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Find fuzz targets
+        id: find
+        uses: actions/github-script@v8
+        env:
+          TARGETS: ${{ inputs.targets || '.' }}
+        with:
+          script: |
+            const fs = require('fs')
+            const path = require('path')
+
+            const re = new RegExp(process.env.TARGETS)
+            const ignored = x => x === 'testdata' || x === 'vendor' || /^[._]/.test(x)
+
+            const targets = []
+            const globber = await glob.create('**/*_test.go', {followSymbolicLinks: false})
+            for await (const file of globber.globGenerator()) {
+              const rel = path.relative(process.env.GITHUB_WORKSPACE, file)
+              const dir = path.dirname(rel)
+              if (ignored(path.basename(rel)) || (dir !== '.' && dir.split('/').some(ignored))) {
+                continue
+              }
+              const src = fs.readFileSync(file, 'utf8')
+              for (const [, target] of src.matchAll(/^func (Fuzz\w*)\(\w+ \*testing\.F\)/gm)) {
+                if (re.test(target)) {
+                  targets.push({dir, target, id: dir === '.' ? target : `${dir.replaceAll('/', '-')}-${target}`})
+                }
+              }
+            }
+            if (!targets.length) {
+              throw new Error(`no targets match ${process.env.TARGETS}`)
+            }
+            targets.sort((a, b) => a.dir.localeCompare(b.dir) || a.target.localeCompare(b.target))
+            for (const t of targets) {
+              core.info(`${t.dir} ${t.target}`)
+            }
+            return targets
+
+  fuzz:
+    needs: setup
+    concurrency:
+      group: fuzz-${{ matrix.id }}
+    permissions:
+      contents: read
+      actions: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.setup.outputs.targets) }}
+    name: ${{ matrix.target }} (${{ matrix.dir == '.' && 'htmlstream' || matrix.dir }})
+    runs-on: ubuntu-latest
+    env:
+      CACHE_PREFIX: fuzz-${{ matrix.id }}-
+      CACHE_KEY: fuzz-${{ matrix.id }}-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false # the go build cache would also save the corpus
+
+      - name: Read go env
+        id: env
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const {stdout} = await exec.getExecOutput('go', ['env', 'GOCACHE'], {silent: true})
+            core.setOutput('fuzzcache', `${stdout.trim()}/fuzz`)
+
+      - name: Restore fuzz cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ steps.env.outputs.fuzzcache }}
+          key: ${{ env.CACHE_KEY }}
+          restore-keys: ${{ env.CACHE_PREFIX }}
+
+      - name: Run ${{ matrix.target }}
+        run: go test -run '^$' -fuzz "^${TARGET}\$" -fuzztime "$FUZZTIME" .
+        working-directory: ${{ matrix.dir }}
+        env:
+          TARGET: ${{ matrix.target }}
+          FUZZTIME: ${{ inputs.fuzztime || (github.event_name == 'schedule' && '15m') || '1m' }}
+
+      - name: Upload fuzz corpus
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.id }}
+          path: ${{ matrix.dir }}/testdata/fuzz
+        if: ${{ failure() }}
+
+      - name: Save new fuzz cache
+        id: save
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ steps.env.outputs.fuzzcache }}
+          key: ${{ env.CACHE_KEY }}
+        if: ${{ !cancelled() }}
+
+      - name: Delete old fuzz cache
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const {CACHE_PREFIX, CACHE_KEY} = process.env
+            const caches = await github.paginate(github.rest.actions.getActionsCacheList, {
+              ...context.repo,
+              key: CACHE_PREFIX,
+              per_page: 100,
+            })
+            for (const c of caches) {
+              if (c.key !== CACHE_KEY && /^\d+-\d+$/.test(c.key.slice(CACHE_PREFIX.length))) {
+                core.info(`deleting ${c.key}`)
+                await github.rest.actions.deleteActionsCacheById({...context.repo, cache_id: c.id})
+              }
+            }
+        if: ${{ !cancelled() && steps.save.outcome == 'success' }}
