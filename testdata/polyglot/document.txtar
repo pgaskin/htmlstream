@@ -240,6 +240,15 @@ the comments after it in place.
 -- out --
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><table><tbody><tr><td>x<!-- a -->y</td></tr></tbody></table><object><!-- b --></object></body></html><!-- c -->
+-- CommentsAfterHTMLEndClosingMisplacedHead --
+An html end tag closing a misplaced head, which HTML parsers ignore, starts
+the body, and the content after it is written after the html end tag or in
+the body, where HTML parsers put it.
+-- in --
+<html></head><head></html> <!-- a -->x<!-- b -->
+-- out --
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body> x<!-- b --></body></html><!-- a -->
 -- CommentsAfterBodyInForeign --
 HTML parsers put a comment after a body or html end tag in the current
 element when it is an SVG or MathML element.

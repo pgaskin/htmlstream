@@ -1615,11 +1615,23 @@ func (p *polyglot) queueToken(tok *htmlstream.Token) {
 
 // closesKept reports whether the implied end tags held back close an
 // element other than body and html, which HTML parsers keep open after a
-// body or html end tag.
+// body or html end tag. Elements which weren't written (e.g., a misplaced
+// head) aren't open for HTML parsers, so they don't count.
 func (p *polyglot) closesKept() bool {
 	for t := range p.implied.All() {
-		if !t.Is("body") && !t.Is("html") {
+		if !t.Is("body") && !t.Is("html") && !p.dropped(t) {
 			return true
+		}
+	}
+	return false
+}
+
+// dropped reports whether the end tag tok closes an element which wasn't
+// written.
+func (p *polyglot) dropped(tok *htmlstream.Token) bool {
+	for _, f := range p.frames.All() {
+		if f.pos == tok.StartPos() {
+			return f.out < 0
 		}
 	}
 	return false
@@ -5442,10 +5454,13 @@ func (p *polyglot) endTag(tok *htmlstream.Token) {
 		p.frames.Pop(tok)
 		return
 	}
-	if tok.Implied() && p.closed.first == "" {
+	// (an element which wasn't written, e.g., a misplaced head, isn't open
+	// for HTML parsers)
+	recordClosed := tok.Implied() && !p.dropped(tok)
+	if recordClosed && p.closed.first == "" {
 		p.closed.first = htmlName(tok)
 	}
-	if tok.Implied() && tok.NS() == htmlstream.NamespaceXHTML {
+	if recordClosed && tok.NS() == htmlstream.NamespaceXHTML {
 		// record what the implied end tags before the next token close, to
 		// warn if HTML parsers handle that token differently
 		if p.closed.html == "" {
