@@ -1,0 +1,60 @@
+name: Test
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: internal/difffuzz
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - run: go mod download
+      - run: go mod verify
+      - run: go vet ./...
+      - run: go generate ./... && git diff --exit-code # ensure go tables in sync with json (it won't update them unless the json files are deleted)
+      - run: go test -v -cover -coverprofile=cover.out ./...
+      - run: go tool cover -func=cover.out && rm cover.out
+
+  test-difffuzz:
+    name: Test difffuzz
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: internal/difffuzz
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - run: command -v xmllint || (sudo apt-get update && sudo apt-get install -y libxml2-utils)
+      - run: go mod download
+      - run: go mod verify
+      - run: go vet ./...
+      - run: go test -v ./...
+
+  api:
+    name: API
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - run: GONOPROXY=github.com/pgaskin/htmlstream go run golang.org/x/exp/cmd/gorelease@v0.0.0-20261014143641-f0251eb4aa3e -base=$(git describe --tags --abbrev=0 HEAD^)
