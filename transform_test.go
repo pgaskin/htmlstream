@@ -1817,6 +1817,40 @@ func TestTransformFail(t *testing.T) {
 	}
 }
 
+// failWriter is an io.Writer whose writes fail with err.
+type failWriter struct{ err error }
+
+func (w failWriter) Write([]byte) (int, error) { return 0, w.err }
+
+// TestTransformWriteError checks that a write error stops the Transformer
+// once the buffered output is written, instead of at Close.
+func TestTransformWriteError(t *testing.T) {
+	errWrite := errors.New("write")
+	const n = 4096
+	in := strings.Repeat("<p>a</p>", n)
+	x := NewTransformer(failWriter{errWrite}, strings.NewReader(in))
+	tokens := 0
+	for x.Next() {
+		tokens++
+	}
+	if x.Err() != errWrite || tokens >= 3*n {
+		t.Errorf("got %v after %d of %d tokens, want the write error before the end", x.Err(), tokens, 3*n)
+	}
+	if err := x.Close(); err != errWrite {
+		t.Errorf("Close: got %v", err)
+	}
+
+	// releasing a hold writes the held output
+	x = NewTransformer(failWriter{errWrite}, strings.NewReader(in))
+	x.Next()
+	h := x.Hold()
+	for i := 0; i < 2*n && x.Next(); i++ {
+	}
+	if err := x.HoldRelease(h); err != errWrite {
+		t.Errorf("HoldRelease: got %v", err)
+	}
+}
+
 // TestTransformUntrackedLimit checks that element operations on untracked
 // elements are limited to the maximum depth, with a sticky error past it.
 func TestTransformUntrackedLimit(t *testing.T) {

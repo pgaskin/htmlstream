@@ -270,7 +270,10 @@ func (t *Transformer) Next() bool { return t.r.Next() }
 // See [Reader.Token].
 func (t *Transformer) Token() *Token { return t.r.Token() }
 
-// See [Reader.Err].
+// Err returns the first error encountered, or nil (see [Reader.Err]),
+// including an error of the [io.Writer]: the output is buffered, so a write
+// error is reported once the buffered output is written, after up to 4 KiB
+// more output, or by Close. The Transformer stops at it like at other errors.
 func (t *Transformer) Err() error { return t.r.Err() }
 
 // See [Reader.All].
@@ -306,9 +309,9 @@ func (t *Transformer) ReadText(dst []byte, limit int) ([]byte, bool) { return t.
 // nothing more unless InsertAtEnd was called since.
 //
 // The error is the one returned by [Transformer.Err], if any (e.g., an error
-// of the [io.Reader], a limit error, or in strict mode a [SyntaxError]), or
-// else an error of the [io.Writer], which is only reported when the output is
-// flushed.
+// of the [io.Reader] or the [io.Writer], a limit error, or in strict mode a
+// [SyntaxError]), or else an error of the [io.Writer] while writing the rest
+// of the output.
 func (t *Transformer) Close() error {
 	for t.Next() {
 	}
@@ -427,7 +430,7 @@ func (t *Transformer) HoldRelease(h Hold) error {
 	}
 	t.holds = t.holds[:i]
 	t.flushHeld()
-	return nil
+	return t.r.err
 }
 
 // HoldDiscard ends the hold h, writing raw (which may be nil) instead of the
@@ -476,7 +479,7 @@ func (t *Transformer) HoldDiscard(h Hold, raw []byte) error {
 		return t.setErr(holdLimit(len(t.hbuf), t.maxHold))
 	}
 	t.flushHeld()
-	return nil
+	return t.r.err
 }
 
 // holdAt returns the index of the open hold h in t.holds, or -1.
@@ -523,7 +526,9 @@ func (t *Transformer) SetMaxHold(n int) {
 // flushHeld writes the held output if there is no hold left.
 func (t *Transformer) flushHeld() {
 	if len(t.holds) == 0 && len(t.hbuf) != 0 {
-		t.w.Write(t.hbuf)
+		if _, err := t.w.Write(t.hbuf); err != nil {
+			t.setErr(err)
+		}
 		t.hbuf = t.hbuf[:0]
 	}
 }
@@ -531,7 +536,9 @@ func (t *Transformer) flushHeld() {
 // write writes b to the output, or to the held output.
 func (t *Transformer) write(b []byte) {
 	if len(t.holds) == 0 {
-		t.w.Write(b)
+		if _, err := t.w.Write(b); err != nil {
+			t.setErr(err)
+		}
 		return
 	}
 	t.hbuf = append(t.hbuf, b...)
@@ -666,8 +673,8 @@ func (t *Transformer) rec(f *frame) *frameRec {
 // It returns the error which stopped the Transformer (i.e.,
 // [Transformer.Err]), if any, or else an error wrapping [ErrInvalidOp] if
 // there is no current token, or at a start tag which opens an element,
-// [ErrUntrackedLimit] or an error which stopped the Transformer while skipping
-// the element's contents (e.g., a read error).
+// [ErrUntrackedLimit] or an error which stopped the Transformer while reading
+// to the element's end tag (e.g., a read error).
 func (t *Transformer) Remove() error {
 	c, err := t.current("removal")
 	if err != nil {
@@ -989,8 +996,8 @@ func xmlVoid(c *Token) bool {
 // current token isn't a start tag, [ErrIncompleteTag] if it was cut off by the
 // end of the input, or in strict mode, the [SyntaxError] of an unsound start
 // tag (see [Token.UnsoundError]), [ErrUntrackedLimit], or an error which
-// stopped the Transformer while skipping the element's contents (e.g., a read
-// error).
+// stopped the Transformer while reading to the element's end tag (e.g., a
+// read error).
 func (t *Transformer) Empty() error {
 	c, err := t.startTag("emptying")
 	if err != nil {

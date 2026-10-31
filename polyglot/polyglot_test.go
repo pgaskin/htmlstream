@@ -286,6 +286,32 @@ func TestWriter(t *testing.T) {
 	}
 }
 
+// TestWriterWriteError checks that WriteToken returns a write error once the
+// buffered output is written, instead of only Close.
+func TestWriterWriteError(t *testing.T) {
+	errWrite := errors.New("write")
+	const n = 4096
+	r := htmlstream.NewReader(strings.NewReader(strings.Repeat("<p>a</p>", n)))
+	pw := NewWriter(failWriter{errWrite}, Options{})
+	tokens := 0
+	var err error
+	for r.Next() && err == nil {
+		err = pw.WriteToken(r.Token())
+		tokens++
+	}
+	if err != errWrite || tokens >= 3*n || pw.Err() != errWrite {
+		t.Errorf("got %v after %d of %d tokens, want the write error before the end", err, tokens, 3*n)
+	}
+	if err := pw.Close(); err != errWrite {
+		t.Errorf("Close: got %v", err)
+	}
+}
+
+// failWriter is an io.Writer whose writes fail with err.
+type failWriter struct{ err error }
+
+func (w failWriter) Write([]byte) (int, error) { return 0, w.err }
+
 func TestWriterErrors(t *testing.T) {
 	for _, tc := range []struct {
 		name string

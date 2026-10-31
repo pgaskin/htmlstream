@@ -1526,7 +1526,9 @@ func NewWriter(w io.Writer, opt Options) *Writer {
 const xmlDeclaration = `<?xml version="1.0" encoding="UTF-8"?>`
 
 // WriteToken converts the next token (see [Writer] for the tokens which can
-// be left out). Errors are sticky.
+// be left out). Errors are sticky, including an error of the [io.Writer]: the
+// output is buffered, so WriteToken returns a write error once the buffered
+// output is written, after up to 4 KiB more output, or Close returns it.
 func (pw *Writer) WriteToken(tok *htmlstream.Token) error {
 	p := &pw.p
 	if p.err != nil {
@@ -1546,6 +1548,9 @@ func (pw *Writer) WriteToken(tok *htmlstream.Token) error {
 		return p.err
 	}
 	p.queueToken(tok)
+	if _, err := p.w.Write(nil); err != nil {
+		p.setErr(err) // a write error, which the buffer returns from every later write
+	}
 	return p.err
 }
 
