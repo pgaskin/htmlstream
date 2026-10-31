@@ -131,6 +131,29 @@ func TestUntracked(t *testing.T) {
 	if _, err := tr.Token(); err != ErrUntracked {
 		t.Errorf("TokenReader after the error: %v", err)
 	}
+
+	// the implied html, head and body elements aren't delivered in untracked
+	// content: an untracked html element has none, and the head ends and the
+	// body starts after an untracked head element or untracked head content
+	for _, tc := range []struct{ in, want string }{
+		{"<html xmlns:0=000000>0", "~<html xmlns:0=000000> ~0 ~implied"},
+		{"<html xmlns:0=000000><body>0", "~<html xmlns:0=000000> ~<body> ~0 ~implied"},
+		{"<html xmlns:0=000000></html>0", `~<html xmlns:0=000000> ~</html> "0"`},
+		{"<head xmlns:0=000000>0", "<html?> ~<head xmlns:0=000000> ~0 ~implied <body?> </body?> </html?>"},
+		{"<html><head xmlns:0=000000>0</head>x", `<html> ~<head xmlns:0=000000> ~0 ~</head> <body?> "x" </body?> </html?>`},
+		{"<title xmlns:0=000000>x</title>0", `<html?> <head?> ~<title xmlns:0=000000> ~x ~</title> </head?> <body?> "0" </body?> </html?>`},
+		{"<noscript xmlns:0=000000><div>0</div></noscript>0", `<html?> <head?> ~<noscript xmlns:0=000000> ~<div> ~0 ~</div> ~</noscript> </head?> <body?> "0" </body?> </html?>`},
+	} {
+		r, s := newReader(htmlstream.HTML, tc.in)
+		r.SetMaxStackBytes(16)
+		got := ""
+		for ev := range s.All() {
+			got += " " + dumpEvent(ev)
+		}
+		if got != " "+tc.want || s.Err() != nil {
+			t.Errorf("%q:\ngot  %s\nwant  %s\nerror %v", tc.in, got, tc.want, s.Err())
+		}
+	}
 }
 
 // dumpEvent returns the event as dump does, but with the text of Untracked

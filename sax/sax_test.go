@@ -505,6 +505,9 @@ func checkEvents(t *testing.T, c *fuzzCase) {
 		switch ev.Kind {
 		case StartElement:
 			e := openElem{ev.Name, -1}
+			if ev.Token() == nil && s.untracked > 0 {
+				fail("implied %v in untracked content", ev.Name)
+			}
 			if tok := ev.Token(); ev.Implied {
 				if !synth || tok != nil || ev.Name != nameHTML && ev.Name != nameHead && ev.Name != nameBody {
 					fail("implied %v", ev.Name)
@@ -528,6 +531,9 @@ func checkEvents(t *testing.T, c *fuzzCase) {
 			}
 			switch tok := ev.Token(); {
 			case tok == nil:
+				if s.untracked > 0 {
+					fail("implied end %v in untracked content", ev.Name)
+				}
 				// the html and body elements are kept open until the end
 				kept := keep && (e.name == nameHTML || e.name == nameBody)
 				if e.pos != -1 && !kept || !ev.Implied {
@@ -867,6 +873,14 @@ func FuzzSAX(f *testing.F) {
 	// and after the </>
 	f.Add("0<!>0<pre></>\n</pre>", byte(htmlstream.HTML), byte(0xf7), byte(4))
 	f.Add("0<!>0<pre></>\n</pre>", byte(htmlstream.HTML), byte(0xf7), byte(5))
+	// the implied head and body elements in untracked content (an untracked
+	// html element, head element and noscript element in an implied head),
+	// where a whitespace Text token split by the chunk size is continued by
+	// the token starting the body
+	f.Add("<html Xmlns:0=000000>   0", byte(htmlstream.HTML), byte(0xb2), byte(0))
+	f.Add("<html><head xmlns:0=000000>   0", byte(htmlstream.HTML), byte(0x32), byte(0))
+	f.Add("<noscript xmlns:0=000000><div>   0", byte(htmlstream.HTML), byte(0x32), byte(0))
+	f.Add("<html xmlns:0=000000></html>0", byte(htmlstream.HTML), byte(0x12), byte(0))
 	// the inputs without parse errors, and the scripting setting (0 for
 	// both)
 	valid := map[string]int{}

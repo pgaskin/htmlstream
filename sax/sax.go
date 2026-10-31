@@ -153,7 +153,13 @@
 // [htmlstream.Token.Untracked]) have no name in the element model, so the
 // Reader can't deliver them as balanced elements. Instead, their tokens,
 // from their start tag to their end tag, are delivered as [Untracked]
-// events, and their text isn't lost.
+// events, and their text isn't lost. The implied html, head and body
+// elements (see Elements) aren't delivered in untracked content: an
+// untracked html element has no implied head and body elements, also for
+// the content after its end tag, and in an untracked head element, or
+// untracked head content (e.g., a noscript element in an implied head), the
+// head ends and the body starts after the untracked element, as when the
+// head content is tracked.
 //
 // # Limits
 //
@@ -672,9 +678,19 @@ func (s *Reader) finish() bool {
 }
 
 // structure delivers the implied html, head and body events before tok, and
-// closes the implied elements in the element closed by tok.
+// closes the implied elements in the element closed by tok. It delivers
+// nothing in untracked content (see Reader.untracked): the head end and the
+// body start wait for the end of the untracked element, as for the
+// elements in the head, and an implied html or head element there would be
+// in the untracked element, so it is left out.
 func (s *Reader) structure() bool {
 	if s.doc == nil {
+		return false
+	}
+	if s.untracked > 0 {
+		s.headEnd = s.headEnd || s.docEv&htmlutil.HeadEnd != 0
+		s.body = s.body || s.docEv&htmlutil.ImpliedBody != 0
+		s.docEv &= htmlutil.MisplacedTag
 		return false
 	}
 	if s.docEv&htmlutil.ImpliedHTML != 0 {
@@ -683,7 +699,11 @@ func (s *Reader) structure() bool {
 	}
 	if s.docEv&htmlutil.ImpliedHead != 0 {
 		s.docEv &^= htmlutil.ImpliedHead
-		return s.implied(nameHead)
+		// the head is implied in the html element: without one on the path
+		// (an untracked html element), it is left out like the body
+		if n := len(s.path); n > 0 && s.path[n-1] == nameHTML {
+			return s.implied(nameHead)
+		}
 	}
 	s.headEnd = s.headEnd || s.docEv&htmlutil.HeadEnd != 0
 	s.body = s.body || s.docEv&htmlutil.ImpliedBody != 0
@@ -711,7 +731,7 @@ func (s *Reader) structure() bool {
 		s.body = false
 		return s.implied(nameBody)
 	}
-	if t := s.tok; t != nil && n > 0 && s.starts[n-1] < 0 && s.untracked == 0 && t.Kind() == htmlstream.EndTag && !t.Stray() && !s.isDropped(t) && !s.keptEnd(t) {
+	if t := s.tok; t != nil && n > 0 && s.starts[n-1] < 0 && t.Kind() == htmlstream.EndTag && !t.Stray() && !s.isDropped(t) && !s.keptEnd(t) {
 		s.ev = Event{Kind: EndElement, Name: s.path[n-1], Implied: true, Pos: t.Pos()}
 		return true
 	}
