@@ -31,6 +31,10 @@ func TestDocument(t *testing.T) {
 		{`<title>t</title></head><link><noscript></head>x`, `[html head] title:InHead #:InHead [headend] link:AfterHead [body] noscript:InBody #:InBody`, false, htmlstream.HTML},
 		{`<noscript></head></noscript></head><title>t</title>`, `[html head] noscript:InHead [headend] title:AfterHead #:AfterHead [body]`, false, htmlstream.HTML},
 		{`<noscript></head></noscript></head><title>t</title>`, `[html head] noscript:InHead #:InHead [headend] title:AfterHead #:AfterHead [body]`, true, htmlstream.HTML},
+		{`<head><noscript></html> </noscript>x`, `[html] head:InHead noscript:InHead [headend] [body] #:InBody`, false, htmlstream.HTML},
+		{`<noscript></body>x`, `[html head] noscript:InHead #:InHead [headend body]`, false, htmlstream.HTML},
+		{`<head><noscript></br>x`, `[html] head:InHead noscript:InHead [headend body] #:InBody`, false, htmlstream.HTML},
+		{`<html><head><link></html> x`, `html:BeforeHead head:InHead link:InHead [headend] [body] #:InBody`, false, htmlstream.HTML},
 		{`<head></head><template><html>x</template>`, `[html] head:InHead [headend] template:AfterHead [misplaced] html:AfterHead #:AfterHead [body]`, false, htmlstream.HTML},
 		// in Universal mode, like in HTML mode for documents read as HTML,
 		// and only the explicit html, head and body elements under XML rules

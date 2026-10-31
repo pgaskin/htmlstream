@@ -1212,8 +1212,9 @@ const (
 //     table, and elements inside head content which they move to the body;
 //   - misnested formatting elements where the adoption agency algorithm
 //     restructures the elements, and end tags HTML parsers ignore;
-//   - content after a body or html end tag which closed other elements,
-//     which HTML parsers keep open and put the content in, and likewise
+//   - content after a body or html end tag which closed other elements
+//     (other than the head, which they close too), which HTML parsers keep
+//     open and put the content in, and likewise
 //     after a noscript end tag which closed a special element, or an end tag
 //     of an element already closed. Whitespace after a body or html end tag
 //     is written in the elements, as HTML parsers put it there, up to the
@@ -1631,11 +1632,12 @@ func (p *polyglot) queueToken(tok *htmlstream.Token) {
 
 // closesKept reports whether the implied end tags held back close an
 // element other than body and html, which HTML parsers keep open after a
-// body or html end tag. Elements which weren't written (e.g., a misplaced
-// head) aren't open for HTML parsers, so they don't count.
+// body or html end tag. The head doesn't count: HTML parsers close it at the
+// end tag and start the body. Elements which weren't written (e.g., a
+// misplaced head) aren't open for HTML parsers, so they don't count either.
 func (p *polyglot) closesKept() bool {
 	for t := range p.implied.All() {
-		if !t.Is("body") && !t.Is("html") && !p.dropped(t) {
+		if !t.Is("body") && !t.Is("html") && !t.Is("head") && !p.dropped(t) {
 			return true
 		}
 	}
@@ -1954,6 +1956,11 @@ func (p *polyglot) close() error {
 	}
 	p.writeAfterBody(true)
 	p.endText()
+	if p.replaced != 0 {
+		// in whitespace held back until here (e.g., after the head)
+		p.warnReplaced(p.pos, p.replaced)
+		p.replaced = 0
+	}
 	if p.opt.FinalNewline {
 		p.emitString("\n")
 	}
@@ -2996,10 +3003,6 @@ func (p *polyglot) token(tok *htmlstream.Token) {
 			p.warn(tok.Pos(), "closed noscript after a misplaced <head> at the content after it (HTML parsers would have kept it open as body content)")
 		}
 		p.misplacedNoscript, p.noscriptInP = false, false
-	}
-	if tok.Kind() == htmlstream.EndTag && !tok.Implied() && (tok.Is("body") || tok.Is("html")) && p.impliedHeadNoscript() {
-		// htmlutil.Document starts the body for it
-		p.warn(tok.Pos(), "applied </%s> in a noscript in the implied head (HTML parsers would have ignored it)", htmlName(tok))
 	}
 	initial := !p.doc.Started() // the initial insertion mode, before the doctype
 	// The Reader reads the leading whitespace of text before the body as a
@@ -5878,9 +5881,10 @@ func (p *polyglot) strayFormattingEnd(tok *htmlstream.Token) {
 // keepOpen records the elements closed by the implied end tags before an end
 // tag which doesn't close them for HTML parsers. They are open for HTML
 // parsers, so they aren't reopened (for whitespace after them), and other
-// content after them is reported.
+// content after them is reported. The head isn't kept open: HTML parsers
+// close it at a body or html end tag and start the body (see closesKept).
 func (p *polyglot) keepOpen(tok *htmlstream.Token) {
-	if p.closed.first != "" && p.closed.first != "body" {
+	if p.closed.first != "" && p.closed.first != "body" && p.closed.first != "head" {
 		p.keptOpen, p.keptBy = p.closed.first, htmlName(tok)
 		p.kept = append(p.kept[:0], p.closed.names...)
 		p.pending, p.tentative = p.pending[:0], p.tentative[:0]

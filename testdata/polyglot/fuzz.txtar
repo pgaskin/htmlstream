@@ -15,6 +15,9 @@ files.
 -- 1d15856760955909 --
 -- in --
 <sCript><!--<sCript</sCript>0
+-- 2719bb20cc4426fa --
+-- in quoted --
+"<html><heAd></html> "
 -- 2997821412e39e10 --
 -- in --
 <B><u A><u></B></u>00
@@ -28,6 +31,9 @@ files.
 -- in --
 <pre></A>
 00
+-- 38750ab877143175 --
+-- in quoted --
+"</heAd>\f"
 -- 3de6560cae232741 --
 -- in quoted --
 "<html>0<A></html> "

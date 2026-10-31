@@ -302,6 +302,9 @@ func (d *Document) Update(tok *htmlstream.Token) DocumentEvent {
 			// inside head content (e.g., a noscript)
 			ev |= d.headStart() | HeadEnd
 			d.part = AfterHead
+		case html && (name == "body" || name == "html") && d.part < InBody && d.nested > 0:
+			// ignored by HTML parsers in a noscript in the head (with
+			// scripting disabled), the only head content with end tags in it
 		case html && (name == "br" || name == "body" || name == "html") && d.part < InBody:
 			// HTML parsers treat </br> as <br>, and </body> and </html>
 			// start the body like other content

@@ -359,7 +359,8 @@ var writerFound = []modeSeed{
 	{"</BodY><!DOCTYPE><!0", '`'}, // a known difference (rewritten by specDoctypes)
 	{"<<!DOCTYPE>A", '\\'},
 	{"<html></heAd><heAd></html><!0", 0x00},
-	{"<ifrAme> ", 0x97}, // whitespace-only iframe contents
+	{"<ifrAme> ", 0x97},            // whitespace-only iframe contents
+	{"<html><heAd></html> ", 0x02}, // whitespace after an html end tag closing the head
 }
 
 // hooksFound are inputs and modes which found bugs with FuzzPolyglotHooks.
@@ -652,8 +653,9 @@ func xmlSyntaxInput(t *testing.T, in string, scripting bool) string {
 // parsers ignore it in body text, and the polyglot package drops it.
 // Leading whitespace which the Reader gives as a token of its own (with
 // only html open) is kept with the text after it, unless that is whitespace
-// too. Whitespace after a body or html end tag which closed nothing else is
-// body text for both, so it is kept (see keepOpen in the polyglot package).
+// too. Whitespace after a body or html end tag which closed nothing else, or
+// only the head, is body text for both, so it is kept (see keepOpen in the
+// polyglot package).
 func dropSpaceAfterBody(in string) string {
 	r := htmlstream.NewReader(strings.NewReader(in))
 	var drop [][2]int
@@ -676,7 +678,7 @@ func dropSpaceAfterBody(in string) string {
 			}
 			continue
 		case !after && tok.Kind() == htmlstream.EndTag && !tok.Stray() && (tok.Is("body") || tok.Is("html")):
-			after = closed != "" && closed != "body"
+			after = closed != "" && closed != "body" && closed != "head"
 		case after && !other:
 			blank := tok.Kind() == htmlstream.Text && strings.TrimLeft(string(tok.AppendText(nil)), " \t\n\f\r\x00") == ""
 			k := tok.Kind()
