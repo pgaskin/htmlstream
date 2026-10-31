@@ -253,6 +253,17 @@ type Options struct {
 	// output is an error.
 	MaxHold int
 
+	// MaxTokenSize, MaxStackBytes and MaxInputSize, if not zero, set the
+	// limits of the Reader of [Options.NewReader], which [Convert] uses (see
+	// [htmlstream.Reader.SetMaxTokenSize],
+	// [htmlstream.Reader.SetMaxStackBytes] and
+	// [htmlstream.Reader.SetMaxInputSize]). If zero, the Reader's defaults
+	// are used, with no limit on the size of the input. For untrusted input,
+	// set lower ones.
+	MaxTokenSize  int
+	MaxStackBytes int
+	MaxInputSize  int64
+
 	// FinalNewline ends the output with a line break after the html end tag,
 	// which HTML parsers append to the body and XML parsers ignore. A line
 	// break ending whitespace at the end of the body (e.g., the line break
@@ -329,16 +340,24 @@ type Options struct {
 
 // NewReader returns an [htmlstream.Reader] reading r as [Convert] does: in
 // HTML mode with the Reader's defaults, the maximum depth of MaxDepth (with
-// the same default and minimum as the output depth), strict mode with
-// Strict, and XML syntax and scripting with XMLSyntax and Scripting. Other
-// options can be set on it before reading, e.g., to pass its tokens to a
-// [Writer] created with opt, which needs a maximum depth of at least 3.
+// the same default and minimum as the output depth), the limits of
+// MaxTokenSize, MaxStackBytes and MaxInputSize, strict mode with Strict, and
+// XML syntax and scripting with XMLSyntax and Scripting. Other options can be
+// set on it before reading, e.g., to pass its tokens to a [Writer] created
+// with opt, which needs a maximum depth of at least 3.
 func (opt Options) NewReader(r io.Reader) *htmlstream.Reader {
 	rd := htmlstream.NewReader(r)
 	rd.SetStrict(opt.Strict)
 	rd.SetXMLSyntax(opt.XMLSyntax)
 	rd.SetScripting(opt.Scripting)
 	rd.SetMaxDepth(opt.maxDepth())
+	if opt.MaxTokenSize != 0 {
+		rd.SetMaxTokenSize(opt.MaxTokenSize)
+	}
+	if opt.MaxStackBytes != 0 {
+		rd.SetMaxStackBytes(opt.MaxStackBytes)
+	}
+	rd.SetMaxInputSize(opt.MaxInputSize)
 	return rd
 }
 
@@ -1043,12 +1062,13 @@ const (
 //
 // Convert reads the input with the [htmlstream.Reader] of
 // [Options.NewReader]: in HTML mode with the Reader's defaults, the maximum
-// depth of Options.MaxDepth, strict mode with Options.Strict, and XML syntax
-// and scripting with Options.XMLSyntax and Options.Scripting. Without
-// Options.Scripting, noscript contents are converted as markup, as XML
-// parsers read them. To use other Reader options (e.g., lower limits for
-// untrusted input), set them on a Reader from Options.NewReader and pass its
-// tokens to a [Writer].
+// depth of Options.MaxDepth, the limits of Options.MaxTokenSize,
+// Options.MaxStackBytes and Options.MaxInputSize, strict mode with
+// Options.Strict, and XML syntax and scripting with Options.XMLSyntax and
+// Options.Scripting. Without Options.Scripting, noscript contents are
+// converted as markup, as XML parsers read them. To use other Reader
+// options, set them on a Reader from Options.NewReader and pass its tokens
+// to a [Writer].
 //
 // Besides its size, converting a token takes time proportional to at most
 // the number of elements open in the output, for the formatting elements

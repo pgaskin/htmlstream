@@ -37,9 +37,6 @@ type config struct {
 	opt   polyglot.Options
 	quiet bool
 
-	// Reader limits, applied if set
-	maxTokenSize, maxStackBytes *int
-
 	stderr io.Writer
 }
 
@@ -116,15 +113,14 @@ func run(name string, args []string, stdin io.Reader, stdout, stderr io.Writer) 
 	}
 	var invalid error
 	fset.Visit(func(f *flag.Flag) {
-		var p **int
 		var v int
 		switch f.Name {
 		case "max-token-size":
-			p, v = &c.maxTokenSize, *maxTokenSize
+			c.opt.MaxTokenSize, v = *maxTokenSize, *maxTokenSize
 		case "max-depth":
 			c.opt.MaxDepth, v = *maxDepth, *maxDepth
 		case "max-stack-bytes":
-			p, v = &c.maxStackBytes, *maxStackBytes
+			c.opt.MaxStackBytes, v = *maxStackBytes, *maxStackBytes
 		case "max-raw-text":
 			c.opt.MaxRawText, v = *maxRawText, *maxRawText
 		default:
@@ -132,9 +128,6 @@ func run(name string, args []string, stdin io.Reader, stdout, stderr io.Writer) 
 		}
 		if v <= 0 && invalid == nil {
 			invalid = fmt.Errorf("invalid -%s %d: must be positive", f.Name, v)
-		}
-		if p != nil {
-			*p = &v
 		}
 	})
 	if invalid != nil {
@@ -273,12 +266,6 @@ func (c *config) convert(w io.Writer, r io.Reader, name string) error {
 		}
 	}
 	rd := opt.NewReader(lr)
-	if c.maxTokenSize != nil {
-		rd.SetMaxTokenSize(*c.maxTokenSize)
-	}
-	if c.maxStackBytes != nil {
-		rd.SetMaxStackBytes(*c.maxStackBytes)
-	}
 	pw := polyglot.NewWriter(w, opt)
 	err := func() error {
 		for rd.Next() {

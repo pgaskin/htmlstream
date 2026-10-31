@@ -2825,3 +2825,30 @@ d</pre></body></html>`},
 		}
 	}
 }
+
+// TestOptionsReaderLimits checks that the Reader limits of the options apply
+// to the Reader of Options.NewReader, which Convert uses.
+func TestOptionsReaderLimits(t *testing.T) {
+	in := `<div><p class="` + strings.Repeat("x", 100) + `">x</p></div>`
+	for _, tc := range []struct {
+		opt  Options
+		err  error
+		warn string
+	}{
+		{Options{}, nil, ""},
+		{Options{MaxTokenSize: 64}, htmlstream.ErrTokenTooLarge, ""},
+		{Options{MaxStackBytes: 1}, nil, "dropped div nested past the stack limits (MaxDepth or MaxStackBytes)"},
+		{Options{MaxInputSize: 12}, htmlstream.ErrInputTooLarge, ""},
+		{Options{MaxInputSize: int64(len(in))}, nil, ""},
+	} {
+		var warns []string
+		tc.opt.Warn = func(w Warning) { warns = append(warns, w.Msg) }
+		err := Convert(io.Discard, strings.NewReader(in), tc.opt)
+		if tc.err == nil && err != nil || tc.err != nil && !errors.Is(err, tc.err) {
+			t.Errorf("%+v: got error %v, want %v", tc.opt, err, tc.err)
+		}
+		if tc.warn != "" && !slices.Contains(warns, tc.warn) {
+			t.Errorf("%+v: got warnings %q, want %q", tc.opt, warns, tc.warn)
+		}
+	}
+}

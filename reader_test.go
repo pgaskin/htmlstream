@@ -2384,3 +2384,45 @@ func TestAttrAtAllocs(t *testing.T) {
 		t.Errorf("%v allocations", n)
 	}
 }
+
+// TestReaderMaxInputSize checks that input past the maximum input size stops
+// the Reader like a read error at that offset.
+func TestReaderMaxInputSize(t *testing.T) {
+	const in = `<div><p class="xx">x</p></div>`
+	tokens := func(r *Reader) (s []string) {
+		for r.Next() {
+			s = append(s, r.Token().String())
+		}
+		return s
+	}
+	for _, read := range []func(io.Reader) io.Reader{
+		func(r io.Reader) io.Reader { return r },
+		iotest.OneByteReader,
+		iotest.HalfReader,
+	} {
+		for _, n := range []int{0, 1, 5, 12, len(in) - 1, len(in), len(in) + 1} {
+			r := NewReader(read(strings.NewReader(in)))
+			r.SetMaxInputSize(int64(n))
+			got := tokens(r)
+			if n == 0 || n >= len(in) {
+				if r.Err() != nil {
+					t.Errorf("limit %d: %v", n, r.Err())
+				}
+				continue
+			}
+			if !errors.Is(r.Err(), ErrInputTooLarge) || !strings.Contains(r.Err().Error(), "MaxInputSize is "+strconv.Itoa(n)+" bytes") {
+				t.Errorf("limit %d: got error %v", n, r.Err())
+			}
+			e := NewReader(io.MultiReader(strings.NewReader(in[:n]), iotest.ErrReader(errors.New("read"))))
+			if want := tokens(e); !slices.Equal(got, want) {
+				t.Errorf("limit %d: tokens differ from a read error at %d:\n got %q\nwant %q", n, n, got, want)
+			}
+		}
+	}
+
+	x := NewTransformer(io.Discard, strings.NewReader(in))
+	x.SetMaxInputSize(5)
+	if err := x.Close(); !errors.Is(err, ErrInputTooLarge) {
+		t.Errorf("Transformer: got %v", err)
+	}
+}

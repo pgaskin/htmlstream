@@ -261,6 +261,9 @@ func (t *Transformer) SetMaxDepth(n int) { t.r.SetMaxDepth(n) }
 // See [Reader.SetMaxStackBytes].
 func (t *Transformer) SetMaxStackBytes(n int) { t.r.SetMaxStackBytes(n) }
 
+// See [Reader.SetMaxInputSize].
+func (t *Transformer) SetMaxInputSize(n int64) { t.r.SetMaxInputSize(n) }
+
 // See [Reader.SetChunkSize].
 func (t *Transformer) SetChunkSize(n int) { t.r.SetChunkSize(n) }
 

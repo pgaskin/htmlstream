@@ -240,7 +240,10 @@
 // HTML mode. The open elements kept are limited in number and size (see
 // [Reader.SetMaxDepth] and [Reader.SetMaxStackBytes], and [Token.Untracked]
 // for the elements past the limits). The output held back by a Transformer
-// is limited too (see [Transformer.SetMaxHold]).
+// is limited too (see [Transformer.SetMaxHold]). The size of the input isn't
+// limited by default; for untrusted input, set a maximum (see
+// [Reader.SetMaxInputSize]), since the time spent reading is proportional to
+// it.
 //
 // The memory used by a Reader is proportional to its limits. Its buffer
 // holds the largest token read, and the attributes of a tag use memory for
@@ -557,6 +560,11 @@ var (
 	// in UTF-16.
 	ErrUnsupportedEncoding = errors.New("htmlstream: unsupported encoding (utf-16 or utf-32)")
 
+	// ErrInputTooLarge is returned for input longer than the maximum input
+	// size (see [Reader.SetMaxInputSize]). The returned error wraps it with
+	// the maximum size.
+	ErrInputTooLarge = errors.New("htmlstream: input too large")
+
 	// ErrUntrackedLimit is returned when an operation depends on the end of
 	// an untracked element (see [Token.Untracked]) while as many untracked
 	// elements as the maximum depth (see [Reader.SetMaxDepth]) already have
@@ -583,6 +591,11 @@ func (r *Reader) tokenTooLarge() error {
 }
 
 // untrackedLimit returns an error wrapping ErrUntrackedLimit.
+// inputTooLarge returns an error wrapping ErrInputTooLarge.
+func (r *Reader) inputTooLarge() error {
+	return &limitError{ErrInputTooLarge, "htmlstream: input too large (MaxInputSize is " + strconv.FormatInt(r.maxInput, 10) + " bytes)"}
+}
+
 func (r *Reader) untrackedLimit() error {
 	return &limitError{ErrUntrackedLimit, "htmlstream: too many untracked elements (MaxDepth is " + strconv.Itoa(r.maxDepth) + ") with pending operations"}
 }
@@ -653,6 +666,7 @@ type Reader struct {
 	maxToken  int
 	maxDepth  int
 	maxStack  int
+	maxInput  int64 // 0: no limit
 	started   bool
 	bom       bool  // the input starts with a UTF-8 byte order mark
 	xml11     bool  // the XML declaration declares version 1.1
@@ -958,6 +972,21 @@ func (r *Reader) SetMaxDepth(n int) {
 func (r *Reader) SetMaxStackBytes(n int) {
 	r.mustNotStart("SetMaxStackBytes")
 	r.maxStack = max(n, 0)
+}
+
+// SetMaxInputSize sets the maximum size of the input, in bytes read from the
+// [io.Reader]. Input past it stops the Reader with an error
+// ([ErrInputTooLarge]) like an error of the io.Reader: after the tokens for
+// the input before it, and without implied end tags for the open elements.
+// If n is zero or negative (the default), the size of the input isn't
+// limited. It must be called before the first call to Next, and panics
+// otherwise.
+//
+// The other limits bound the memory used, not the time spent reading. For
+// untrusted input, set it to the largest document expected.
+func (r *Reader) SetMaxInputSize(n int64) {
+	r.mustNotStart("SetMaxInputSize")
+	r.maxInput = max(n, 0)
 }
 
 // SetChunkSize sets the size at which text, comments and CDATA sections are
@@ -1400,7 +1429,18 @@ func (r *Reader) fill() bool {
 		r.buf = nb
 	}
 	for range 100 {
-		n, err := r.src.Read(r.buf[r.end:])
+		b := r.buf[r.end:]
+		if r.maxInput > 0 {
+			// read at most one byte past the limit, to see if there is more
+			if left := r.maxInput - r.off - int64(r.end) + 1; left < int64(len(b)) {
+				b = b[:left]
+			}
+		}
+		n, err := r.src.Read(b)
+		if r.maxInput > 0 && r.off+int64(r.end+n) > r.maxInput {
+			n = int(r.maxInput - r.off - int64(r.end))
+			err = r.inputTooLarge()
+		}
 		r.end += n
 		if err != nil {
 			r.srcErr = err
