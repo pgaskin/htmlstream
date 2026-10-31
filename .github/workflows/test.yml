@@ -14,9 +14,6 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: internal/difffuzz
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
