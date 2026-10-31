@@ -285,7 +285,7 @@ func (t *Transformer) Stack() iter.Seq[Element] { return t.r.Stack() }
 func (t *Transformer) LookupPrefix(prefix string) (string, bool) { return t.r.LookupPrefix(prefix) }
 
 // See [Reader.Skip].
-func (t *Transformer) Skip() error { return t.r.Skip() }
+func (t *Transformer) Skip() { t.r.Skip() }
 
 // See [Reader.Children].
 func (t *Transformer) Children() iter.Seq[*Token] { return t.r.Children() }
@@ -301,6 +301,11 @@ func (t *Transformer) ReadText(dst []byte, limit int) ([]byte, bool) { return t.
 // output and returns the first error encountered. It doesn't close the
 // [io.Writer] passed to [NewTransformer]. Calling Close again returns the
 // same error, and writes nothing more unless InsertAtEnd was called since.
+//
+// The error is the one returned by [Transformer.Err], if any (e.g., an error
+// of the [io.Reader], a limit error, or in strict mode a [SyntaxError]), or
+// else an error of the [io.Writer], which is only reported when the output is
+// flushed.
 func (t *Transformer) Close() error {
 	for t.Next() {
 	}
@@ -385,7 +390,12 @@ func (t *Transformer) Held(h Hold) []byte {
 }
 
 // HoldRelease ends the hold h, writing the output held back (or keeping it in
-// the enclosing hold). See [Transformer.Hold] for the errors.
+// the enclosing hold).
+//
+// It returns the error which stopped the Transformer (i.e.,
+// [Transformer.Err]), if any, or else an error wrapping [ErrInvalidOp] for the
+// zero Hold, a hold of another Transformer or a hold with an open hold inside
+// it, or [ErrHoldReleased] for a hold which has ended.
 func (t *Transformer) HoldRelease(h Hold) error {
 	i, err := t.holdEnd("HoldRelease", h)
 	if err != nil {
@@ -411,7 +421,11 @@ func (t *Transformer) HoldRelease(h Hold) error {
 // elements without such edits are written as usual, like after Replace(nil)
 // on the start tag: use Remove on the end tag to drop it.
 //
-// See [Transformer.Hold] for the other errors.
+// It returns the error which stopped the Transformer (i.e.,
+// [Transformer.Err]), if any, or else an error wrapping [ErrInvalidOp] for the
+// zero Hold, a hold of another Transformer or a hold with an open hold inside
+// it, [ErrHoldReleased] for a hold which has ended, [ErrHeldOpen] as described
+// above, or [ErrHoldLimit] if raw makes the enclosing hold exceed the limit.
 func (t *Transformer) HoldDiscard(h Hold, raw []byte) error {
 	i, err := t.holdEnd("HoldDiscard", h)
 	if err != nil {
@@ -624,6 +638,12 @@ func (t *Transformer) rec(f *frame) *frameRec {
 // [Transformer.Rename] and [Transformer.Empty].
 //
 // The current token can be of any kind.
+//
+// It returns the error which stopped the Transformer (i.e.,
+// [Transformer.Err]), if any, or else an error wrapping [ErrInvalidOp] if
+// there is no current token, or at a start tag which opens an element,
+// [ErrUntrackedLimit] or an error which stopped the Transformer while skipping
+// the element's contents (e.g., a read error).
 func (t *Transformer) Remove() error {
 	c, err := t.current("removal")
 	if err != nil {
@@ -661,6 +681,10 @@ func (t *Transformer) skipToEnd(depth int) error {
 // start tag which opens an element, only the start tag is replaced.
 //
 // The current token can be of any kind.
+//
+// It returns the error which stopped the Transformer (i.e.,
+// [Transformer.Err]), if any, or else an error wrapping [ErrInvalidOp] if
+// there is no current token.
 func (t *Transformer) Replace(raw []byte) error {
 	if _, err := t.current("replacement"); err != nil {
 		return err
@@ -674,6 +698,10 @@ func (t *Transformer) Replace(raw []byte) error {
 // start tag (see [Transformer.Wrap]).
 //
 // The current token can be of any kind.
+//
+// It returns the error which stopped the Transformer (i.e.,
+// [Transformer.Err]), if any, or else an error wrapping [ErrInvalidOp] if
+// there is no current token.
 func (t *Transformer) InsertBefore(raw []byte) error {
 	if _, err := t.current("insertion"); err != nil {
 		return err
@@ -703,6 +731,11 @@ func (t *Transformer) InsertBefore(raw []byte) error {
 // [AppendEndTag]).
 //
 // The current token can be of any kind.
+//
+// It returns the error which stopped the Transformer (i.e.,
+// [Transformer.Err]), if any, or else an error wrapping [ErrInvalidOp] if
+// there is no current token, or at the start tag of a void element under XML
+// rules or with XML syntax, [ErrUntrackedLimit].
 func (t *Transformer) InsertAfter(raw []byte) error {
 	c, err := t.current("insertion")
 	if err != nil {
@@ -734,6 +767,12 @@ func (t *Transformer) opensVoid(c *Token) bool {
 // element's end tag, keeping the element's contents.
 //
 // The current token must be a start tag.
+//
+// It returns the error which stopped the Transformer (i.e.,
+// [Transformer.Err]), if any, or else an error wrapping [ErrInvalidOp] if the
+// current token isn't a start tag, [ErrIncompleteTag] if it was cut off by the
+// end of the input, or in strict mode, the [SyntaxError] of an unsound start
+// tag (see [Token.UnsoundError]), or [ErrUntrackedLimit].
 func (t *Transformer) Unwrap() error {
 	if _, err := t.startTag("unwrap"); err != nil {
 		return err
@@ -767,6 +806,12 @@ func (t *Transformer) Unwrap() error {
 // replace the implied end tag with an end tag (see [AppendEndTag]).
 //
 // The current token must be a start tag.
+//
+// It returns the error which stopped the Transformer (i.e.,
+// [Transformer.Err]), if any, or else an error wrapping [ErrInvalidOp] if the
+// current token isn't a start tag, [ErrIncompleteTag] if it was cut off by the
+// end of the input, or in strict mode, the [SyntaxError] of an unsound start
+// tag (see [Token.UnsoundError]), or [ErrUntrackedLimit].
 func (t *Transformer) Wrap(start, end []byte) error {
 	if _, err := t.startTag("wrap"); err != nil {
 		return err
@@ -795,6 +840,12 @@ func (t *Transformer) Wrap(start, end []byte) error {
 // <br>x</br>, see [Transformer.Remove]) isn't renamed.
 //
 // The current token must be a start tag.
+//
+// It returns the error which stopped the Transformer (i.e.,
+// [Transformer.Err]), if any, or else an error wrapping [ErrInvalidOp] if the
+// current token isn't a start tag, [ErrIncompleteTag] if it was cut off by the
+// end of the input, or in strict mode, the [SyntaxError] of an unsound start
+// tag (see [Token.UnsoundError]), or [ErrUntrackedLimit].
 func (t *Transformer) Rename(name string) error {
 	if _, err := t.startTag("rename"); err != nil {
 		return err
@@ -817,6 +868,10 @@ func (t *Transformer) Rename(name string) error {
 // RenameEnd renames the current end tag. Implied end tags are not written.
 //
 // The current token must be an end tag.
+//
+// It returns the error which stopped the Transformer (i.e.,
+// [Transformer.Err]), if any, or else an error wrapping [ErrInvalidOp] if the
+// current token isn't an end tag.
 func (t *Transformer) RenameEnd(name string) error {
 	if _, err := t.current("end tag rename", EndTag); err != nil {
 		return err
@@ -841,6 +896,12 @@ func (t *Transformer) RenameEnd(name string) error {
 // written as <br></br>), since <br>x</br> isn't one element.
 //
 // The current token must be a start tag.
+//
+// It returns the error which stopped the Transformer (i.e.,
+// [Transformer.Err]), if any, or else an error wrapping [ErrInvalidOp] if the
+// current token isn't a start tag, [ErrIncompleteTag] if it was cut off by the
+// end of the input, or in strict mode, the [SyntaxError] of an unsound start
+// tag (see [Token.UnsoundError]).
 func (t *Transformer) ExpandSelfClosing() error {
 	c, err := t.startTag("self-closing tag expansion")
 	if err != nil {
@@ -898,6 +959,14 @@ func xmlVoid(c *Token) bool {
 // the output, after the contents following the element.
 //
 // The current token must be a start tag.
+//
+// It returns the error which stopped the Transformer (i.e.,
+// [Transformer.Err]), if any, or else an error wrapping [ErrInvalidOp] if the
+// current token isn't a start tag, [ErrIncompleteTag] if it was cut off by the
+// end of the input, or in strict mode, the [SyntaxError] of an unsound start
+// tag (see [Token.UnsoundError]), [ErrUntrackedLimit], or an error which
+// stopped the Transformer while skipping the element's contents (e.g., a read
+// error).
 func (t *Transformer) Empty() error {
 	c, err := t.startTag("emptying")
 	if err != nil {
@@ -938,6 +1007,12 @@ func (t *Transformer) Empty() error {
 // escaped as described in [Transformer].
 //
 // The current token must be a start tag.
+//
+// It returns the error which stopped the Transformer (i.e.,
+// [Transformer.Err]), if any, or else an error wrapping [ErrInvalidOp] if the
+// current token isn't a start tag, [ErrIncompleteTag] if it was cut off by the
+// end of the input, or in strict mode, the [SyntaxError] of an unsound start
+// tag (see [Token.UnsoundError]).
 func (t *Transformer) SetAttr(name, value string) error {
 	c, err := t.startTag("attribute edit")
 	if err != nil {
@@ -974,6 +1049,12 @@ func (t *Transformer) SetAttr(name, value string) error {
 // SetAttrAt returns an error wrapping [ErrInvalidOp].
 //
 // The current token must be a start tag.
+//
+// It returns the error which stopped the Transformer (i.e.,
+// [Transformer.Err]), if any, or else an error wrapping [ErrInvalidOp] if the
+// current token isn't a start tag or at is out of range, [ErrIncompleteTag] if
+// it was cut off by the end of the input, or in strict mode, the [SyntaxError]
+// of an unsound start tag (see [Token.UnsoundError]).
 func (t *Transformer) SetAttrAt(name, value string, at int) error {
 	c, err := t.startTag("attribute edit")
 	if err != nil {
@@ -1020,6 +1101,12 @@ func (t *Transformer) addAttr(name, value string, at int32) {
 // start tag to newName, keeping their position and value.
 //
 // The current token must be a start tag.
+//
+// It returns the error which stopped the Transformer (i.e.,
+// [Transformer.Err]), if any, or else an error wrapping [ErrInvalidOp] if the
+// current token isn't a start tag, [ErrIncompleteTag] if it was cut off by the
+// end of the input, or in strict mode, the [SyntaxError] of an unsound start
+// tag (see [Token.UnsoundError]).
 func (t *Transformer) RenameAttr(name, newName string) error {
 	c, err := t.startTag("attribute edit")
 	if err != nil {
@@ -1044,6 +1131,12 @@ func (t *Transformer) RenameAttr(name, newName string) error {
 // current start tag.
 //
 // The current token must be a start tag.
+//
+// It returns the error which stopped the Transformer (i.e.,
+// [Transformer.Err]), if any, or else an error wrapping [ErrInvalidOp] if the
+// current token isn't a start tag, [ErrIncompleteTag] if it was cut off by the
+// end of the input, or in strict mode, the [SyntaxError] of an unsound start
+// tag (see [Token.UnsoundError]).
 func (t *Transformer) RemoveAttr(name string) error {
 	return t.removeAttrs(func(a Attr) bool { return a.Is(name) })
 }
@@ -1053,6 +1146,12 @@ func (t *Transformer) RemoveAttr(name string) error {
 // edited or added attribute passed to fn is only valid during the call.
 //
 // The current token must be a start tag.
+//
+// It returns the error which stopped the Transformer (i.e.,
+// [Transformer.Err]), if any, or else an error wrapping [ErrInvalidOp] if the
+// current token isn't a start tag, [ErrIncompleteTag] if it was cut off by the
+// end of the input, or in strict mode, the [SyntaxError] of an unsound start
+// tag (see [Token.UnsoundError]).
 func (t *Transformer) RemoveAttrs(fn func(Attr) bool) error {
 	return t.removeAttrs(fn)
 }

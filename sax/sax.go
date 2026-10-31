@@ -1117,50 +1117,44 @@ func doctype(t *htmlstream.Token) []byte {
 // Skip advances to the EndElement event of the element of the current
 // StartElement event, skipping the events in it, including Warning events.
 // At an Untracked event of a start tag, it likewise advances to the
-// Untracked event of the end tag of its element. It stops at a SyntaxError
-// event in strict mode, returning the error. Otherwise, it returns Err. At
-// other events, Skip does nothing.
-func (s *Reader) Skip() error {
+// Untracked event of the end tag of its element. It stops at an error,
+// including a SyntaxError event in strict mode, which Err returns. At other
+// events, Skip does nothing.
+func (s *Reader) Skip() {
 	switch s.ev.Kind {
 	case StartElement:
-		return s.skipTo(len(s.path))
+		s.skipTo(len(s.path))
 	case Untracked:
 		if t := s.ev.tok; t.Kind() == htmlstream.StartTag && t.Opens() {
-			return s.skipUntracked()
+			s.skipUntracked()
 		}
 	}
-	return nil
 }
 
 // skipTo advances to the EndElement event of the element at depth in the
 // path, or to a SyntaxError event.
-func (s *Reader) skipTo(depth int) error {
+func (s *Reader) skipTo(depth int) {
 	for s.Next() {
-		switch {
-		case s.ev.Kind == EndElement && len(s.path) == depth:
-			return nil
-		case s.ev.Kind == SyntaxError:
-			return s.err
+		if s.ev.Kind == EndElement && len(s.path) == depth || s.ev.Kind == SyntaxError {
+			return
 		}
 	}
-	return s.err
 }
 
 // skipUntracked advances from the Untracked event of a start tag to the
 // Untracked event of the end tag of its element, or to a SyntaxError event.
-func (s *Reader) skipUntracked() error {
+func (s *Reader) skipUntracked() {
 	level := s.untracked - 1
 	for s.Next() {
 		switch ev := &s.ev; ev.Kind {
 		case Untracked:
 			if t := ev.tok; t.Kind() == htmlstream.EndTag && !t.Stray() && s.untracked == level {
-				return nil
+				return
 			}
 		case SyntaxError:
-			return s.err
+			return
 		}
 	}
-	return s.err
 }
 
 // ReadText appends the text of the element of the current StartElement

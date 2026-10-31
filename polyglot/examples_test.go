@@ -122,9 +122,7 @@ func ExampleWriter() {
 		switch tok.Kind() {
 		case htmlstream.StartTag:
 			if tok.Is("script") {
-				if err := r.Skip(); err != nil {
-					panic(err)
-				}
+				r.Skip()
 				continue
 			}
 			if tok.Is("font") || tok.Is("span") {

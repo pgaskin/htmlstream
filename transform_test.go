@@ -1405,7 +1405,8 @@ func TestTransformHold(t *testing.T) {
 			switch {
 			case tok.Kind() == StartTag && tok.Is("b"):
 				h = x.Hold()
-				return x.Skip()
+				x.Skip()
+				return x.Err()
 			case tok.Kind() == Text && string(tok.Raw()) == "d":
 				return x.HoldDiscard(h, append([]byte("<!--s-->"), x.Held(h)...))
 			}

@@ -306,6 +306,7 @@ func InnerText(r *htmlstream.Reader, opt TextOptions) (s string, truncated bool)
 // template contents. It is InnerText with
 // TextOptions{KeepWhitespace: true, Hidden: true, Max: limit}: if limit is
 // positive, the text is truncated to limit bytes, and TextContent reports it.
+// Read errors are returned by the Reader's Err method.
 //
 // [textContent]: https://dom.spec.whatwg.org/#dom-node-textcontent
 func TextContent(r *htmlstream.Reader, limit int) (s string, truncated bool) {

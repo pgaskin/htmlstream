@@ -1853,15 +1853,15 @@ func TestUntracked(t *testing.T) {
 	r := NewReader(strings.NewReader(`<a><b></b>x</a>y`))
 	r.SetMaxDepth(1)
 	r.Next()
-	if err := r.Skip(); err != nil || !r.Token().Is("a") || r.Token().StartPos() != 0 {
-		t.Errorf("Skip: %v, stopped at %v", err, r.Token())
+	if r.Skip(); r.Err() != nil || !r.Token().Is("a") || r.Token().StartPos() != 0 {
+		t.Errorf("Skip: %v, stopped at %v", r.Err(), r.Token())
 	}
 	r = NewReader(strings.NewReader(`<div xmlns:a="` + long + `"><b>x</b></div>`))
 	r.SetMaxStackBytes(50)
 	r.Next()
 	r.Next()
-	if err := r.Skip(); err != nil || !r.Token().Is("b") || r.Token().Implied() {
-		t.Errorf("Skip above an untracked element: %v, stopped at %v", err, r.Token())
+	if r.Skip(); r.Err() != nil || !r.Token().Is("b") || r.Token().Implied() {
+		t.Errorf("Skip above an untracked element: %v, stopped at %v", r.Err(), r.Token())
 	}
 	// Skip and Children on untracked elements stop at the end tag at the
 	// same depth.
@@ -1869,8 +1869,8 @@ func TestUntracked(t *testing.T) {
 	r.SetMaxDepth(1)
 	r.Next()
 	r.Next()
-	if err := r.Skip(); err != nil || r.Token().Kind() != EndTag || string(r.Token().Raw()) != "</b>" {
-		t.Errorf("Skip on an untracked element: %v, stopped at %v", err, r.Token())
+	if r.Skip(); r.Err() != nil || r.Token().Kind() != EndTag || string(r.Token().Raw()) != "</b>" {
+		t.Errorf("Skip on an untracked element: %v, stopped at %v", r.Err(), r.Token())
 	}
 	r.Next()
 	if tok := r.Token(); tok.Kind() != Text || string(tok.Raw()) != "z" {
@@ -1904,7 +1904,8 @@ func TestUntracked(t *testing.T) {
 		r.SetStrict(true)
 		r.Next()
 		r.Next()
-		err := r.Skip()
+		r.Skip()
+		err := r.Err()
 		var se *SyntaxError
 		if tc.err != errors.As(err, &se) {
 			t.Errorf("%q: strict Skip on an untracked element: %v", tc.in, err)
@@ -1941,8 +1942,8 @@ func TestUntracked(t *testing.T) {
 	r.SetStrict(true)
 	for r.Next() && !r.Token().Is("br") {
 	}
-	if err := r.Skip(); err != nil || !r.Token().Implied() {
-		t.Errorf("strict Skip on an untracked void element: %v, stopped at %v", err, r.Token())
+	if r.Skip(); r.Err() != nil || !r.Token().Implied() {
+		t.Errorf("strict Skip on an untracked void element: %v, stopped at %v", r.Err(), r.Token())
 	}
 	// Depth counts the untracked elements, and drops after their end tags.
 	// A void sibling of an untracked element has the same depth.
@@ -2021,8 +2022,8 @@ func TestStrictSoundImplied(t *testing.T) {
 		r.SetStrict(true)
 		for r.Next() && r.Token().Kind() != StartTag {
 		}
-		if err := r.Skip(); err != nil || r.Err() != nil || !r.Token().Implied() || r.Token().Unsound() {
-			t.Errorf("%s %q: Skip: %v, %v, stopped at %v", tc.mode, tc.in, err, r.Err(), r.Token())
+		if r.Skip(); r.Err() != nil || !r.Token().Implied() || r.Token().Unsound() {
+			t.Errorf("%s %q: Skip: %v, stopped at %v", tc.mode, tc.in, r.Err(), r.Token())
 		}
 	}
 }

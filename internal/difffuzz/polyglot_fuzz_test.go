@@ -457,7 +457,7 @@ func FuzzPolyglotWriter(f *testing.F) {
 				if unwrap {
 					sound = sound && unwrapSound(rd, in)
 					left.Push(tok, struct{}{})
-				} else if err := rd.Skip(); err != nil {
+				} else if rd.Skip(); rd.Err() != nil {
 					return
 				}
 				continue

@@ -111,9 +111,7 @@ func ExampleReader_Skip() {
 		switch tok.Kind() {
 		case htmlstream.StartTag:
 			if tok.Is("script") || tok.Is("style") {
-				if err := r.Skip(); err != nil {
-					panic(err)
-				}
+				r.Skip()
 			}
 		case htmlstream.Text:
 			text = tok.AppendText(text)
@@ -282,7 +280,8 @@ func ExampleReader_SetStrict() {
 		if !r.Find(htmlstream.Tag("span")) {
 			panic("no span")
 		}
-		if err := r.Skip(); err != nil {
+		r.Skip()
+		if err := r.Err(); err != nil {
 			var serr *htmlstream.SyntaxError
 			if errors.As(err, &serr) {
 				fmt.Printf("strict=%t: %s at offset %d\n", strict, serr.Msg, serr.Pos)

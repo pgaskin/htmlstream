@@ -115,8 +115,8 @@ func TestUntracked(t *testing.T) {
 	s.Next()
 	s.Next()
 	s.Next()
-	if err := s.Skip(); err != nil || dumpEvent(s.Event()) != "~</c>" || s.Next() && dumpEvent(s.Event()) != `"v"` {
-		t.Errorf("Skip at an untracked start tag: %v, %s", err, dumpEvent(s.Event()))
+	if s.Skip(); s.Err() != nil || dumpEvent(s.Event()) != "~</c>" || s.Next() && dumpEvent(s.Event()) != `"v"` {
+		t.Errorf("Skip at an untracked start tag: %v, %s", s.Err(), dumpEvent(s.Event()))
 	}
 
 	var v struct {
@@ -375,8 +375,8 @@ func TestSkipReadText(t *testing.T) {
 
 	_, s = newReader(htmlstream.XML, `<a><b>x<c/>y</b>z</a>`)
 	s.Next()
-	if err := s.Skip(); err != nil || s.Event().Kind != EndElement || s.Event().Name.Local != "a" || s.Next() {
-		t.Errorf("Skip: %v, %s", err, dumpEvent(s.Event()))
+	if s.Skip(); s.Err() != nil || s.Event().Kind != EndElement || s.Event().Name.Local != "a" || s.Next() {
+		t.Errorf("Skip: %v, %s", s.Err(), dumpEvent(s.Event()))
 	}
 	_, s = newReader(htmlstream.XML, `<a><b>x</b>z</a>`)
 	s.Next()
@@ -385,15 +385,15 @@ func TestSkipReadText(t *testing.T) {
 	if s.Next(); string(s.Event().Text) != "z" || s.Depth() != 1 {
 		t.Errorf("after Skip: %s, depth %d", dumpEvent(s.Event()), s.Depth())
 	}
-	if err := s.Skip(); err != nil || string(s.Event().Text) != "z" {
-		t.Errorf("Skip at text: %v, %s", err, dumpEvent(s.Event()))
+	if s.Skip(); s.Err() != nil || string(s.Event().Text) != "z" {
+		t.Errorf("Skip at text: %v, %s", s.Err(), dumpEvent(s.Event()))
 	}
 
 	_, s = newReader(htmlstream.XML, `<a><b>x</c></b></a>`)
 	s.SetStrict(true)
 	s.Next()
-	if err := s.Skip(); err == nil || err != s.Err() || s.Event().Kind != SyntaxError {
-		t.Errorf("strict Skip: %v, %s", err, dumpEvent(s.Event()))
+	if s.Skip(); s.Err() == nil || s.Event().Kind != SyntaxError {
+		t.Errorf("strict Skip: %v, %s", s.Err(), dumpEvent(s.Event()))
 	}
 }
 

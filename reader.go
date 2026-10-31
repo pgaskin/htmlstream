@@ -40,6 +40,13 @@
 // to the element's end tag, and [Reader.Children] iterates over the tokens
 // inside the element.
 //
+// Errors are sticky: the Reader stops at the first one, and the methods which
+// read (Next, Find, Skip, ReadText, Children and All) and the functions
+// reading through a Reader (e.g.,
+// [github.com/pgaskin/htmlstream/htmlutil.InnerText]) have no error result.
+// Check [Reader.Err] after them, or once at the end, since it also reports a
+// read error which cut off text read earlier.
+//
 // [github.com/pgaskin/htmlstream/sax] delivers balanced element events (and
 // encoding/xml tokens) instead of tokens,
 // [github.com/pgaskin/htmlstream/htmlutil] reads the text of elements and
@@ -969,6 +976,17 @@ func (r *Reader) mustNotStart(fn string) {
 		panic("htmlstream: " + fn + " called after Next")
 	}
 }
+
+// NOTE (mine, not the LLM's): The methods which only read (Next, Find, Skip,
+// ReadText, Children, All) and the functions reading through a Reader (e.g.,
+// htmlutil.InnerText) do not return their own errors. Errors are sticky and
+// reported by Err (and by Close for a Transformer) instead since an error
+// result on each of them would add a lot of boilerplate, make it unclear
+// whether the operation itself can fail or only the I/O (especially for the
+// transformer's methods), and be error-prone to use, since every call would
+// need to be checked. For the transformer, some of the methods have error
+// returns, but they're mostly non-sticky [ErrInvalidOp] ones (or the sticky
+// error if there is one).
 
 // Err returns the first error encountered, or nil at the end of the input.
 // An error of the [io.Reader] is returned as it is, after the tokens for the
@@ -4426,24 +4444,22 @@ func (r *Reader) atEnd(depth int) bool {
 
 // Skip advances to the end tag of the element opened by the current start
 // tag, which may be untracked (see [Token.Untracked]). If the current token
-// doesn't open an element, Skip does nothing. It returns the error which
-// stopped the Reader, if any (see [Reader.Err]), including the SyntaxError of
-// strict mode.
-func (r *Reader) Skip() error {
+// doesn't open an element, Skip does nothing. It stops at an error, including
+// the SyntaxError of strict mode, which Err returns.
+func (r *Reader) Skip() {
 	depth, err := r.elementStart()
 	if err != nil {
 		r.err = err
-		return err
+		return
 	}
 	if depth == 0 {
-		return r.err
+		return
 	}
 	for r.Next() {
 		if r.atEnd(depth) {
-			return nil
+			return
 		}
 	}
-	return r.err
 }
 
 // Children returns an iterator over the tokens inside the element opened by
