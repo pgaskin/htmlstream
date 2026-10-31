@@ -259,6 +259,29 @@ the cut off end tag ends the double escape
 <html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><iframe src="x"></iframe><iframe src="y"></iframe></body></html>
 -- warn --
 14: dropped contents of iframe
+-- IframeSpace --
+Whitespace-only contents of iframe, noembed and noframes are kept: HTML
+parsers read them as raw text and XML parsers as text.
+-- in --
+<head><noframes>
+</noframes></head><iframe src=x>
+</iframe><noembed> </noembed>
+-- out --
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><noframes>
+</noframes></head><body><iframe src="x">
+</iframe><noembed> </noembed></body></html>
+-- IframeSpaceDropped htmldiff --
+The leading whitespace of other contents is dropped with them.
+-- in --
+<iframe>
+ fallback
+</iframe>
+-- out --
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><iframe></iframe></body></html>
+-- warn --
+8: dropped contents of iframe
 -- XmpPlaintextNewline htmldiff --
 HTML parsers keep a leading newline in xmp and plaintext, which pre can't
 represent.

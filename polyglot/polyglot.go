@@ -1185,6 +1185,9 @@ const (
 //   - xmp and plaintext are converted to pre. A leading newline in them,
 //     which HTML parsers keep, is removed with a warning, since pre can't
 //     represent it.
+//   - The contents of iframe, noembed and noframes, which HTML parsers read
+//     as text and XML parsers as markup, are dropped, with a warning, unless
+//     they are whitespace only, which both read the same.
 //   - Tags cut off by the end of the input, which HTML parsers drop, are
 //     dropped.
 //   - xmlns attributes are only written on html, svg and math and on HTML
@@ -4423,10 +4426,22 @@ func (p *polyglot) textToken(tok *htmlstream.Token, start, end int) {
 		return
 	}
 	if top := p.top(); top != nil && (top.name == "iframe" || top.name == "noembed" || top.name == "noframes") && top.ns == "" {
-		if !ascii.IsBlank(b) && !p.warned {
+		// whitespace-only contents are written: HTML parsers read them as
+		// raw text and XML parsers as text, which is the same. Other
+		// contents are dropped, with the leading whitespace, which is held
+		// back until other text or the end of the text (see spaceHold)
+		if p.warned {
+			return
+		}
+		if b = p.spaceHold(tok, b); b == nil {
+			return
+		}
+		if !ascii.IsBlank(b) {
 			p.warned = true
 			p.warn(p.pos, "dropped contents of %s", top.name)
+			return
 		}
+		p.textPart(tok, b, false)
 		return
 	}
 	// noscript contents read as raw text (with scripting enabled) are

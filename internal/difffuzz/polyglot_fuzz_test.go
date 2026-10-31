@@ -359,6 +359,7 @@ var writerFound = []modeSeed{
 	{"</BodY><!DOCTYPE><!0", '`'}, // a known difference (rewritten by specDoctypes)
 	{"<<!DOCTYPE>A", '\\'},
 	{"<html></heAd><heAd></html><!0", 0x00},
+	{"<ifrAme> ", 0x97}, // whitespace-only iframe contents
 }
 
 // hooksFound are inputs and modes which found bugs with FuzzPolyglotHooks.
