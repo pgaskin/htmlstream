@@ -1,5 +1,9 @@
 # htmlstream
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/pgaskin/htmlstream.svg)](https://pkg.go.dev/github.com/pgaskin/htmlstream)
+[![Test](https://github.com/pgaskin/htmlstream/actions/workflows/test.yml/badge.svg)](https://github.com/pgaskin/htmlstream/actions/workflows/test.yml)
+[![Fuzz](https://github.com/pgaskin/htmlstream/actions/workflows/fuzz.yml/badge.svg)](https://github.com/pgaskin/htmlstream/actions/workflows/fuzz.yml)
+
 Go library for robust streaming html/xhtml/xml parsing and transformation, suitable for untrusted/malformed input.
 
 #### Features
