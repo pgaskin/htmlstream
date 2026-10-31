@@ -67,7 +67,8 @@ import (
 // Errors are sticky and can be retrieved with Err or Close, except
 // [ErrInvalidOp], [ErrIncompleteTag], [ErrHeldOpen] and [ErrHoldReleased],
 // which only mean the operation wasn't done. On error, the output is
-// incomplete.
+// incomplete. [Transformer.Fail] stops the Transformer with an error of the
+// caller, so that Close writes nothing more.
 //
 // [attribute-value normalization]: https://www.w3.org/TR/2006/REC-xml-20060816/#AVNormalize
 // [preprocessing the input stream]: https://html.spec.whatwg.org/multipage/parsing.html#preprocessing-the-input-stream
@@ -298,9 +299,11 @@ func (t *Transformer) ReadText(dst []byte, limit int) ([]byte, bool) { return t.
 
 // Close writes the remaining tokens, the output still held back (see
 // [Transformer.Hold]) and anything inserted with InsertAtEnd, flushes the
-// output and returns the first error encountered. It doesn't close the
-// [io.Writer] passed to [NewTransformer]. Calling Close again returns the
-// same error, and writes nothing more unless InsertAtEnd was called since.
+// output and returns the first error encountered. After an error, including
+// one given to [Transformer.Fail], it writes nothing more and doesn't flush
+// the output, which is incomplete. It doesn't close the [io.Writer] passed to
+// [NewTransformer]. Calling Close again returns the same error, and writes
+// nothing more unless InsertAtEnd was called since.
 //
 // The error is the one returned by [Transformer.Err], if any (e.g., an error
 // of the [io.Reader], a limit error, or in strict mode a [SyntaxError]), or
@@ -319,6 +322,27 @@ func (t *Transformer) Close() error {
 	}
 	return t.r.err
 }
+
+// Fail stops the Transformer with err, for errors of the caller (e.g., a
+// value it can't parse). If the Transformer has already stopped with an
+// error (see [Transformer.Err]), Fail does nothing and that error is kept,
+// and a nil err does nothing. Otherwise, err is sticky like other errors:
+// Next returns false, the edits and Close return it, and Close writes nothing
+// more.
+//
+// Calling Fail with the function's error and then Close in a deferred
+// function makes the function return the first error: an error of the input
+// or the output before the caller's (e.g., a read error which cut off the
+// text the caller failed to parse), or else the caller's, and stops writing
+// after the caller's error (see the example).
+//
+// To write the rest of the output after an error of the caller, don't give
+// that error to Fail: e.g., call Fail where the errors which stop the output
+// are returned, instead of in the deferred function. This also applies to an
+// error returned after reading all of the input, since after Fail, Close
+// writes nothing more: not the output still held back, the markup inserted
+// with InsertAtEnd, or the output not yet flushed to the [io.Writer].
+func (t *Transformer) Fail(err error) { t.setErr(err) }
 
 // InsertAtEnd writes raw at the end of the output, after the last token, when
 // the Transformer is closed. After an error, which Close returns, it does

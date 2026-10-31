@@ -212,11 +212,17 @@ func ExampleInnerText() {
 	r := htmlstream.NewReader(strings.NewReader(page))
 	r.Find(htmlstream.Tag("article"))
 	text, _ := htmlutil.InnerText(r, htmlutil.TextOptions{})
+	if err := r.Err(); err != nil {
+		panic(err)
+	}
 	fmt.Printf("%s\n---\n", text)
 
 	r = htmlstream.NewReader(strings.NewReader(page))
 	r.Find(htmlstream.Tag("article"))
 	text, _ = htmlutil.TextContent(r, 0)
+	if err := r.Err(); err != nil {
+		panic(err)
+	}
 	fmt.Printf("%q\n", htmlutil.CollapseSpace(text))
 	// Output:
 	// Fish & chips

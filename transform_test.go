@@ -1761,6 +1761,62 @@ func FuzzTransformHold(f *testing.F) {
 	})
 }
 
+// TestTransformFail checks that Fail stops the Transformer: Close returns the
+// first error and writes nothing more.
+func TestTransformFail(t *testing.T) {
+	errCaller := errors.New("caller")
+	errRead := errors.New("read")
+
+	var b bytes.Buffer
+	x := NewTransformer(&b, strings.NewReader(`<p>a<b>b</b>c</p>`))
+	x.Next()
+	x.InsertAtEnd([]byte("<!--end-->"))
+	x.Next()
+	x.Hold()
+	x.Next()
+	x.Fail(errCaller)
+	x.Fail(errRead) // the first error is kept
+	if x.Next() || x.Err() != errCaller {
+		t.Errorf("after Fail: Next returned true or Err is %v", x.Err())
+	}
+	if err := x.SetAttr("x", "y"); err != errCaller {
+		t.Errorf("SetAttr after Fail: got %v", err)
+	}
+	if err := x.Close(); err != errCaller || b.Len() != 0 {
+		t.Errorf("Close after Fail: got %v, wrote %q", err, b.String())
+	}
+
+	// a read error before the caller's error is kept
+	b.Reset()
+	x = NewTransformer(&b, io.MultiReader(strings.NewReader(`<p>a`), iotest.ErrReader(errRead)))
+	for x.Next() {
+	}
+	x.Fail(errCaller)
+	if err := x.Close(); err != errRead {
+		t.Errorf("Close after a read error and Fail: got %v", err)
+	}
+
+	// Fail(nil) does nothing
+	b.Reset()
+	x = NewTransformer(&b, strings.NewReader(`<p>a</p>`))
+	x.Next()
+	x.Fail(nil)
+	if err := x.Close(); err != nil || b.String() != `<p>a</p>` {
+		t.Errorf("Close after Fail(nil): got %v, wrote %q", err, b.String())
+	}
+
+	// the output already flushed stays, the rest isn't written
+	b.Reset()
+	in := strings.Repeat("<p>a</p>", 1024) + "<p>tail</p>"
+	x = NewTransformer(&b, strings.NewReader(in))
+	for x.Next() && !bytes.Contains(x.Token().Raw(), []byte("tail")) {
+	}
+	x.Fail(errCaller)
+	if err := x.Close(); err != errCaller || b.Len() == 0 || !strings.HasPrefix(in, b.String()) || strings.Contains(b.String(), "tail") {
+		t.Errorf("Close after Fail with flushed output: got %v, wrote %d bytes", err, b.Len())
+	}
+}
+
 // TestTransformUntrackedLimit checks that element operations on untracked
 // elements are limited to the maximum depth, with a sticky error past it.
 func TestTransformUntrackedLimit(t *testing.T) {

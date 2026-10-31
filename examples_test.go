@@ -136,6 +136,9 @@ func ExampleReader_Children() {
 
 	r := htmlstream.NewReader(strings.NewReader(page))
 	if !r.Find(htmlstream.Tag("ul")) {
+		if err := r.Err(); err != nil {
+			panic(err)
+		}
 		panic("no list")
 	}
 	depth := r.Depth()
@@ -165,6 +168,9 @@ func ExampleReader_Stack() {
 	r := htmlstream.NewReader(strings.NewReader(page))
 	r.SetKeepAttrs(true)
 	if !r.Find(htmlstream.Tag("em")) {
+		if err := r.Err(); err != nil {
+			panic(err)
+		}
 		panic("no em")
 	}
 	var path []string
@@ -278,6 +284,9 @@ func ExampleReader_SetStrict() {
 		r := htmlstream.NewReader(strings.NewReader(page))
 		r.SetStrict(strict)
 		if !r.Find(htmlstream.Tag("span")) {
+			if err := r.Err(); err != nil {
+				panic(err)
+			}
 			panic("no span")
 		}
 		r.Skip()
@@ -337,6 +346,9 @@ func ExampleToken_NS() {
 			local = []byte(htmlstream.AdjustSVGTagName(string(local)))
 		}
 		fmt.Printf("%-13s %-13s %s\n", tok.Name(), local, tok.NS())
+	}
+	if err := r.Err(); err != nil {
+		panic(err)
 	}
 	// Output:
 	// DIV           div           http://www.w3.org/1999/xhtml

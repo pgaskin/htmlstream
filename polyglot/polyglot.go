@@ -2040,9 +2040,12 @@ type hold struct {
 // including those held back.
 func (pw *Writer) Written() int64 { return pw.p.written() }
 
-// Fail makes the conversion fail with err, for errors of the hooks: it is
-// sticky, and returned by WriteToken and Close (and by the current one, if
-// called from a hook). An earlier error is kept, and a nil err does nothing.
+// Fail makes the conversion fail with err, for errors of the hooks or of the
+// caller. If the conversion has already failed (see [Writer.Err]), Fail does
+// nothing and that error is kept, and a nil err does nothing. Otherwise, err
+// is sticky: it is returned by WriteToken and Close (and by the current one,
+// if called from a hook), and Close then writes nothing more. To end the
+// document after an error of the caller, don't give that error to Fail.
 func (pw *Writer) Fail(err error) {
 	if err != nil {
 		pw.p.setErr(err)
