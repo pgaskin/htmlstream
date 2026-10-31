@@ -1107,6 +1107,7 @@ func FuzzTransformAttrs(f *testing.F) {
 	f.Add("<\x000\x00", uint8(0x00), []byte("0"))
 	f.Add("<A 0=0 A/>", uint8(0x1b), []byte("9"))
 	f.Add(`<A 0 B=""= 0>`, uint8('6'), []byte("1"))
+	f.Add("<plAinteXt/><A", uint8('_'), []byte("0"))
 	// values with tabs, newlines and carriage returns, under HTML and XML rules
 	for mode := range uint8(3) {
 		f.Add(`<p a="1"><svg xmlns="http://www.w3.org/2000/svg"><g x="1"/></svg><q>`, mode, []byte{0x01, 0xA0, 0x02, 0x01, 0xB9, 0x05, 0x02})

@@ -831,7 +831,9 @@ func (t *Transformer) RenameEnd(name string) error {
 // parsers read <x//> as self-closing too. If the self-closing syntax isn't
 // honored (e.g., <div/> in HTML mode, which opens an element), or the element
 // is an HTML void element under HTML rules (e.g., <br/>), only these "/"
-// characters are removed. The end tag is part of the start
+// characters are removed. A self-closing plaintext element under HTML rules
+// (e.g., <plaintext/> in HTML mode with XML syntax) is left unchanged, since
+// no end tag closes it. The end tag is part of the start
 // tag's edits: Remove, Replace and Unwrap remove it with the start tag.
 // Markup inserted after the start tag (see [Transformer.InsertAfter]) is
 // written before the end tag, inside the element, except for a void element
@@ -844,7 +846,7 @@ func (t *Transformer) ExpandSelfClosing() error {
 	if err != nil {
 		return err
 	}
-	if !c.SelfClosing() {
+	if !c.SelfClosing() || !c.Opens() && htmlPlaintext(c) {
 		return nil
 	}
 	t.edited = true
@@ -857,6 +859,13 @@ func (t *Transformer) ExpandSelfClosing() error {
 // rules.
 func htmlVoid(c *Token) bool {
 	return c.ns == nsHTML && c.HTMLRules() && internal.HTMLElem(lowerASCII(make([]byte, 0, 16), c.Name()))&internal.Void != 0
+}
+
+// htmlPlaintext reports whether the start tag c is an HTML plaintext element
+// under HTML rules, which no end tag closes, so it can only be written empty
+// with self-closing syntax.
+func htmlPlaintext(c *Token) bool {
+	return c.ns == nsHTML && c.HTMLRules() && internal.HTMLElem(lowerASCII(make([]byte, 0, 16), c.Name()))&internal.Plaintext != 0
 }
 
 // xmlVoid reports whether the start tag c is an HTML void element under XML
@@ -875,8 +884,10 @@ func xmlVoid(c *Token) bool {
 // before or after the end tag is written after the element.
 //
 // HTML elements under HTML rules (see [Token.HTMLRules]) other than void
-// elements are written as <x ...></x>, since HTML parsers ignore
-// self-closing syntax on them. Other elements are written with self-closing
+// elements and plaintext are written as <x ...></x>, since HTML parsers
+// ignore self-closing syntax on them. A plaintext element under HTML rules,
+// which no end tag closes, is written as <plaintext .../>, with the markup
+// inserted after the start tag following it. Other elements are written with self-closing
 // syntax, like <x .../>, which XML parsers and, for SVG and MathML elements,
 // HTML parsers read as empty, or as <x ...></x> to keep markup inserted after
 // the start tag inside the element (for a start tag which doesn't open an
@@ -899,10 +910,10 @@ func (t *Transformer) Empty() error {
 	// markup inserted after the start tag is written inside the element, so
 	// it needs an end tag (InsertAfter at a void element under XML rules or
 	// with XML syntax writes after the element)
-	inside := f != nil && len(t.after) != 0
+	inside := f != nil && len(t.after) != 0 && !htmlPlaintext(c)
 	t.edited = true
 	t.selfClose = 0
-	if c.ns == nsHTML && c.HTMLRules() && !htmlVoid(c) || inside {
+	if c.ns == nsHTML && c.HTMLRules() && !htmlVoid(c) && !htmlPlaintext(c) || inside {
 		if c.SelfClosing() {
 			t.selfClose = -1
 		}
@@ -1226,7 +1237,7 @@ func (t *Transformer) emit(c *Token) {
 	case t.replaced:
 		t.write(t.replace)
 	case c.kind == StartTag && t.edited:
-		if t.emptied && len(t.after) != 0 && !t.closeTag && !htmlVoid(c) && !xmlVoid(c) {
+		if t.emptied && len(t.after) != 0 && !t.closeTag && !htmlVoid(c) && !xmlVoid(c) && !htmlPlaintext(c) {
 			// an emptied start tag which doesn't open an element (e.g.,
 			// <x/> under XML rules), with markup inserted after it: keep
 			// the markup inside the element
