@@ -235,22 +235,24 @@ func checkPolyglot(t *testing.T, in, html, out string, warnings []string, script
 	if xmlOnly {
 		return
 	}
-	outDOM := htmlDOMScripting(t, out, scripting, false)
+	outDOM := htmlDOMScripting(t, out, scripting, true)
 	if html != "" {
 		if xnetForeignTemplate(html) {
 			return
 		}
-		html = xnetDroppedSlash(html)
-		inDOM := htmlDOMScripting(t, html, scripting, false)
-		if inDOM != outDOM && htmlDOMScripting(t, dropSpaceAfterBody(html), scripting, false) == outDOM {
-			return
-		}
+		html = specXMLDecl(xnetNoscriptSpace(xnetDroppedSlash(html), scripting))
+		inDOM := htmlDOMScripting(t, html, scripting, true)
 		if inDOM != outDOM && xnetScriptEscape(html) {
 			return
 		}
 		if inDOM != outDOM {
-			if d := htmlDOMScripting(t, xnetTemplateTableSpace(html), scripting, false); d == outDOM {
-				inDOM = d
+			// whitespace-only text polyglot moves or x/net misplaces is
+			// removed from the input, and the DOMs are compared without
+			// whitespace-only text if the input had some
+			for _, fix := range []func(string) string{dropSpaceAfterBody, xnetTemplateTableSpace} {
+				if h := fix(html); h != html && htmlDOMScripting(t, h, scripting, false) == htmlDOMScripting(t, out, scripting, false) {
+					return
+				}
 			}
 		}
 		if inDOM != outDOM {
@@ -863,9 +865,9 @@ func xnetDroppedSlash(in string) string {
 // "in table" insertion mode handles text like in a table when the current
 // node is a template), while x/net handles it like other text in a table,
 // reopening formatting elements first (e.g., the a in
-// <template><tr></tr><a><tr></tr> ). Whitespace-only text isn't part of the
-// compared DOM, but text next to it across a comment is, so the fuzz target
-// only uses this if the DOMs differ.
+// <template><tr></tr><a><tr></tr> ). The fuzz target only uses this if the
+// DOMs differ, and compares them without whitespace-only text then (see
+// checkPolyglot).
 func xnetTemplateTableSpace(s string) string {
 	if !strings.Contains(strings.ToLower(s), "<template") {
 		return s
@@ -923,6 +925,71 @@ func xnetTemplateTableSpace(s string) string {
 	for _, d := range drop {
 		b.WriteString(s[last:d[0]])
 		last = d[1]
+	}
+	b.WriteString(s[last:])
+	return b.String()
+}
+
+// xnetNoscriptSpace inserts an empty comment after the whitespace at the
+// start of text in a noscript element in the head, with scripting disabled,
+// when the text continues with other characters (e.g., <noscript> x). The
+// HTML5 spec (and the Reader) inserts the whitespace in the noscript, then
+// closes it at the first other character, while x/net handles the text as a
+// whole: it closes the noscript first and inserts the whitespace in the head.
+// With the comment, x/net reads the whitespace as text of its own. Empty
+// comments aren't part of the compared DOM.
+func xnetNoscriptSpace(s string, scripting bool) string {
+	if scripting || !strings.Contains(strings.ToLower(s), "<noscript") {
+		return s
+	}
+	r := htmlstream.NewReader(strings.NewReader(s))
+	var d htmlutil.Document
+	var stack htmlutil.Stack[bool] // whether each open element is a noscript in the head
+	var at []int
+	pending := -1 // the end of whitespace-only text in such a noscript, until the next token
+	for r.Next() {
+		tok := r.Token()
+		d.Update(tok)
+		switch tok.Kind() {
+		case htmlstream.StartTag:
+			stack.Push(tok, tok.NS() == htmlstream.NamespaceXHTML && tok.Is("noscript") && d.Part() == htmlutil.InHead)
+		case htmlstream.EndTag:
+			stack.Pop(tok)
+			if tok.Implied() {
+				continue // the noscript closed by the text after the whitespace
+			}
+		case htmlstream.Text:
+			if pending >= 0 {
+				at = append(at, pending)
+				break
+			}
+			if noscript, ok := stack.Top(); ok && *noscript {
+				raw := tok.Raw()
+				i := 0
+				for i < len(raw) && ascii.IsSpace(raw[i]) {
+					i++
+				}
+				switch {
+				case i == 0:
+				case i == len(raw):
+					pending = int(tok.Pos()) + i
+					continue
+				default:
+					at = append(at, int(tok.Pos())+i)
+				}
+			}
+		}
+		pending = -1
+	}
+	if r.Err() != nil || len(at) == 0 {
+		return s
+	}
+	var b strings.Builder
+	last := 0
+	for _, i := range at {
+		b.WriteString(s[last:i])
+		b.WriteString("<!---->")
+		last = i
 	}
 	b.WriteString(s[last:])
 	return b.String()

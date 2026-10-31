@@ -39,7 +39,7 @@ c</pre>
 -- out --
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p>ab</p><pre>c</pre></body></html>
--- CommentControlChars --
+-- CommentControlChars htmldiff --
 -- in quoted --
 "<!--a\x01bcdefghij\x02k--><?xml-stylesheet\x01?>"
 -- out --

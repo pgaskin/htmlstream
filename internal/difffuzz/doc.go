@@ -16,17 +16,18 @@
 //
 // # Comparing documents
 //
-// Documents are compared as DOMs dumped as indented text, ignoring comments
-// other than those in the root element and after it (compared without their
-// data), doctypes, whitespace-only text, namespace declarations, xml:lang,
+// Documents are compared as DOMs dumped as indented text, with comments
+// (their data compared as polyglot.Convert writes it, except empty ones) and
+// whitespace-only text, ignoring doctypes, namespace declarations, xml:lang,
 // character encoding declarations, and the CDATA wrappers in scripts and
-// styles. The x/net and encoding/xml DOMs of an output are compared with
-// whitespace-only text, which both must have in the same places. Known differences between x/net and the HTML Standard are worked
-// around by rewriting the input before x/net parses it (specDoctypes,
-// specPreNewlines, specCaptionTh, xnetTemplateTableSpace, xnetDroppedSlash),
-// or the input is skipped (xnetScriptEscape, xnetTextareaCR,
-// xnetForeignTemplate). Whitespace after a body or html end tag which closed
-// other elements is removed from the input if that makes the DOMs equal
+// styles. The XML declaration polyglot.Convert removes is removed from the
+// input (specXMLDecl). Known differences between x/net and the HTML Standard
+// are worked around by rewriting the input before x/net parses it
+// (specDoctypes, specPreNewlines, specCaptionTh, xnetTemplateTableSpace,
+// xnetDroppedSlash, xnetNoscriptSpace), or the input is skipped
+// (xnetScriptEscape, xnetTextareaCR, xnetForeignTemplate). Whitespace after a
+// body or html end tag which closed other elements is removed from the input
+// if that makes the DOMs equal without whitespace-only text
 // (dropSpaceAfterBody). The XML output must also meet the namespace
 // constraints of Namespaces in XML 1.0, which encoding/xml doesn't check
 // (xmlNSCheck).

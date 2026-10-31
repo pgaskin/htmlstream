@@ -13,6 +13,7 @@ import (
 	"golang.org/x/net/html"
 
 	"github.com/pgaskin/htmlstream"
+	"github.com/pgaskin/htmlstream/ascii"
 	"github.com/pgaskin/htmlstream/htmlutil"
 	"github.com/pgaskin/htmlstream/polyglot"
 	polyglot_testdata "github.com/pgaskin/htmlstream/testdata/polyglot"
@@ -107,12 +108,12 @@ func TestPolyglot(t *testing.T) {
 
 			// with XML syntax, the input as HTML parsers would have to read
 			// it (see xmlSyntaxInput), if it can be written
-			html := tc.In
+			html := specXMLDecl(tc.In)
 			if tc.XMLSyntax {
 				html = xmlSyntaxInput(t, tc.In, tc.Scripting)
 			}
-			inDOM := htmlDOMScripting(t, html, tc.Scripting, false)
-			outDOM := htmlDOMScripting(t, out, tc.Scripting, false)
+			inDOM := htmlDOMScripting(t, html, tc.Scripting, true)
+			outDOM := htmlDOMScripting(t, out, tc.Scripting, true)
 			if !tc.HTMLDiff && html != "" && inDOM != outDOM {
 				t.Errorf("HTML DOM differs (input -, output +):\n%s", domDiff(inDOM, outDOM))
 			}
@@ -144,7 +145,7 @@ func TestPolyglot(t *testing.T) {
 			if out = b.String(); len(warnings) != 0 {
 				return
 			}
-			if outDOM = htmlDOMScripting(t, out, tc.Scripting, false); html != "" && inDOM != outDOM {
+			if outDOM = htmlDOMScripting(t, out, tc.Scripting, true); html != "" && inDOM != outDOM {
 				t.Errorf("NoDoctype: HTML DOM differs (input -, output +):\n%s\noutput: %s", domDiff(inDOM, outDOM), out)
 			}
 			xmlDOM, err := xmlDOM(out, true)
@@ -227,16 +228,18 @@ func domDiff(a, b string) string {
 	return s.String()
 }
 
-// The DOMs are compared as indented text, ignoring comments other than
-// those in the root element and after it (without their data, and except
-// empty ones, since x/net reads </> as one), doctypes,
-// whitespace-only text (unless space is set: the HTML and XML DOMs of the
-// output are compared with it), namespace declarations, xml:lang, charset
-// declarations, and the CDATA wrappers in scripts and styles. An HTML element
-// with xml:lang and without lang is compared as having a lang attribute with
-// the value of xml:lang, since polyglot.Convert adds it. The SVG element
-// fedropshadow is compared as feDropShadow, the case the HTML Standard gives
-// it and x/net doesn't.
+// The DOMs are compared as indented text, ignoring empty comments (x/net
+// reads </> as one, and specPreNewlines inserts them), doctypes,
+// whitespace-only text (unless space is set, which the comparisons of an
+// output with its input and with its XML DOM do; checkIndent doesn't),
+// namespace declarations, xml:lang, charset declarations, and the CDATA
+// wrappers in scripts and styles. The data of comments is compared as
+// polyglot.Convert writes it (see domComment), and the XML declaration it
+// removes from the input is removed before parsing it (see specXMLDecl). An
+// HTML element with xml:lang and without lang is compared as having a lang
+// attribute with the value of xml:lang, since polyglot.Convert adds it. The
+// SVG element fedropshadow is compared as feDropShadow, the case the HTML
+// Standard gives it and x/net doesn't.
 
 func htmlDOM(t *testing.T, s string) string {
 	return htmlDOMScripting(t, s, false, false)
@@ -258,17 +261,14 @@ func htmlDOMScripting(t *testing.T, s string, scripting, space bool) string {
 			text.Reset()
 		}
 		defer flush()
-		root := n.Type == html.ElementNode && n.Parent != nil && n.Parent.Type == html.DocumentNode
-		after := false // after the root element
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
 			switch c.Type {
 			case html.CommentNode:
-				if (root || after) && c.Data != "" {
+				if c.Data != "" {
 					flush()
-					domComment(&b, depth)
+					domComment(&b, depth, c.Data)
 				}
 			case html.ElementNode:
-				after = n.Type == html.DocumentNode
 				if dropCharsetDecl(c) {
 					continue
 				}
@@ -365,14 +365,50 @@ func specDoctypes(s string) string {
 	return b.String()
 }
 
+// specXMLDecl removes the first XML declaration before the root element from
+// s, which polyglot.Convert removes (or writes as an XML declaration with
+// KeepXMLDecl) rather than writing it as a comment like other bogus comments
+// (see its xmlDecl). HTML parsers read it as a bogus comment, a child of the
+// document before the html element.
+func specXMLDecl(s string) string {
+	if !strings.Contains(s, "?xml") {
+		return s
+	}
+	r := htmlstream.NewReader(strings.NewReader(s))
+	var d htmlutil.Document
+	start := -1 // the start of the comment being read, if it is an XML declaration
+	var data []byte
+	for r.Next() {
+		tok := r.Token()
+		d.Update(tok)
+		if d.Part() != htmlutil.BeforeHTML {
+			break
+		}
+		if tok.Kind() != htmlstream.Comment || !tok.Bogus() {
+			continue
+		}
+		if !tok.Continued() {
+			start, data = int(tok.Pos()), data[:0]
+		}
+		data = tok.AppendText(data)
+		if tok.Partial() {
+			continue
+		}
+		if isXMLDecl(string(data)) {
+			return s[:start] + s[int(tok.Pos())+len(tok.Raw()):]
+		}
+	}
+	return s
+}
+
 // specPreNewlines inserts an empty comment before text in a pre or listing
 // element starting with a newline after end tags which HTML parsers ignore
 // (e.g., <pre></b>\nx, or <pre>\n</b>\nx), or starting with a carriage
 // return from a character reference (<pre>&#13;x). The HTML5 spec drops a
 // line feed only directly after the start tag, while x/net drops a carriage
 // return and a line feed at the start of any text while the element has no
-// children, and the comment is a child. Comments in the element aren't part
-// of the compared DOM. It also removes </> after the start tag, which x/net
+// children, and the comment is a child. Empty comments aren't part of the
+// compared DOM. It also removes </> after the start tag, which x/net
 // reads as an empty comment, a child, while the HTML5 spec ignores it
 // (<pre></>\nx).
 func specPreNewlines(s string) string {
@@ -565,10 +601,36 @@ func domText(b *strings.Builder, depth int, text string, space bool) {
 	fmt.Fprintf(b, "%s%q\n", strings.Repeat("  ", depth), text)
 }
 
-// domComment writes a comment, without its data, which polyglot.Convert
-// changes (e.g., "--" becomes "- -").
-func domComment(b *strings.Builder, depth int) {
-	fmt.Fprintf(b, "%s<!---->\n", strings.Repeat("  ", depth))
+// domComment writes a comment with its data as polyglot.Convert writes it:
+// with a space between two dashes and after a trailing dash, and before a
+// leading ">" or "->" (which would end the comment early for XML parsers).
+// Applying it to the data of a comment written that way changes nothing, so
+// the comments of an input and its output compare equal.
+func domComment(b *strings.Builder, depth int, data string) {
+	b.WriteString(strings.Repeat("  ", depth))
+	b.WriteString("<!--")
+	if strings.HasPrefix(data, ">") || strings.HasPrefix(data, "->") {
+		b.WriteByte(' ')
+	}
+	dash := false
+	for i := 0; i < len(data); i++ {
+		if data[i] == '-' && dash {
+			b.WriteByte(' ')
+		}
+		b.WriteByte(data[i])
+		dash = data[i] == '-'
+	}
+	if dash {
+		b.WriteByte(' ')
+	}
+	b.WriteString("-->\n")
+}
+
+// isXMLDecl reports whether the data of a bogus comment is an XML
+// declaration as the polyglot package recognizes one (see its isXMLDecl):
+// "?xml" followed by whitespace, or "?xml?".
+func isXMLDecl(data string) bool {
+	return len(data) > 4 && strings.HasPrefix(data, "?xml") && (ascii.IsSpace(data[4]) || data == "?xml?")
 }
 
 // xmlNSCheck checks the namespace constraints of Namespaces in XML 1.0,
@@ -675,7 +737,6 @@ func xmlDOM(s string, space bool) (string, error) {
 	var text strings.Builder
 	var stack []bool // whether each open element is skipped
 	var names []string
-	after := false         // after the root element
 	var defaultNS []string // the default namespace in each open element
 	depth := 0
 	flush := func() {
@@ -757,11 +818,12 @@ func xmlDOM(s string, space bool) (string, error) {
 			stack = stack[:len(stack)-1]
 			names = names[:len(names)-1]
 			defaultNS = defaultNS[:len(defaultNS)-1]
-			after = len(names) == 0
 		case xml.Comment:
-			if (len(names) == 1 || after) && len(tok) != 0 {
+			if len(tok) != 0 {
+				// x/net decodes character references in comments, unlike
+				// the HTML5 spec
 				flush()
-				domComment(&b, depth)
+				domComment(&b, depth, html.UnescapeString(string(tok)))
 			}
 		case xml.CharData:
 			text.Write(tok)
