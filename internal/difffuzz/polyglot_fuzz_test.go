@@ -639,8 +639,10 @@ func xmlSyntaxInput(t *testing.T, in string, scripting bool) string {
 	return b.String()
 }
 
-// dropSpaceAfterBody removes the whitespace text after the first body or html
-// end tag which closed other elements from in. HTML parsers keep elements
+// dropSpaceAfterBody removes from in the whitespace text after the first
+// token other than whitespace, comments and body and html end tags which
+// follows the first body or html end tag closing other elements, and keeps
+// the whitespace before that token. HTML parsers keep elements
 // left open before these end tags open, and append the whitespace after them
 // to the elements (e.g., the text of an unclosed p), while the Reader closes
 // them. The polyglot package writes the whitespace after them in them up to

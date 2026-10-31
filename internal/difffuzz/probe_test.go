@@ -19,9 +19,11 @@ var probeFlag = flag.String("probe", "", "file with the inputs for TestProbe: a 
 
 // TestProbe prints the polyglot.Convert output and warnings for the inputs in
 // the file named by -probe, the HTML DOMs of the input and the output and the
-// XML DOM of the output if they differ, and the Reader tokens. The file is a
-// fuzz corpus file (its first string value is the input), or has one input
-// per line, as a quoted Go string or raw.
+// XML DOM of the output if they differ, and the Reader tokens. The DOMs keep
+// whitespace-only text, as in the fuzz targets' comparisons; whether the HTML
+// DOMs of the input and the output differ without it is printed too. The
+// file is a fuzz corpus file (its first string value is the input), or has
+// one input per line, as a quoted Go string or raw.
 func TestProbe(t *testing.T) {
 	if *probeFlag == "" {
 		t.Skip("no -probe file")
@@ -61,9 +63,9 @@ func TestProbe(t *testing.T) {
 		for _, w := range warns {
 			fmt.Printf("warn: %s\n", w)
 		}
-		in1, out1 := htmlDOM(t, in), htmlDOM(t, out)
+		in1, out1 := htmlDOMScripting(t, in, false, true), htmlDOMScripting(t, out, false, true)
 		x, xerr := xmlDOM(out, true)
-		fmt.Printf("HTML in == out: %v, XML == HTML out: %v (xml err %v)\n", in1 == out1, x == out1, xerr)
+		fmt.Printf("HTML in == out: %v (%v without whitespace-only text), XML == HTML out: %v (xml err %v)\n", in1 == out1, htmlDOM(t, in) == htmlDOM(t, out), x == out1, xerr)
 		if in1 != out1 || x != out1 {
 			fmt.Printf("in DOM:\n%s\nout DOM:\n%s\nXML DOM:\n%s\n", in1, out1, x)
 		}
