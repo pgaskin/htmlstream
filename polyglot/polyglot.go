@@ -1548,9 +1548,10 @@ func (pw *Writer) WriteToken(tok *htmlstream.Token) error {
 // queueToken converts tok, or holds it back: implied end tags are held
 // back until the next token, and if it is a body or html end tag, which
 // doesn't close the elements for HTML parsers, until the next token other
-// than text of whitespace and NUL, comments, body and html end tags, and
-// stray end tags of SVG and MathML elements held back (see closesForeign),
-// which are converted inside the elements, where HTML parsers put them.
+// than text of whitespace and NUL, comments, body and html end tags, stray
+// end tags of SVG and MathML elements held back (see closesForeign), and
+// stray end tags HTML parsers ignore in them (see ignoredInForeign), which
+// are converted inside the elements, where HTML parsers put them.
 func (p *polyglot) queueToken(tok *htmlstream.Token) {
 	p.afterBodyToken(tok)
 	k := tok.Kind()
@@ -1585,6 +1586,10 @@ func (p *polyglot) queueToken(tok *htmlstream.Token) {
 		}
 		p.implied.Reset()
 		p.implied, p.afterEnd = p.afterEnd, p.implied
+		p.convert(tok)
+		return
+	case p.keptByEnd && k == htmlstream.EndTag && tok.Stray() && !tok.Is("p") && !tok.Is("br") && p.ignoredInForeign(tok):
+		// ignored by HTML parsers, which keep the elements open
 		p.convert(tok)
 		return
 	case p.keptByEnd && k == htmlstream.Text:
@@ -1655,6 +1660,36 @@ func (p *polyglot) closesForeign(tok *htmlstream.Token) int {
 		}
 	}
 	return 0
+}
+
+// ignoredInForeign reports whether HTML parsers ignore the stray end tag tok
+// (other than p and br, which they write as elements) after a body or html
+// end tag, with the implied end tags held back (see queueToken) starting with
+// that of an SVG or MathML element: they apply it in foreign content, and
+// then in HTML content if it matches no foreign element, where it closes no
+// element since it matches none held back by name (or, for h1-h6, as any
+// h1-h6 element), so they ignore it.
+func (p *polyglot) ignoredInForeign(tok *htmlstream.Token) bool {
+	if p.implied.Len() == 0 {
+		return false
+	}
+	if t := p.implied.At(0); !t.Implied() || t.NS() == htmlstream.NamespaceXHTML {
+		return false
+	}
+	var a, b [16]byte
+	name := tok.AppendLocalName(b[:0])
+	// an h1-h6 end tag closes any h1-h6 element in scope
+	heading := internal.HTMLElem(name)&internal.Heading != 0
+	for t := range p.implied.All() {
+		if !t.Implied() {
+			continue
+		}
+		n := t.AppendLocalName(a[:0])
+		if bytes.Equal(n, name) || heading && t.NS() == htmlstream.NamespaceXHTML && internal.HTMLElem(n)&internal.Heading != 0 {
+			return false
+		}
+	}
+	return true
 }
 
 // flushImplied converts the implied end tags held back by queueToken, and
@@ -3176,7 +3211,8 @@ const (
 // end tag, and back to "in body" at a token other than whitespace,
 // comments, doctypes, html start tags and body and html end tags, except
 // in foreign content (SVG and MathML elements left open by the end tag),
-// where text and the end tags of these elements keep the mode. It is
+// where text and the start and end tags of these elements keep the mode
+// (see foreignTag). It is
 // called before the token, and the implied end tags before it, are
 // converted, since the implied end tags and body and html end tags can be
 // held back (see queueToken).
@@ -3198,6 +3234,7 @@ func (p *polyglot) afterBodyToken(tok *htmlstream.Token) {
 	case k == htmlstream.EndTag && p.keptByEnd && tok.Stray() && p.closesForeign(tok) != 0:
 		// closes SVG or MathML elements left open by the end tag, which
 		// HTML parsers do in foreign content, without changing the mode
+	case (k == htmlstream.StartTag || k == htmlstream.EndTag) && p.foreignTag(tok):
 	case k == htmlstream.Text, k == htmlstream.CDATA:
 		if !tok.Continued() {
 			// decided at the first part, before the text closes the
@@ -3216,6 +3253,33 @@ func (p *polyglot) afterBodyToken(tok *htmlstream.Token) {
 	default:
 		p.afterBody = 0
 	}
+}
+
+// foreignTag reports whether HTML parsers apply the start or end tag tok in
+// foreign content, which doesn't change the insertion mode: a start tag of an
+// SVG or MathML element inside an element of the same namespace, other than
+// an integration point (except for mglyph and malignmark in a MathML text
+// integration point), and an end tag closing SVG or MathML elements open
+// above the first HTML element.
+func (p *polyglot) foreignTag(tok *htmlstream.Token) bool {
+	t := p.top()
+	if t == nil || t.ns == "" || tok.NS() == htmlstream.NamespaceXHTML {
+		return false
+	}
+	if tok.Kind() == htmlstream.EndTag {
+		return !tok.Stray()
+	}
+	if tok.NS() != t.ns {
+		return false
+	}
+	if !t.integration {
+		return true
+	}
+	switch t.name {
+	case "mi", "mo", "mn", "ms", "mtext":
+		return t.ns == htmlstream.NamespaceMathML && (tok.Is("mglyph") || tok.Is("malignmark"))
+	}
+	return false
 }
 
 // bodyInScope reports whether HTML parsers apply a body or html end tag at

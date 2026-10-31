@@ -276,6 +276,32 @@ are open.
 <html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p><math xmlns="http://www.w3.org/1998/Math/MathML"><mrow></mrow>�<!-- a --></math> </p></body><!-- b --></html>
 -- warn --
 35: replaced characters XML doesn't allow
+-- IgnoredEndTagAfterBodyInForeign --
+In SVG and MathML elements left open by a body end tag, HTML parsers ignore
+an end tag matching no open element, and keep the elements open, but switch
+back to the "in body" insertion mode.
+-- in --
+<body><svg><g></body></x> </svg> <!-- a --></html><!-- b -->
+-- out --
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><g> </g></svg> <!-- a --></body></html><!-- b -->
+-- HeadingEndTagAfterBodyInForeign --
+An h1-h6 end tag closes any h1-h6 element, so HTML parsers apply it to the
+elements left open by the body end tag.
+-- in --
+<body><h2><svg></body></h1> <!--c-->
+-- out --
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><h2><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"></svg></h2> <!--c--></body></html>
+-- TagsAfterBodyInForeign --
+In an SVG or MathML element left open by a body end tag ignored by the
+Reader, HTML parsers apply the start and end tags of SVG and MathML elements
+in foreign content without changing the insertion mode.
+-- in --
+<svg></body><g></g> <!-- a --> </svg><!-- b -->
+-- out --
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><g></g> <!-- a --> </svg></body><!-- b --></html>
 -- ContentAfterBody --
 -- in --
 <body>x</body>y</html>z
