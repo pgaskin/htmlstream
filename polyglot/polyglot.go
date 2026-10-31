@@ -1548,13 +1548,17 @@ func (pw *Writer) WriteToken(tok *htmlstream.Token) error {
 // queueToken converts tok, or holds it back: implied end tags are held
 // back until the next token, and if it is a body or html end tag, which
 // doesn't close the elements for HTML parsers, until the next token other
-// than text of whitespace and NUL, comments, body and html end tags, stray
-// end tags of SVG and MathML elements held back (see closesForeign), and
-// stray end tags HTML parsers ignore in them (see ignoredInForeign), which
-// are converted inside the elements, where HTML parsers put them.
+// than text of whitespace and NUL, comments, body and html end tags, and
+// stray end tags HTML parsers ignore or apply to some of the elements (see
+// heldEnd), which are converted inside the elements, where HTML parsers put
+// them.
 func (p *polyglot) queueToken(tok *htmlstream.Token) {
 	p.afterBodyToken(tok)
 	k := tok.Kind()
+	held := -1 // the implied end tags held back a stray end tag applies (see heldEnd)
+	if p.keptByEnd && k == htmlstream.EndTag && tok.Stray() {
+		held = p.heldEnd(tok)
+	}
 	switch {
 	case k == htmlstream.EndTag && tok.Implied():
 		if p.keptByEnd {
@@ -1571,14 +1575,12 @@ func (p *polyglot) queueToken(tok *htmlstream.Token) {
 	case p.keptByEnd && (k == htmlstream.Comment || k == htmlstream.ProcInst):
 		p.convert(tok)
 		return
-	case p.keptByEnd && k == htmlstream.EndTag && tok.Stray() && p.closesForeign(tok) != 0:
-		// HTML parsers close the SVG or MathML elements up to the one it
-		// matches, and keep the elements around it open (the end tags
-		// after them are moved to the start of p.afterEnd, which is empty
-		// between tokens)
-		n := p.closesForeign(tok)
+	case held >= 0:
+		// HTML parsers close the elements up to the one it matches, if any,
+		// and keep the others open (the end tags after them are moved to
+		// the start of p.afterEnd, which is empty between tokens)
 		for i := range p.implied.Len() {
-			if t := p.implied.At(i); i < n {
+			if t := p.implied.At(i); i < held {
 				p.convert(t)
 			} else {
 				p.afterEnd.Append(t)
@@ -1586,11 +1588,17 @@ func (p *polyglot) queueToken(tok *htmlstream.Token) {
 		}
 		p.implied.Reset()
 		p.implied, p.afterEnd = p.afterEnd, p.implied
+		if name := htmlName(tok); held != 0 && internal.HTMLElem([]byte(name))&internal.Formatting != 0 {
+			// the adoption agency algorithm removes the element it matched
+			// (the outermost one closed) from the list of active formatting
+			// elements, so it isn't reopened
+			if i := lastIndexFunc(p.tentative, func(r reopen) bool { return r.name == name }); i >= 0 {
+				p.tentative = slices.Delete(p.tentative, i, i+1)
+			}
+		}
+		p.heldApplied = held != 0
 		p.convert(tok)
-		return
-	case p.keptByEnd && k == htmlstream.EndTag && tok.Stray() && !tok.Is("p") && !tok.Is("br") && p.ignoredInForeign(tok):
-		// ignored by HTML parsers, which keep the elements open
-		p.convert(tok)
+		p.heldApplied = false
 		return
 	case p.keptByEnd && k == htmlstream.Text:
 		// held back until it is known to be whitespace or NUL (up to
@@ -1642,6 +1650,170 @@ func (p *polyglot) dropped(tok *htmlstream.Token) bool {
 	return false
 }
 
+// heldEnd returns the number of implied end tags held back after a body or
+// html end tag (see queueToken) which HTML parsers apply when they apply the
+// stray end tag tok to the elements they closed for the Reader, which are
+// still open for HTML parsers: the elements up to the one the end tag
+// matches, none if they ignore it, or -1 if they change the elements in a
+// way the output can't follow (the implied end tags are all converted then,
+// and the end tag is reported as applied to closed elements, see keepOpen).
+//
+// In foreign content, the end tag matches an SVG or MathML element above the
+// first HTML element by name (see closesForeign). Otherwise, HTML parsers
+// apply the "in body" rules to the elements open in the output above the
+// body (including the formatting elements reopened in the output, which the
+// Reader doesn't know about): an end tag of a formatting element matches the
+// innermost element with its name, if it is in scope, and closes the special
+// elements above it too, which the output can't (the adoption agency
+// algorithm clones the formatting element into them); an h1-h6 end tag
+// matches the innermost h1-h6 element in scope; a form end tag removes the
+// form from the stack of open elements without closing the elements above
+// it (they stay open in the output, where their contents are in the form
+// too, see outElem.removed) after generating implied end tags, if the form
+// element pointer is set and the form in scope (in a template, it closes the
+// form like the end tags below); a p end tag with no p in button scope, and
+// a br end tag, write an element in the current node, which the output can
+// do in HTML content; an li end tag matches an li in list item scope; the
+// end tags of dd, dt, template and the elements with their own end tag
+// rules (address, div, etc.) match an element with their name in scope;
+// those of table parts and head are ignored; other end tags match the
+// innermost HTML element with their name unless a special element comes
+// first. HTML parsers ignore the end tag if nothing matches.
+func (p *polyglot) heldEnd(tok *htmlstream.Token) int {
+	foreign := p.closesForeign(tok)
+	// the output elements of the elements held back, innermost first
+	var held []int
+	for t := range p.implied.All() {
+		if !t.Implied() {
+			break
+		}
+		out := -1
+		for _, f := range p.frames.All() {
+			if f.pos == t.StartPos() {
+				out = f.out
+				break
+			}
+		}
+		if out < 0 || out >= len(p.out) {
+			return cmp.Or(foreign, -1)
+		}
+		held = append(held, out)
+	}
+	if len(held) == 0 {
+		return cmp.Or(foreign, -1)
+	}
+	// n implied end tags, and those of the forms removed by HTML parsers
+	// left at the top after them
+	removed := func(n int) int {
+		for n < len(held) && p.out[held[n]].removed {
+			n++
+		}
+		return n
+	}
+	if foreign != 0 {
+		return removed(foreign)
+	}
+	// the number of implied end tags up to the output element i, or none
+	// if i is -1 (the end tag matches nothing, and is ignored)
+	pops := func(i int) int {
+		n := 0
+		if i >= 0 {
+			if !slices.Contains(held, i) {
+				return -1 // a reopened formatting element, or a p kept open around a table
+			}
+			for _, out := range held {
+				if out >= i {
+					n++
+				}
+			}
+		}
+		return removed(n)
+	}
+	// the innermost output element above the body, or -1, for which match
+	// returns true, unless one for which stop returns true comes first
+	find := func(match, stop func(e *outElem) bool) int {
+		for i := len(p.out) - 1; i >= 0; i-- {
+			switch e := &p.out[i]; {
+			case e.removed:
+			case e.ns == "" && (e.name == "body" || e.name == "html"):
+				return -1
+			case match(e):
+				return i
+			case stop(e):
+				return -1
+			}
+		}
+		return -1
+	}
+	htmlNamed := func(name string) func(e *outElem) bool {
+		return func(e *outElem) bool { return e.ns == "" && e.name == name }
+	}
+	name := htmlName(tok)
+	info := internal.HTMLElem([]byte(name))
+	switch {
+	case name == "br", name == "p" && find(htmlNamed(name), inButtonScope) < 0:
+		if t := p.top(); t != nil && (t.ns == "" || t.integration) {
+			return pops(-1) // written in the current node (see endTag)
+		}
+		return -1 // in foreign content, where the output can't put an HTML element
+	case name == "p":
+		return pops(find(htmlNamed(name), inButtonScope))
+	case info&internal.Formatting != 0:
+		i := find(htmlNamed(name), func(e *outElem) bool { return false })
+		if i < 0 {
+			if slices.ContainsFunc(p.pending, func(r reopen) bool { return r.name == name && r.marker == p.markers }) {
+				return -1 // reopened after it by HTML parsers (see strayFormattingEnd)
+			}
+			break // any other end tag
+		}
+		if find(htmlNamed(name), inScope) != i {
+			return pops(-1)
+		}
+		if p.out[i].reopened {
+			return -1
+		}
+		for j := i + 1; j < len(p.out); j++ {
+			if isSpecial(&p.out[j]) {
+				return -1
+			}
+		}
+		return pops(i)
+	case info&internal.Heading != 0:
+		return pops(find(func(e *outElem) bool { return e.ns == "" && internal.HTMLElem([]byte(e.name))&internal.Heading != 0 }, inScope))
+	case name == "form" && p.ctx().templates != 0:
+		return pops(find(htmlNamed(name), inScope))
+	case name == "form":
+		i := find(htmlNamed(name), inScope)
+		if !p.form || i < 0 {
+			return pops(-1)
+		}
+		n := 0
+		for _, e := range slices.Backward(p.out[i+1:]) {
+			if e.ns != "" || internal.HTMLElem([]byte(e.name))&internal.ImpliedEnd == 0 {
+				break
+			}
+			n++
+		}
+		if n != 0 && !slices.Contains(held, len(p.out)-n) {
+			return -1
+		}
+		p.out[i].removed = true
+		if n == 0 {
+			return pops(-1)
+		}
+		return pops(len(p.out) - n)
+	case name == "li":
+		return pops(find(htmlNamed(name), func(e *outElem) bool { return inScope(e) || e.ns == "" && (e.name == "ol" || e.name == "ul") }))
+	}
+	switch name {
+	case "address", "applet", "article", "aside", "blockquote", "button", "center", "dd", "details", "dialog", "dir", "div", "dl", "dt", "fieldset", "figcaption", "figure", "footer", "header", "hgroup", "listing", "main", "marquee", "menu", "nav", "object", "ol", "pre", "search", "section", "summary", "template", "ul":
+		return pops(find(htmlNamed(name), inScope))
+	case "caption", "col", "colgroup", "frame", "head", "tbody", "td", "tfoot", "th", "thead", "tr":
+		return pops(-1)
+	}
+	return pops(find(htmlNamed(name), isSpecial))
+}
+
 // closesForeign returns the number of implied end tags held back after a
 // body or html end tag (see queueToken) up to and including that of the
 // SVG or MathML element matched by the stray end tag tok, or 0 if an HTML
@@ -1662,34 +1834,44 @@ func (p *polyglot) closesForeign(tok *htmlstream.Token) int {
 	return 0
 }
 
-// ignoredInForeign reports whether HTML parsers ignore the stray end tag tok
-// (other than p and br, which they write as elements) after a body or html
-// end tag, with the implied end tags held back (see queueToken) starting with
-// that of an SVG or MathML element: they apply it in foreign content, and
-// then in HTML content if it matches no foreign element, where it closes no
-// element since it matches none held back by name (or, for h1-h6, as any
-// h1-h6 element), so they ignore it.
-func (p *polyglot) ignoredInForeign(tok *htmlstream.Token) bool {
-	if p.implied.Len() == 0 {
-		return false
+// isSpecial reports whether the output element e is in the special category
+// of HTML parsers.
+func isSpecial(e *outElem) bool {
+	switch e.ns {
+	case "":
+		return internal.HTMLElem([]byte(e.name))&internal.Special != 0
+	case htmlstream.NamespaceMathML:
+		return e.integration || e.name == "annotation-xml"
+	case htmlstream.NamespaceSVG:
+		return e.integration
 	}
-	if t := p.implied.At(0); !t.Implied() || t.NS() == htmlstream.NamespaceXHTML {
-		return false
+	return false
+}
+
+// inScope reports whether the output element e limits the default scope of
+// HTML parsers (see internal.Scope).
+func inScope(e *outElem) bool {
+	if e.ns == "" {
+		return internal.HTMLElem([]byte(e.name))&internal.Scope != 0
 	}
-	var a, b [16]byte
-	name := tok.AppendLocalName(b[:0])
-	// an h1-h6 end tag closes any h1-h6 element in scope
-	heading := internal.HTMLElem(name)&internal.Heading != 0
-	for t := range p.implied.All() {
-		if !t.Implied() {
-			continue
+	return isSpecial(e)
+}
+
+// inButtonScope reports whether the output element e limits the button scope
+// of HTML parsers.
+func inButtonScope(e *outElem) bool {
+	return inScope(e) || e.ns == "" && e.name == "button"
+}
+
+// lastIndexFunc returns the index of the last element of s for which f
+// returns true, or -1.
+func lastIndexFunc[S ~[]E, E any](s S, f func(E) bool) int {
+	for i := len(s) - 1; i >= 0; i-- {
+		if f(s[i]) {
+			return i
 		}
-		n := t.AppendLocalName(a[:0])
-		if bytes.Equal(n, name) || heading && t.NS() == htmlstream.NamespaceXHTML && internal.HTMLElem(n)&internal.Heading != 0 {
-			return false
-		}
 	}
-	return true
+	return -1
 }
 
 // flushImplied converts the implied end tags held back by queueToken, and
@@ -2543,6 +2725,7 @@ type polyglot struct {
 	keptByEnd    bool
 	afterEnd     htmlstream.TokenBuffer
 	afterEndText bool
+	heldApplied  bool // the stray end tag being converted closed elements held back (see heldEnd)
 
 	// with FinalNewline, the whitespace directly in the body, until the next
 	// token, for a line break at its end (see bodySpaceToken)
@@ -2630,14 +2813,14 @@ type outRef struct {
 // closed describes the elements closed by the implied end tags before a
 // token.
 type closed struct {
-	// HTML elements: the first one, the first special (block-level) one, and
-	// the first one whose end tag can't be omitted
-	html, special, unsound string
-	names                  []string // the names of all HTML elements
-	first                  string   // the first element, in any namespace
-	p                      bool     // a p element
-	reopened               bool     // reopened formatting elements
-	kept                   bool     // a p kept open around a table (see keepP), closed first
+	// HTML elements: the first one and the first special (block-level) one
+	html, special string
+	names         []string // the names of all HTML elements
+	first         string   // the first element, in any namespace
+	unsound       string   // the first element, in any namespace, whose end tag can't be omitted
+	p             bool     // a p element
+	reopened      bool     // reopened formatting elements
+	kept          bool     // a p kept open around a table (see keepP), closed first
 }
 
 type outElem struct {
@@ -2653,6 +2836,7 @@ type outElem struct {
 	written     string // the name written, which Tag.Rename changes
 	id          int    // its ID for the Tag hook (see Tag)
 	unwrap      bool   // the tags aren't written (Tag.Unwrap, Remove)
+	removed     bool   // a form removed from the stack of open elements by HTML parsers, still open in the output (see heldEnd)
 	level       int    // p.markers when a reopened element was first opened
 	key         []byte // formatting elements: name and attributes (see noahsArk), in p.starts for elements from the input
 	seq         int    // formatting elements: order in the input, kept when reopened
@@ -5467,6 +5651,8 @@ func (p *polyglot) endTag(tok *htmlstream.Token) {
 			p.noscriptInP, p.noscriptPEnd = false, true
 		}
 		switch {
+		case p.heldApplied:
+			// applied to the elements held back (see heldEnd)
 		case (tok.Is("br") || tok.Is("p")) && p.templateIgnoresEnd():
 			// ignored by HTML parsers
 		case tok.Is("br"):
@@ -5524,6 +5710,9 @@ func (p *polyglot) endTag(tok *htmlstream.Token) {
 	if recordClosed && p.closed.first == "" {
 		p.closed.first = htmlName(tok)
 	}
+	if recordClosed && p.closed.unsound == "" && tok.Unsound() {
+		p.closed.unsound = htmlName(tok)
+	}
 	if recordClosed && tok.NS() == htmlstream.NamespaceXHTML {
 		// record what the implied end tags before the next token close, to
 		// warn if HTML parsers handle that token differently
@@ -5534,9 +5723,6 @@ func (p *polyglot) endTag(tok *htmlstream.Token) {
 		var buf [16]byte
 		if p.closed.special == "" && internal.HTMLElem(tok.AppendLocalName(buf[:0]))&internal.Special != 0 {
 			p.closed.special = htmlName(tok)
-		}
-		if p.closed.unsound == "" && tok.Unsound() {
-			p.closed.unsound = htmlName(tok)
 		}
 		if tok.Is("p") {
 			p.closed.p = true

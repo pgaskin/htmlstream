@@ -343,19 +343,69 @@ replace NUL with U+FFFD.
 -- warn --
 18: wrote content after </body> outside the svg it closed (HTML parsers would have kept svg open and put the content in it)
 -- IgnoredEndTagAfterBodyInElement --
+HTML parsers ignore an end tag matching none of the elements left open by the
+body end tag, and keep them open.
 -- in --
 <body><a><div></body></b>
 -- out --
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><a><div></div></a></body></html>
--- StrayEndTagAfterBodyInElement htmldiff --
+-- ContentAfterIgnoredEndTagAfterBody --
+-- in --
+<body><b></body></x><!--c-->
+-- out --
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><b><!--c--></b></body></html>
+-- IgnoredEndTagAfterForeignClosedAfterBody --
+The svg end tag closes the svg left open by the body end tag in foreign
+content, and the desc end tag is ignored in HTML content, keeping the b open.
+-- in --
+<body><b><svg></body></html></svg></desc><!--c-->
+-- out --
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><b><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"></svg><!--c--></b></body></html>
+-- StrayEndTagAfterBodyInElement --
+HTML parsers write the p and br for the end tags in the a left open by the
+html end tag.
 -- in --
 <html><a></html></p></br>
 -- out --
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><a></a><p></p><br /></body></html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><a><p></p><br /></a></body></html>
+-- HeadingEndTagAfterBodyInElement --
+An end tag matching an element left open by the body end tag closes the
+elements up to it only.
+-- in --
+<body><ul><li><h3></body></h1><!--c-->
+-- out --
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><ul><li><h3></h3><!--c--></li></ul></body></html>
+-- FormEndTagAfterBodyInForeign --
+A form end tag removes the form from the stack of open elements of HTML
+parsers without closing the elements above it, which stay open in the form.
+-- in --
+<body><form><svg></body></form><!--c-->
+-- out --
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><form><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><!--c--></svg></form></body></html>
+-- FormEndTagAfterBodyInElement --
+The form end tag generates implied end tags, closing the p, and the second
+one is ignored, since the form element pointer was cleared.
+-- in --
+<body><form><p></body></form><!--c--></form>x
+-- out --
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><form><p></p></form><!--c-->x</body></html>
+-- FormEndTagClosingForeign htmldiff --
+The Reader closes the svg at the form end tag, while HTML parsers remove only
+the form from the stack of open elements.
+-- in --
+<form><svg></form><!--c-->
+-- out --
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><form><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"></svg></form><!--c--></body></html>
 -- warn --
-16: wrote content after </html> outside the a it closed (HTML parsers would have kept a open and put the content in it)
+11: closed svg at </form> (HTML parsers would have kept it open)
 -- ContentAfterBodyInElement htmldiff --
 HTML parsers keep the a open after </html>
 -- in --
