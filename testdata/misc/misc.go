@@ -19,7 +19,10 @@ import (
 //go:embed *.txt
 var fsys embed.FS
 
-var items = map[string][]string{} // by category
+var (
+	items = map[string][]string{} // by category
+	lines = map[string][]int{}    // by category, the line number of each item
+)
 
 func init() {
 	names, err := fs.Glob(fsys, "*.txt")
@@ -35,6 +38,7 @@ func init() {
 			panic(err)
 		}
 		var vs []string
+		var ls []int
 		i := 0
 		for line := range strings.Lines(string(b)) {
 			i++
@@ -47,8 +51,10 @@ func init() {
 				panic(fmt.Errorf("%s:%d: %q: %w", name, i, line, err))
 			}
 			vs = append(vs, v)
+			ls = append(ls, i)
 		}
 		items[strings.TrimSuffix(name, ".txt")] = vs
+		lines[strings.TrimSuffix(name, ".txt")] = ls
 	}
 }
 
@@ -65,4 +71,20 @@ func Items(category string) iter.Seq[string] {
 		panic("misc_testdata: no category " + strconv.Quote(category))
 	}
 	return slices.Values(vs)
+}
+
+// Lines is like [Items], but also returns the line number of each input in
+// the file.
+func Lines(category string) iter.Seq2[int, string] {
+	vs, ok := items[category]
+	if !ok {
+		panic("misc_testdata: no category " + strconv.Quote(category))
+	}
+	return func(yield func(int, string) bool) {
+		for i, v := range vs {
+			if !yield(lines[category][i], v) {
+				return
+			}
+		}
+	}
 }

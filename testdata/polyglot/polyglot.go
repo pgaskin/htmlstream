@@ -75,6 +75,17 @@ func Cases(pattern string, sections ...string) iter.Seq2[string, Case] {
 	}
 }
 
+// Files returns the names of the test case files, e.g. "tables.txtar", sorted.
+func Files() iter.Seq[string] {
+	return func(yield func(string) bool) {
+		for _, f := range files {
+			if !yield(f.Name) {
+				return
+			}
+		}
+	}
+}
+
 // Flags returns the flags of the case, sorted.
 func (c Case) Flags() iter.Seq[string] {
 	return slices.Values(slices.Sorted(maps.Keys(c.flags)))
