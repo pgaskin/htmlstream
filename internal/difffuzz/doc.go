@@ -64,7 +64,7 @@
 // closing a p in quirks mode are also converted without a doctype.
 //
 // FuzzPolyglotWriter does the same checks for polyglot.Writer, with the
-// Reader options polyglot.Convert doesn't use (XML syntax, scripting), with
+// Reader options FuzzPolyglotDOM doesn't set (XML syntax, scripting), with
 // an element left out or unwrapped, and without a doctype, selected by a
 // mode byte.
 //

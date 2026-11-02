@@ -375,7 +375,7 @@ var hooksFound = []modeSeed{
 }
 
 // FuzzPolyglotWriter checks polyglot.Writer like FuzzPolyglotDOM checks
-// polyglot.Convert, with the Reader options polyglot.Convert doesn't use and
+// polyglot.Convert, with the Reader options FuzzPolyglotDOM doesn't set and
 // with elements left out, selected by mode: bit 0 enables XML syntax, bit 1
 // scripting, bits 2-4 select an element to leave out (the n-th distinct
 // element name opened, or none for 0), and bit 5 selects leaving out only its
