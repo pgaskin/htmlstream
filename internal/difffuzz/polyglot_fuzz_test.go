@@ -361,6 +361,7 @@ var writerFound = []modeSeed{
 	{"<html></heAd><heAd></html><!0", 0x00},
 	{"<ifrAme> ", 0x97},            // whitespace-only iframe contents
 	{"<html><heAd></html> ", 0x02}, // whitespace after an html end tag closing the head
+	{"<A tYpe tYpe=0\"/>", 0x02},   // a quote in the value quoted by xnetDroppedSlash
 }
 
 // hooksFound are inputs and modes which found bugs with FuzzPolyglotHooks.
@@ -821,7 +822,7 @@ func xnetForeignTemplate(in string) bool {
 // attribute value, and whose last attribute is a duplicate. x/net drops the
 // duplicate attribute, and then reads the tag as self-closing, since it only
 // checks whether the "/" ends the value of the last attribute it kept (e.g.,
-// <svg a a=/>x).
+// <svg a a=/>x). Quotes in the value are escaped.
 func xnetDroppedSlash(in string) string {
 	if !strings.Contains(in, "/>") {
 		return in
@@ -853,7 +854,7 @@ func xnetDroppedSlash(in string) string {
 		raw := tok.Raw()
 		pos := int(tok.Pos())
 		b.WriteString(in[last : pos+bytes.LastIndex(raw, a.Raw())])
-		fmt.Fprintf(&b, "%s=\"%s\">", a.Name(), a.RawValue())
+		fmt.Fprintf(&b, "%s=\"%s\">", a.Name(), bytes.ReplaceAll(a.RawValue(), []byte(`"`), []byte("&quot;")))
 		last = pos + len(raw)
 	}
 	if last == 0 {
