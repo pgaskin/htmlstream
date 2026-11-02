@@ -1100,7 +1100,7 @@ type Text struct {
 	Data []byte
 
 	// First is set for the first part of a text node, and Last for the call
-	// ending it, which has no Data.
+	// ending it, which has no Data and no Raw.
 	First, Last bool
 
 	// Raw is set for the contents of a script or style element and for
@@ -1110,7 +1110,7 @@ type Text struct {
 	// These contents, noscript contents read as raw text written as escaped
 	// text, and title and textarea contents read with XML syntax starting
 	// with a CDATA section (after whitespace, see [Writer]), which aren't
-	// Raw, are reported in one call.
+	// Raw, are reported in one call. It isn't set on the Last call.
 	Raw bool
 
 	// Token is the input token the text comes from (for the contents
@@ -1137,7 +1137,8 @@ type Text struct {
 // element in them, nor end with an incomplete one (e.g., </script), and
 // those of script must not contain <!--<script without a later -->, after
 // which HTML parsers ignore the end tag). For the Last call, data is written
-// at the end of the text node. The data must have only characters allowed in XML (see
+// at the end of the text node like a part (escaped, also after Raw
+// contents). The data must have only characters allowed in XML (see
 // [htmlstream.AppendXMLChars]), and must not start with a newline at the
 // start of the contents of pre, listing or textarea (see [Tag]).
 //
@@ -2547,6 +2548,7 @@ func (p *polyglot) tag(b []byte, e Tag) {
 	if p.opt.OnTag == nil {
 		if p.layout() && !(e.Void && !e.Start) {
 			p.layoutTag(e.Name, e.NS, e.Start, e.Void)
+			p.endText() // the whitespace held back and written by the layout
 		}
 		p.emit(b)
 		if e.fixed && e.Start {
@@ -2582,6 +2584,7 @@ func (p *polyglot) tag(b []byte, e Tag) {
 	}
 	if p.layout() && !ev.omit && !(e.Void && !e.Start) {
 		p.layoutTag(ev.w.name, e.NS, e.Start, e.Void)
+		p.endText() // the whitespace held back and written by the layout
 	}
 	p.emit(ev.before)
 	if !ev.omit {
@@ -2655,7 +2658,7 @@ func (p *polyglot) endText() {
 		if ev := p.callText(Text{Last: true}); ev.set {
 			if ev.isText {
 				p.raw = AppendEscapeText(p.raw[:0], ev.data)
-				p.emit(p.raw)
+				p.emitText()
 			} else {
 				p.emit(ev.data)
 			}
@@ -5145,6 +5148,11 @@ func (p *polyglot) writeText(tok *htmlstream.Token, b []byte) {
 	}
 	p.raw = AppendEscapeText(p.raw[:0], b)
 	p.textOpen = true
+	p.emitText()
+}
+
+// emitText writes the escaped text in p.raw, with the layout.
+func (p *polyglot) emitText() {
 	c := p.ctx()
 	if !p.layout() || c.layOff {
 		p.emit(p.raw)

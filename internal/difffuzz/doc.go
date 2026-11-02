@@ -69,7 +69,9 @@
 // mode byte.
 //
 // FuzzPolyglotHooks checks the invariants of the polyglot.Options OnTag and
-// OnText hooks (also with holds of the output, which must not change it), the
+// OnText hooks (also with holds of the output, and with each text node
+// written whole on the Last call of the Text hook, with and without Indent,
+// which must not change it), the
 // output with random edits allowed by their documentation (well-formed XML, and
 // matching XML and HTML DOMs without warnings), and the output with random
 // renames (the same HTML DOM as without them, with the names in each rename

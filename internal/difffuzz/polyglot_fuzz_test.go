@@ -1074,12 +1074,23 @@ func FuzzPolyglotHooks(f *testing.F) {
 		if err != nil {
 			return
 		}
-		for pass := range 3 {
-			explicit, holds := pass == 1, pass == 2
+		// pass 3 writes each text node whole on the Last call (see wholeText),
+		// and pass 4 does the same with Indent, which lays out the text
+		plainIndent, _, err := convert(func(*htmlstream.Reader) polyglot.Options { return polyglot.Options{Indent: "  "} })
+		if err != nil {
+			t.Fatalf("%q, mode %#x: with Indent: %v", in, mode, err)
+		}
+		for pass := range 5 {
+			explicit, holds, whole, indent := pass == 1, pass == 2, pass >= 3, pass == 4
+			want := plain
+			if indent {
+				want = plainIndent
+			}
 			hooked, _, err := convert(func(*htmlstream.Reader) polyglot.Options {
-				c := &hookChecker{t: t, in: in, mode: mode, ids: map[int]bool{}}
+				c := &hookChecker{t: t, in: in, mode: mode, ids: map[int]bool{}, indent: indent}
 				h := &holdOps{c: c, rnd: rand.New(rand.NewPCG(uint64(mode), uint64(len(in))))}
-				return polyglot.Options{
+				var w wholeText
+				opt := polyglot.Options{
 					OnTag: func(e *polyglot.Tag) {
 						c.tag(e)
 						if explicit {
@@ -1095,17 +1106,24 @@ func FuzzPolyglotHooks(f *testing.F) {
 						if explicit {
 							x.SetText(x.Data)
 						}
+						if whole {
+							w.step(x)
+						}
 						if holds {
 							h.step(x.Writer())
 						}
 					},
 				}
+				if indent {
+					opt.Indent = "  "
+				}
+				return opt
 			})
 			if err != nil {
 				t.Fatalf("%q, mode %#x: with hooks: %v", in, mode, err)
 			}
-			if hooked != plain {
-				t.Fatalf("%q, mode %#x: output differs with pass-through hooks (explicit %v, holds %v):\n%s\n%s", in, mode, explicit, holds, plain, hooked)
+			if hooked != want {
+				t.Fatalf("%q, mode %#x: output differs with pass-through hooks (explicit %v, holds %v, whole %v, indent %v):\n%s\n%s", in, mode, explicit, holds, whole, indent, want, hooked)
 			}
 		}
 		if edits == 0 {
@@ -1141,6 +1159,30 @@ func FuzzPolyglotHooks(f *testing.F) {
 			t.Fatalf("%q, mode %#x: HTML DOM differs with renames:\noutput: %s\nwith renames: %s\nDOM (without -, with +):\n%s", in, mode, plain, renamed, domDiff(want, got))
 		}
 	})
+}
+
+// wholeText is a Text hook writing each text node whole on its Last call:
+// it collects the Data of the parts, writing nothing for them, and writes
+// the text back unchanged with SetText on the Last call, which must give the
+// same output as no hook. Raw text is left alone (Raw isn't set on the Last
+// call, so it is kept from the First one).
+type wholeText struct {
+	raw bool
+	buf []byte
+}
+
+func (w *wholeText) step(x *polyglot.Text) {
+	if x.First {
+		w.raw, w.buf = x.Raw, w.buf[:0]
+	}
+	switch {
+	case w.raw:
+	case !x.Last:
+		w.buf = append(w.buf, x.Data...)
+		x.SetMarkup(nil)
+	default:
+		x.SetText(w.buf)
+	}
 }
 
 // renameGroups are the groups of HTML elements polyglot.Tag.Rename renames
@@ -1239,6 +1281,7 @@ type hookChecker struct {
 	textOpen bool
 	maxID    int
 	ids      map[int]bool // IDs of the start tags seen
+	indent   bool         // with Options.Indent, whitespace held back is reported after the tag events following it (see polyglot.Text), so ID and Depth aren't checked
 }
 
 // lookupPrefixes are the prefixes looked up on each tag event with
@@ -1337,7 +1380,7 @@ func (c *hookChecker) text(x *polyglot.Text) {
 	if x.Last != (x.Token == nil) || x.Last && len(x.Data) != 0 {
 		t.Fatalf("%q, mode %#x: text %+v: Last without data and token, or data or token with Last", in, mode, x)
 	}
-	if n := len(c.open); n == 0 || x.Depth != n || x.ID != c.open[n-1].ID {
+	if n := len(c.open); !c.indent && (n == 0 || x.Depth != n || x.ID != c.open[n-1].ID) {
 		t.Fatalf("%q, mode %#x: text %+v in %d open elements, the innermost %+v", in, mode, x, n, c.open[max(n-1, 0):])
 	}
 }

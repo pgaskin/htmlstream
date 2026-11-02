@@ -866,6 +866,7 @@ func TestHooks(t *testing.T) {
 	t.Run("Unwrap", testUnwrap)
 	t.Run("Remove", testRemove)
 	t.Run("Text", testText)
+	t.Run("TextIndent", testTextIndent)
 	t.Run("Writer", testWriterMethods)
 	t.Run("Errors", testHookErrors)
 }
@@ -1653,6 +1654,38 @@ func testRemove(t *testing.T) {
 // in a CDATA section when needed, text added at the end of a node, text
 // removed, and noscript raw contents escaped when they get markup characters.
 // The contents set aren't warned about, and aren't errors with Strict.
+// testTextIndent checks that with Indent, the text written on the Last call
+// of the Text hook is laid out like the parts, and that the Last call for
+// whitespace held back before a tag is made before the tag is written.
+func testTextIndent(t *testing.T) {
+	const head = "<html xmlns=\"http://www.w3.org/1999/xhtml\"><head>\n  <meta charset=\"UTF-8\" />\n</head>\n"
+	for _, tc := range []struct {
+		in, data, want string
+		markup         bool
+	}{
+		{"<!doctype html><p> <frameset><frame>", "<!--L-->", head + "<body>\n  <p> <!--L--><frameset><frame /></frameset></p>\n</body></html>", true},
+		{"<html> \x00 <frameset></frameset>", "<!--L-->", head + "<body> <!--L--><frameset></frameset></body></html>", true},
+		{"<div><p>a\nb</p></div>", "c\nd", head + "<body>\n  <div>\n    <p>a\n      bc\n      d</p>\n  </div>\n</body></html>", false},
+		{"<div>a\nb</div>", "\nc", head + "<body>\n  <div>a\n    b\n    c</div>\n</body></html>", false},
+	} {
+		got, err := convertHookedErr(tc.in, Options{DoctypeMode: NoDoctype, Indent: "  ", Warn: func(Warning) {}, OnText: func(x *Text) {
+			switch {
+			case !x.Last:
+			case tc.markup:
+				x.SetMarkup([]byte(tc.data))
+			default:
+				x.SetText([]byte(tc.data))
+			}
+		}}, false)
+		if err != nil {
+			t.Fatalf("%q: %v", tc.in, err)
+		}
+		if got != tc.want {
+			t.Errorf("%q with %q on the Last call:\n got %q\nwant %q", tc.in, tc.data, got, tc.want)
+		}
+	}
+}
+
 func testText(t *testing.T) {
 	for _, tc := range []struct {
 		in, want  string
