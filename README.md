@@ -53,6 +53,8 @@ This library is well-tested, fuzzed, and used in quite a few of my projects. Alt
 
 I haven't released a v1 yet since I want to be able to make minor changes to the API, but it can be considered stable enough for production use regardless.
 
+For the weirder or more ambiguous HTML5 documents, there is a long tail of minor bugs getting found by the fuzzer in edge-cases (mostly around the auto-closing and reopening logic), but they are relatively harmless, resulting in misplaced whitespace or a slightly different structure. This is due to the fact that the HTML spec specifies how to handle these when parsing the document fully, whereas we need to try and approximate that logic while only streaming it. In practice, you will rarely (if ever) hit them on real documents, and the other guarantees of this library still hold for them.
+
 #### LLM Usage
 
 This README is written entirely by me.
