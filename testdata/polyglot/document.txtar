@@ -547,6 +547,22 @@ parsers ignore the noscript end tag, and keep the a open
 <html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><noscript></noscript></head><body><a></a>x</body></html>
 -- warn --
 24: wrote content after </noscript> outside the a it closed (HTML parsers would have kept a open and put the content in it)
+-- ImpliedHeadNoscriptClosedEndTagSpace --
+the whitespace and comments after the ignored noscript end tag are in
+the a, which HTML parsers keep open
+-- in quoted --
+"<noscript><a></noscript> <!--c--> "
+-- out --
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><noscript></noscript></head><body><a> <!--c--> </a></body></html>
+-- ImpliedHeadNoscriptClosedEndTagReopened --
+the b reopened in the body takes the place of the closed noscript in the
+output's open elements: the noscript end tag is still ignored
+-- in quoted --
+"<noscript><p><b></p><a><div></noscript> "
+-- out --
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><noscript></noscript></head><body><p><b></b></p><b><a><div> </div></a></b></body></html>
 -- NoscriptAfterHead --
 noscript after the head (also implied, or ended by a stray </head>)
 is in the body
@@ -580,6 +596,24 @@ the noscript end tag is ignored when the p is open
 <html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><noscript><p>x</p></noscript>y<noscript><div>z</div></noscript></body></html>
 -- warn --
 31: wrote content after </noscript> outside the p it closed (HTML parsers would have kept p open and put the content in it)
+-- BodyNoscriptEndTagClosesDivSpace --
+the whitespace and comments after the ignored noscript end tag are in
+the div, which HTML parsers keep open with the noscript
+-- in quoted --
+"<body><noscript><div></noscript> <!--c--> "
+-- out --
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><noscript><div> <!--c--> </div></noscript></body></html>
+-- BodyNoscriptEndTagKeptOpen htmldiff --
+the div end tag closes the div for HTML parsers, which keep the noscript
+open after the ignored noscript end tag
+-- in --
+<body><noscript><div></noscript> </div> x
+-- out --
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><noscript><div> </div></noscript> x</body></html>
+-- warn --
+39: wrote content after </noscript> outside the noscript it closed (HTML parsers would have kept noscript open and put the content in it)
 -- BodyNoscriptEndTag --
 -- in --
 <body><noscript><b>x</noscript>y

@@ -1452,13 +1452,14 @@ const (
 //     restructures the elements, and end tags HTML parsers ignore;
 //   - content after a body or html end tag which closed other elements
 //     (other than the head, which they close too), which HTML parsers keep
-//     open and put the content in, and likewise
-//     after a noscript end tag which closed a special element, or an end tag
-//     of an element already closed. Whitespace after a body or html end tag
-//     is written in the elements, as HTML parsers put it there, up to the
-//     first other token (e.g., content, or a stray end tag) and 64 KiB of
-//     whitespace in one text; whitespace and comments after that and after
-//     the other end tags aren't reported. An end tag of an SVG or MathML
+//     open and put the content in, and likewise after a noscript end tag
+//     which closed a special element (ignored by HTML parsers, which keep
+//     the noscript open too), or an end tag of an element already closed.
+//     Whitespace after these end tags is written in the elements, as HTML
+//     parsers put it there, and so are comments after the noscript and
+//     other end tags, up to the first other token (e.g., content, or a
+//     stray end tag) and 64 KiB of whitespace in one text; whitespace and
+//     comments after that aren't reported. An end tag of an SVG or MathML
 //     element among them, which HTML parsers apply to it, closes it and the
 //     elements inside it, and the others stay open;
 //   - template contents which HTML parsers parse differently: they parse
@@ -1614,8 +1615,9 @@ func Convert(w io.Writer, r io.Reader, opt Options) error {
 // and inserted markup are done on the output, through the hooks (see below).
 //
 // Implied end tags are converted with the token after them, and the elements
-// closed by implied end tags before a body or html end tag are closed after
-// the whitespace and comments after the end tag (see [Convert]): the hooks
+// closed by implied end tags before a body or html end tag, or an end tag
+// HTML parsers ignore, are closed after the whitespace and comments after
+// the end tag (see [Convert]): the hooks
 // are called, the output written and the errors for the tokens returned when
 // they are converted. The comments after body and html end tags are written
 // by Close.
@@ -1796,11 +1798,11 @@ func (pw *Writer) WriteToken(tok *htmlstream.Token) error {
 
 // queueToken converts tok, or holds it back: implied end tags are held
 // back until the next token, and if it is a body or html end tag, which
-// doesn't close the elements for HTML parsers, until the next token other
-// than text of whitespace and NUL, comments, body and html end tags, and
-// stray end tags HTML parsers ignore or apply to some of the elements (see
-// heldEnd), which are converted inside the elements, where HTML parsers put
-// them.
+// doesn't close the elements for HTML parsers, or an end tag they ignore
+// (see ignoredEnd), until the next token other than text of whitespace and
+// NUL, comments, body and html end tags, and stray end tags HTML parsers
+// ignore or apply to some of the elements (see heldEnd), which are converted
+// inside the elements, where HTML parsers put them.
 func (p *polyglot) queueToken(tok *htmlstream.Token) {
 	p.afterBodyToken(tok)
 	k := tok.Kind()
@@ -1818,6 +1820,10 @@ func (p *polyglot) queueToken(tok *htmlstream.Token) {
 	case p.implied.Len() == 0:
 	case k == htmlstream.EndTag && (tok.Is("body") || tok.Is("html")) && (tok.Stray() && p.keptByEnd || tok.NS() == htmlstream.NamespaceXHTML && (p.keptByEnd || p.closesKept())):
 		// (a stray one after the first one, which HTML parsers ignore)
+		p.implied.Append(tok)
+		p.keptByEnd = true
+		return
+	case k == htmlstream.EndTag && p.ignoredEnd(tok):
 		p.implied.Append(tok)
 		p.keptByEnd = true
 		return
@@ -1889,6 +1895,44 @@ func (p *polyglot) closesKept() bool {
 	return false
 }
 
+// ignoredEnd reports whether HTML parsers ignore the explicit end tag tok,
+// which closes elements for the Reader (the implied end tags held back),
+// and keep the elements open: a noscript end tag closing a special element
+// (see checkEndTag), or the end tag of an element already closed in the
+// output, like a noscript in the head closed by body content (see endTag).
+// The implied end tags are held back with it, like after a body or html end
+// tag (see queueToken), with the whitespace and comments after it written
+// in the elements. Elements which weren't written don't count, as for
+// closesKept.
+func (p *polyglot) ignoredEnd(tok *htmlstream.Token) bool {
+	if tok.Stray() || tok.Implied() || tok.NS() != htmlstream.NamespaceXHTML || !p.closesKept() {
+		return false
+	}
+	var f *frame
+	for _, g := range p.frames.All() {
+		if g.pos == tok.StartPos() {
+			f = g
+			break
+		}
+	}
+	if f == nil || f.out < 0 {
+		return false
+	}
+	if p.closedOut(f) {
+		return true
+	}
+	if !tok.Is("noscript") || p.out[f.out].ns != "" {
+		return false
+	}
+	var buf [16]byte
+	for t := range p.implied.All() {
+		if t.NS() == htmlstream.NamespaceXHTML && !p.dropped(t) && internal.HTMLElem(t.AppendLocalName(buf[:0]))&internal.Special != 0 {
+			return true
+		}
+	}
+	return false
+}
+
 // dropped reports whether the end tag tok closes an element which wasn't
 // written.
 func (p *polyglot) dropped(tok *htmlstream.Token) bool {
@@ -1901,9 +1945,10 @@ func (p *polyglot) dropped(tok *htmlstream.Token) bool {
 }
 
 // heldEnd returns the number of implied end tags held back after a body or
-// html end tag (see queueToken) which HTML parsers apply when they apply the
-// stray end tag tok to the elements they closed for the Reader, which are
-// still open for HTML parsers: the elements up to the one the end tag
+// html end tag, or an end tag HTML parsers ignore (see queueToken), which
+// HTML parsers apply when they apply the stray end tag tok to the elements
+// they closed for the Reader, which are still open for HTML parsers: the
+// elements up to the one the end tag
 // matches, none if they ignore it, or -1 if they change the elements in a
 // way the output can't follow (the implied end tags are all converted then,
 // and the end tag is reported as applied to closed elements, see keepOpen).
@@ -1937,17 +1982,17 @@ func (p *polyglot) heldEnd(tok *htmlstream.Token) int {
 		if !t.Implied() {
 			break
 		}
-		out := -1
-		for _, f := range p.frames.All() {
-			if f.pos == t.StartPos() {
-				out = f.out
+		var f *frame
+		for _, g := range p.frames.All() {
+			if g.pos == t.StartPos() {
+				f = g
 				break
 			}
 		}
-		if out < 0 || out >= len(p.out) {
+		if f == nil || f.out < 0 || p.closedOut(f) {
 			return cmp.Or(foreign, -1)
 		}
-		held = append(held, out)
+		held = append(held, f.out)
 	}
 	if len(held) == 0 {
 		return cmp.Or(foreign, -1)
@@ -2065,11 +2110,11 @@ func (p *polyglot) heldEnd(tok *htmlstream.Token) int {
 }
 
 // closesForeign returns the number of implied end tags held back after a
-// body or html end tag (see queueToken) up to and including that of the
-// SVG or MathML element matched by the stray end tag tok, or 0 if an HTML
-// element comes first. HTML parsers apply an end tag in foreign content to
-// the foreign elements open above the first HTML element, which the Reader
-// closed before the body or html end tag.
+// body or html end tag, or an end tag HTML parsers ignore (see queueToken),
+// up to and including that of the SVG or MathML element matched by the
+// stray end tag tok, or 0 if an HTML element comes first. HTML parsers
+// apply an end tag in foreign content to the foreign elements open above
+// the first HTML element, which the Reader closed before the end tag.
 func (p *polyglot) closesForeign(tok *htmlstream.Token) int {
 	var a, b [16]byte
 	for i := range p.implied.Len() {
@@ -2125,11 +2170,14 @@ func lastIndexFunc[S ~[]E, E any](s S, f func(E) bool) int {
 }
 
 // flushImplied converts the implied end tags held back by queueToken, and
-// the body and html end tags after them.
+// the body and html end tags and the end tags HTML parsers ignore after
+// them.
 func (p *polyglot) flushImplied() {
 	for t := range p.implied.All() {
+		p.heldIgnored = !t.Implied() && !t.Is("body") && !t.Is("html")
 		p.convert(t)
 	}
+	p.heldIgnored = false
 	p.implied.Reset()
 	p.keptByEnd = false
 }
@@ -3034,13 +3082,15 @@ type polyglot struct {
 	afterHeadFull bool
 
 	// implied end tags held back until the next token, followed by body and
-	// html end tags if keptByEnd (see queueToken), and the text after them,
-	// held back while it is whitespace (afterEndText is set once it isn't)
+	// html end tags and end tags HTML parsers ignore if keptByEnd (see
+	// queueToken and ignoredEnd), and the text after them, held back while
+	// it is whitespace (afterEndText is set once it isn't)
 	implied      htmlstream.TokenBuffer
 	keptByEnd    bool
 	afterEnd     htmlstream.TokenBuffer
 	afterEndText bool
 	heldApplied  bool // the stray end tag being converted closed elements held back (see heldEnd)
+	heldIgnored  bool // the end tag being converted was held back as one HTML parsers ignore (see flushImplied)
 
 	// with FinalNewline, the whitespace directly in the body, until the next
 	// token, for a line break at its end (see bodySpaceToken)
@@ -3204,6 +3254,7 @@ type fmtKey struct {
 type frame struct {
 	pos        htmlstream.Pos // of the start tag
 	out        int            // index in p.out, or -1 if the element wasn't written
+	id         int            // the id of the output element (see outElem), to tell whether it is still open (see closedOut)
 	start      []byte         // written start tag of formatting elements (nil if unwrapped: not reopened)
 	name       string
 	marker     int      // p.markers when the element was opened
@@ -5930,9 +5981,21 @@ func (p *polyglot) tableFixup(name string) bool {
 // pushFrame pushes the frame of the element opened by tok.
 func (p *polyglot) pushFrame(tok *htmlstream.Token, f frame) {
 	f.pos = tok.Pos()
+	if f.out >= 0 {
+		f.id = p.out[f.out].id
+	}
 	if p.frames.Push(tok, f) && f.start != nil {
 		p.reopens++
 	}
+}
+
+// closedOut reports whether the output element of the frame f, which was
+// written (f.out >= 0), was closed without its end tag (e.g., a noscript in
+// the head, closed with it, or an element in a p kept open around a table,
+// see keepP): HTML parsers ignore the end tag. Another element (e.g., a
+// reopened formatting element) can have taken its place in p.out.
+func (p *polyglot) closedOut(f *frame) bool {
+	return f.out >= len(p.out) || p.out[f.out].id != f.id
 }
 
 // dropElement skips writing a start tag, and the end tag of the element it
@@ -6088,7 +6151,7 @@ func (p *polyglot) endTag(tok *htmlstream.Token) {
 		// HTML parsers put content after body and html end tags in the
 		// body, in the elements still open: the end tags (also of misplaced
 		// start tags) don't close them
-		p.keepOpen(tok)
+		p.keepOpen(tok, false)
 	}
 	if !ok || f.out < 0 {
 		return
@@ -6099,11 +6162,11 @@ func (p *polyglot) endTag(tok *htmlstream.Token) {
 	case "body", "html":
 		return // written at the end
 	}
-	if f.out >= len(p.out) {
+	if p.closedOut(&f) {
 		// already closed (e.g., a noscript in the head, closed with it):
 		// HTML parsers ignore the end tag
 		if !tok.Implied() {
-			p.keepOpen(tok)
+			p.keepOpen(tok, false)
 		}
 		return
 	}
@@ -6201,16 +6264,27 @@ func (p *polyglot) strayFormattingEnd(tok *htmlstream.Token) {
 }
 
 // keepOpen records the elements closed by the implied end tags before an end
-// tag which doesn't close them for HTML parsers. They are open for HTML
-// parsers, so they aren't reopened (for whitespace after them), and other
-// content after them is reported. The head isn't kept open: HTML parsers
-// close it at a body or html end tag and start the body (see closesKept).
-func (p *polyglot) keepOpen(tok *htmlstream.Token) {
-	if p.closed.first != "" && p.closed.first != "body" && p.closed.first != "head" {
-		p.keptOpen, p.keptBy = p.closed.first, htmlName(tok)
-		p.kept = append(p.kept[:0], p.closed.names...)
-		p.pending, p.tentative = p.pending[:0], p.tentative[:0]
+// tag which doesn't close them for HTML parsers, and with self, the element
+// of the end tag, which they ignore (a noscript with a special element open
+// inside it). They are open for HTML parsers, so they aren't reopened (for
+// whitespace after them), and other content after them is reported. The
+// head isn't kept open: HTML parsers close it at a body or html end tag and
+// start the body (see closesKept).
+func (p *polyglot) keepOpen(tok *htmlstream.Token, self bool) {
+	first := p.closed.first
+	if first == "body" || first == "head" {
+		first = ""
 	}
+	if first == "" && !self {
+		return
+	}
+	p.keptBy = htmlName(tok)
+	p.keptOpen = cmp.Or(first, p.keptBy)
+	p.kept = append(p.kept[:0], p.closed.names...)
+	if self {
+		p.kept = append(p.kept, p.keptBy)
+	}
+	p.pending, p.tentative = p.pending[:0], p.tentative[:0]
 }
 
 // keepP keeps a p open around a table like HTML parsers in quirks mode, when
@@ -6412,8 +6486,10 @@ func (p *polyglot) templateTableEnd(tok *htmlstream.Token) {
 //     open and clones the formatting element into it;
 //   - the end tag of other non-special elements is ignored when a special
 //     element is open inside it, and so is the end tag of noscript (special,
-//     but without its own end tag rules), which is reported for content
-//     after it (see keepOpen);
+//     but without its own end tag rules), which keeps the noscript and the
+//     elements inside it open for content after it (see keepOpen; the end
+//     tag was held back as one they ignore, or closes a p kept open around
+//     a table, see keepP);
 //   - a form end tag removes only the form from the stack of open elements
 //     (other elements inside it are closed by their own implied end tags).
 func (p *polyglot) checkEndTag(tok *htmlstream.Token, name string) {
@@ -6423,8 +6499,8 @@ func (p *polyglot) checkEndTag(tok *htmlstream.Token, name string) {
 		p.warn(tok.Pos(), "closed %s at </%s> (HTML parsers would have kept %s open and cloned %s into it)", p.closed.special, name, p.closed.special, name)
 	case info&(internal.Formatting|internal.Special) == 0 && p.closed.special != "":
 		p.warn(tok.Pos(), "closed %s at </%s> (HTML parsers would have ignored the end tag)", p.closed.special, name)
-	case name == "noscript" && p.closed.special != "":
-		p.keepOpen(tok)
+	case name == "noscript" && (p.closed.special != "" || p.heldIgnored):
+		p.keepOpen(tok, true)
 	case name == "form" && p.closed.unsound != "":
 		p.warn(tok.Pos(), "closed %s at </form> (HTML parsers would have kept it open)", p.closed.unsound)
 	}
