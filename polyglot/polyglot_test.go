@@ -1392,6 +1392,24 @@ func testHookErrors(t *testing.T) {
 			}
 			return nil
 		}},
+		{"SetAttr with the prefix of the last start tag on the implied body", `<style xmlns:x="u"></style></head>a`, "unbound prefix", func(e *Tag) error {
+			if e.Start && e.Name == "body" {
+				e.SetAttr("x:a", "1")
+			}
+			return nil
+		}},
+		{"SetAttr with the prefix of the td on the implied tbody", `<table><td xmlns:x="u">x`, "unbound prefix", func(e *Tag) error {
+			if e.Start && e.Name == "tbody" {
+				e.SetAttr("x:a", "1")
+			}
+			return nil
+		}},
+		{"SetAttr with the prefix of the last start tag on the p of a stray end tag", `<p xmlns:x="u">x</p></p>`, "unbound prefix", func(e *Tag) error {
+			if e.Start && e.Name == "p" && e.Token == nil {
+				e.SetAttr("x:a", "1")
+			}
+			return nil
+		}},
 		{"SetAttr uppercase name", `<p>x</p>`, "HTML parsers give it", func(e *Tag) error {
 			if e.Start && e.Name == "p" {
 				e.SetAttr("Class", "u")

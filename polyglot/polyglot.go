@@ -2359,10 +2359,15 @@ func (p *polyglot) startPending() {
 	p.pendRaw = p.pendRaw[:0]
 }
 
-// tagString is tag for a constant tag, which has no attributes to edit.
+// tagString is tag for a constant tag, which has no attributes to edit. A
+// start tag has no namespace declarations (those of the last input start tag
+// were kept with its element, see outDecls).
 func (p *polyglot) tagString(s string, e Tag) {
 	p.buf = append(p.buf[:0], s...)
 	p.attrs = p.attrs[:0]
+	if e.Start {
+		p.tagDecls, p.tagIndexed = p.tagDecls[:0], false
+	}
 	p.tag(p.buf, e)
 }
 
@@ -5617,12 +5622,17 @@ func (p *polyglot) tableFixup(name string) bool {
 	if len(p.out)+n >= p.opt.MaxDepth {
 		return false
 	}
-	switch {
-	case n == 0:
-	case name == "col":
+	if n == 0 {
+		return true
+	}
+	// the declarations of the start tag being written don't apply to the
+	// elements written before it (see reconstruct)
+	tagDecls, tagIndexed := p.tagDecls, p.tagIndexed
+	p.tagDecls, p.tagIndexed = nil, false
+	if name == "col" {
 		p.tagString("<colgroup>", htmlTag("colgroup", true))
 		p.pushOut(outElem{name: "colgroup", synthetic: true})
-	default:
+	} else {
 		if p.topIs("table", false) {
 			p.tagString("<tbody>", htmlTag("tbody", true))
 			p.pushOut(outElem{name: "tbody", synthetic: true})
@@ -5632,6 +5642,7 @@ func (p *polyglot) tableFixup(name string) bool {
 			p.pushOut(outElem{name: "tr", synthetic: true})
 		}
 	}
+	p.tagDecls, p.tagIndexed = tagDecls, tagIndexed
 	return true
 }
 
