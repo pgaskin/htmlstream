@@ -45,3 +45,18 @@ it is, and which is escaped again on every pass.
 <html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><noscript>no js</noscript><noscript>&lt;b&gt;x&lt;/b&gt;</noscript></body></html>
 -- warn --
 42: escaped raw text noscript contents containing <, & or ]]> (HTML parsers with scripting enabled will read them as raw text when parsing the output)
+-- XMLSyntaxEmptyFormattingNoahsArk xs --
+An empty formatting element counts for the Noah's Ark clause: HTML parsers
+push it onto the list of active formatting elements, which removes an
+earlier identical one, before its end tag removes it.
+-- in --
+<p><b><b><b><b/>x<p>y
+-- out --
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p><b><b><b><b></b>x</b></b></b></p><p><b><b>y</b></b></p></body></html>
+-- XMLSyntaxEmptyFormattingBeforeLink xs --
+-- in --
+<a><b><b><b><b/><a>
+-- out --
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><a><b><b><b><b></b></b></b></b></a><b><b><a></a></b></b></body></html>

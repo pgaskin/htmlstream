@@ -362,6 +362,7 @@ var writerFound = []modeSeed{
 	{"<ifrAme> ", 0x97},            // whitespace-only iframe contents
 	{"<html><heAd></html> ", 0x02}, // whitespace after an html end tag closing the head
 	{"<A tYpe tYpe=0\"/>", 0x02},   // a quote in the value quoted by xnetDroppedSlash
+	{"<A><B><B><B><B/><A >", 0x01}, // Noah's Ark clause with an empty formatting element
 }
 
 // hooksFound are inputs and modes which found bugs with FuzzPolyglotHooks.

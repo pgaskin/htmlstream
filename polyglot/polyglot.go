@@ -5532,6 +5532,13 @@ func (p *polyglot) startTag(tok *htmlstream.Token) {
 			e := outElem{name: name, decls: p.outDecls()}
 			if ns != htmlstream.NamespaceXHTML {
 				e.ns = ns
+			} else if info&internal.Formatting != 0 {
+				// HTML parsers push the empty element onto the list of
+				// active formatting elements before its end tag removes it,
+				// which can remove an earlier identical one (see noahsArk)
+				off := len(p.starts)
+				p.noahsArk(p.formattingKey(tok, name))
+				p.starts = p.starts[:off]
 			}
 			p.pushOut(e)
 			p.popOut()
