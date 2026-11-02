@@ -973,8 +973,9 @@ var renameGroup = func() map[string]int {
 // Unwrap leaves out the tag and its end tag, keeping the contents of the
 // element (like leaving out both tags of the input, see [Writer]). Both tag
 // events are still reported. A formatting element unwrapped isn't reopened
-// after a misnested end tag, and a leading newline isn't removed from an
-// unwrapped pre, textarea or listing.
+// after a misnested end tag, and doesn't count toward the identical ones
+// HTML parsers keep to reopen (see Rename), and a leading newline isn't
+// removed from an unwrapped pre, textarea or listing.
 //
 // It fails the conversion for an end tag, a reopened element, html, head and
 // body (also those of the input), an element the conversion adds (tbody, tr,
@@ -1013,8 +1014,10 @@ func (e *Tag) Unwrap() {
 // the contents, and the end tag event is still reported, with no tag written.
 // Markup inserted before or after either tag (in this event or in the end tag
 // event) is still written, in that order, where the element was. Text nodes
-// separated only by a removed element are still reported as two nodes. It
-// fails the conversion for an end tag, a reopened element, html, head and
+// separated only by a removed element are still reported as two nodes. Like
+// an unwrapped one, a removed formatting element isn't reopened and doesn't
+// count toward the identical ones HTML parsers keep to reopen. It fails the
+// conversion for an end tag, a reopened element, html, head and
 // body (also those of the input), an element the conversion adds and the
 // first child element of a template (see Unwrap). Removing other elements
 // doesn't change how HTML parsers read the rest of the document.
@@ -5712,7 +5715,7 @@ func (p *polyglot) startTag(tok *htmlstream.Token) {
 			e := outElem{name: name, decls: p.outDecls()}
 			if ns != htmlstream.NamespaceXHTML {
 				e.ns = ns
-			} else if info&internal.Formatting != 0 {
+			} else if info&internal.Formatting != 0 && !p.startOmit {
 				// HTML parsers push the empty element onto the list of
 				// active formatting elements before its end tag removes it,
 				// which can remove an earlier identical one (see noahsArk)
@@ -5744,10 +5747,14 @@ func (p *polyglot) startTag(tok *htmlstream.Token) {
 			f.start = p.starts[f.startOff:len(p.starts):len(p.starts)]
 			f.bound = p.boundPrefixes()
 		}
-		e.key = p.formattingKey(tok, name)
 		p.seq++
 		e.seq = p.seq
-		p.noahsArk(e.key)
+		if !p.startOmit {
+			// HTML parsers don't see unwrapped and removed elements, so they
+			// don't count toward the Noah's Ark clause
+			e.key = p.formattingKey(tok, name)
+			p.noahsArk(e.key)
+		}
 	}
 	p.pushOut(e)
 	f.out, f.marker = len(p.out)-1, p.markers

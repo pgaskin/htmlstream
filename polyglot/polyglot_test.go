@@ -865,6 +865,7 @@ func TestHooks(t *testing.T) {
 	t.Run("Rename", testRename)
 	t.Run("Unwrap", testUnwrap)
 	t.Run("Remove", testRemove)
+	t.Run("OmittedFormatting", testOmittedFormatting)
 	t.Run("Text", testText)
 	t.Run("TextIndent", testTextIndent)
 	t.Run("Writer", testWriterMethods)
@@ -1529,6 +1530,43 @@ func TestRenameGroups(t *testing.T) {
 
 // testUnwrap checks Unwrap: the tags are left out and the events still
 // reported, and an unwrapped formatting element isn't reopened.
+// testOmittedFormatting checks that unwrapped and removed formatting
+// elements don't count toward the three identical formatting elements HTML
+// parsers keep to reopen: the output reopens what HTML parsers reopen in the
+// input without the element.
+func testOmittedFormatting(t *testing.T) {
+	for _, tc := range []struct {
+		in     string
+		unwrap bool
+		omit   int // the n-th b start tag
+		want   string
+	}{
+		{"<p><b><b><b><b>x</p>y", true, 4, "<p><b><b><b>x</b></b></b></p><b><b><b>y</b></b></b>"},
+		{"<p><b><b><b><b>x</p>y", false, 4, "<p><b><b><b></b></b></b></p><b><b><b>y</b></b></b>"},
+		{"<p><b><b><b><b/>x</p>y", true, 4, "<p><b><b><b>x</b></b></b></p><b><b><b>y</b></b></b>"},
+		{"<p><b><b><b><b>x</p>y", true, 1, "<p><b><b><b>x</b></b></b></p><b><b><b>y</b></b></b>"},
+	} {
+		n := 0
+		got, err := convertHookedErr(tc.in, Options{DoctypeMode: NoDoctype, OnTag: func(e *Tag) {
+			if e.Start && e.Name == "b" && !e.Reopened {
+				if n++; n == tc.omit {
+					if tc.unwrap {
+						e.Unwrap()
+					} else {
+						e.Remove()
+					}
+				}
+			}
+		}}, false)
+		if err != nil {
+			t.Fatalf("%q: %v", tc.in, err)
+		}
+		if want := `<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body>` + tc.want + `</body></html>`; got != want {
+			t.Errorf("%q, unwrap %v, b %d:\n got %s\nwant %s", tc.in, tc.unwrap, tc.omit, got, want)
+		}
+	}
+}
+
 func testUnwrap(t *testing.T) {
 	for _, tc := range []struct{ in, unwrap, want string }{
 		{`<p><span class=u>a<b>b</b></span>c</p>`, "span", `<p>a<b>b</b>c</p>`},
