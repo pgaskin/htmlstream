@@ -1109,6 +1109,11 @@ func FuzzTransformAttrs(f *testing.F) {
 	f.Add(`<A 0 B=""= 0>`, uint8('6'), []byte("1"))
 	f.Add("<plAinteXt/><A", uint8('_'), []byte("0"))
 	f.Add("<plAinteXt/><A", uint8('_'), []byte("1"))
+	// a doctype or processing instruction ended at its first ">" by the end
+	// of the input (see endedAtEOF), with a later edit adding "]>" or "?>"
+	f.Add("<!DOCTYPE[><A] [>", uint8('/'), []byte("1"))
+	f.Add("<!DOCTYPE x [><a] [>", uint8(2), []byte{0, 1})
+	f.Add("<?xml?><?p a><b?/>", uint8(2), []byte{0})
 	// values with tabs, newlines and carriage returns, under HTML and XML rules
 	for mode := range uint8(3) {
 		f.Add(`<p a="1"><svg xmlns="http://www.w3.org/2000/svg"><g x="1"/></svg><q>`, mode, []byte{0x01, 0xA0, 0x02, 0x01, 0xB9, 0x05, 0x02})
@@ -1123,9 +1128,13 @@ func FuzzTransformAttrs(f *testing.F) {
 		if len(ops) == 0 {
 			return
 		}
+		m := modes[int(mode)%len(modes)]
+		if endedAtEOF(in, m) {
+			return
+		}
 		var b bytes.Buffer
 		x := NewTransformer(&b, strings.NewReader(in))
-		x.SetMode(modes[int(mode)%len(modes)])
+		x.SetMode(m)
 		var want [][]attr
 		k := 0
 		next := func() byte {
@@ -1286,6 +1295,54 @@ func FuzzTransformAttrs(f *testing.F) {
 			t.Fatalf("output %q has %d start tags, want %d", b.String(), j, len(want))
 		}
 	})
+}
+
+// endedAtEOF reports whether a doctype or processing instruction in the input
+// was ended at its first ">" because it reached the end of the input (see
+// Universal and Reader.SetXMLSyntax): an internal subset, quoted literal or
+// processing instruction continuing to the end of the input. Where such a
+// token ends depends on the input after it, so edits after it can change it
+// when the output is read again. The input is read with and without a suffix
+// closing such a token, and the tokens must be the same up to the ones the
+// suffix changes: the implied end tags at the end of the input, and before
+// them, text or a token cut off by the end of the input.
+func endedAtEOF(in string, m Mode) bool {
+	type token struct {
+		kind       Kind
+		raw        string
+		incomplete bool
+		implied    bool
+	}
+	read := func(in string) (toks []token) {
+		r := NewReader(strings.NewReader(in))
+		r.SetMode(m)
+		for r.Next() {
+			tok := r.Token()
+			toks = append(toks, token{tok.Kind(), string(tok.Raw()), tok.Incomplete(), tok.Implied()})
+		}
+		return
+	}
+	toks := read(in)
+	n := len(toks)
+	for n > 0 && toks[n-1].kind == EndTag && toks[n-1].implied {
+		n--
+	}
+	if n > 0 && (toks[n-1].kind == Text || toks[n-1].incomplete) {
+		n--
+		for n > 0 && toks[n].kind == Text && toks[n-1].kind == Text {
+			n-- // text split into several tokens
+		}
+	}
+	more := read(in + "]>\">'>?>")
+	if len(more) < n {
+		return true
+	}
+	for i, tok := range toks[:n] {
+		if more[i].kind != tok.kind || more[i].raw != tok.raw {
+			return true
+		}
+	}
+	return false
 }
 
 func TestTransformHold(t *testing.T) {
