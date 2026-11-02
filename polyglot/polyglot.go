@@ -563,7 +563,8 @@ func (e *Tag) InsertAfter(raw []byte) {
 // declarations are removed, and the encoding is declared by the meta element
 // the conversion adds), and type and language on script (the CDATA wrapper
 // and JSON escaping of the contents are chosen from the type in the input).
-// Other attributes don't affect the document structure.
+// Other attributes don't affect the document structure, except on
+// formatting elements (see below).
 //
 // Prefixed names other than xml:lang on HTML elements (e.g., xml:space or
 // epub:type) aren't checked either: HTML parsers put these attributes in no
@@ -571,7 +572,15 @@ func (e *Tag) InsertAfter(raw []byte) {
 // warning for such attributes of the input (see [Convert]). The prefix must
 // be bound where the tag is (see LookupPrefix): by a declaration of the
 // input on the element or an enclosing one, or by Declare on this tag
-// (before SetAttr) or on the tag of an enclosing element.
+// (before SetAttr) or on the tag of an enclosing element. SetAttr doesn't
+// check for another attribute of the tag with the same namespace and local
+// name for XML parsers: with two prefixes bound to the same namespace, x:a
+// and y:a are the same attribute, and XML parsers reject the output.
+//
+// HTML parsers consider formatting elements (e.g., b) with the same name and
+// attributes identical, and reopen only the last three of them after
+// misnested markup (see Rename), so after attribute edits of formatting
+// elements, the output can nest differently than the edited input would.
 func (e *Tag) SetAttr(name, value string) {
 	if e.checkAttrEdit(name) != nil {
 		return
@@ -611,6 +620,67 @@ func (e *Tag) RemoveAttr(name string) {
 			p.removeAttr("xml:lang")
 		case "xml:lang":
 			p.removeAttr("lang")
+		}
+	}
+	e.edited = true
+}
+
+// RenameAttr renames the attribute name of the start tag to newName, if the
+// tag has it (of the input, or added by SetAttr), in place: the attribute
+// keeps its position among the attributes of the tag, and its value as
+// written (escaped like a value of the input, and on HTML elements, the value
+// of lang for xml:lang, see [Convert]). If the tag already has an attribute
+// named newName, that attribute is removed. On HTML elements, lang and
+// xml:lang are kept together, as by SetAttr and RemoveAttr: renaming either
+// of them removes the other, and renaming an attribute to either of them
+// adds the other (after the attributes of the tag, if the tag doesn't have
+// it) with the value. Renaming an attribute to its own name does nothing.
+// The reopened copies of a formatting element repeat the rename (see
+// Reopened).
+//
+// An attribute can be renamed to a prefixed name (e.g., type to epub:type)
+// and back. The prefix must be bound where the tag is, as for SetAttr (by a
+// declaration of the input, or by Declare on this tag before RenameAttr or
+// on the tag of an enclosing element). XML parsers put the attribute in the
+// namespace bound to the prefix, and HTML parsers in no namespace, with the
+// prefixed name (except for some xlink and xml attributes of SVG and MathML
+// elements, see [Convert]), like for attributes of the input and SetAttr.
+//
+// It fails the conversion like SetAttr: for a tag which can't be edited, and
+// for either name which isn't an XML name, has an unbound prefix, is a
+// namespace declaration (xmlns or xmlns:*, which can't be renamed) or isn't
+// the name HTML parsers give the attribute. Like SetAttr, it doesn't check
+// the attributes which change how the document is parsed or converted
+// (renaming to or from type on input, encoding on annotation-xml, charset,
+// http-equiv and content on meta, and type and language on script changes
+// the document for HTML parsers, or how the conversion converts it; see
+// SetAttr), prefixed names, attributes which are the same for XML parsers,
+// or the attributes of formatting elements (see SetAttr).
+func (e *Tag) RenameAttr(name, newName string) {
+	if e.checkAttrEdit(name) != nil || e.checkAttrEdit(newName) != nil {
+		return
+	}
+	p := e.p
+	if name == newName || p.attrIndex(name) < 0 {
+		return
+	}
+	html := e.w.ns == htmlstream.NamespaceXHTML
+	if html {
+		switch name {
+		case "lang":
+			p.removeAttr("xml:lang")
+		case "xml:lang":
+			p.removeAttr("lang")
+		}
+	}
+	p.removeAttr(newName)
+	p.renameAttr(name, newName)
+	if html {
+		switch newName {
+		case "lang":
+			p.copyAttr(newName, "xml:lang")
+		case "xml:lang":
+			p.copyAttr(newName, "lang")
 		}
 	}
 	e.edited = true
@@ -2571,8 +2641,33 @@ func (p *polyglot) setAttr(name string, value []byte) {
 	a = AppendEscapeAttr(a, value)
 	a = append(a, '"')
 	p.ebuf = a
+	p.putAttr(name, a)
+}
+
+// copyAttr sets the attribute to of the start tag in p.buf to the value of
+// its attribute from, as written (escaped), like setAttr.
+func (p *polyglot) copyAttr(from, to string) {
+	i := p.attrIndex(from)
+	if i < 0 {
+		return
+	}
+	r := p.attrs[i]
+	a := append(p.ebuf[:0], ' ')
+	a = append(a, to...)
+	a = append(a, `="`...)
+	a = append(a, p.buf[r.off+1+len(from)+2:r.end-1]...) // after ` from="`, before `"`
+	a = append(a, '"')
+	p.ebuf = a
+	p.putAttr(to, a)
+}
+
+// putAttr writes the attribute a (its bytes as written, from the space
+// before the name to the closing quote, in p.ebuf), named name, to the start
+// tag in p.buf: in place of the attribute name if the tag has it, or before
+// the end of the tag.
+func (p *polyglot) putAttr(name string, a []byte) {
 	b := p.buf
-	if i := slices.IndexFunc(p.attrs, func(a attrRange) bool { return a.name == name }); i >= 0 {
+	if i := p.attrIndex(name); i >= 0 {
 		r := p.attrs[i]
 		delta := len(a) - (r.end - r.off)
 		p.buf = slices.Replace(b, r.off, r.end, a...)
@@ -2594,7 +2689,7 @@ func (p *polyglot) setAttr(name string, value []byte) {
 // removeAttr removes the attribute name from the start tag in p.buf, if it
 // has it.
 func (p *polyglot) removeAttr(name string) {
-	i := slices.IndexFunc(p.attrs, func(a attrRange) bool { return a.name == name })
+	i := p.attrIndex(name)
 	if i < 0 {
 		return
 	}
@@ -2605,6 +2700,32 @@ func (p *polyglot) removeAttr(name string) {
 		p.attrs[j].off -= r.end - r.off
 		p.attrs[j].end -= r.end - r.off
 	}
+}
+
+// renameAttr renames the attribute name of the start tag in p.buf to newName,
+// if it has it, in place: the attribute keeps its position and its value as
+// written.
+func (p *polyglot) renameAttr(name, newName string) {
+	i := p.attrIndex(name)
+	if i < 0 {
+		return
+	}
+	r := p.attrs[i]
+	delta := len(newName) - len(name)
+	p.ebuf = append(p.ebuf[:0], newName...)
+	p.buf = slices.Replace(p.buf, r.off+1, r.off+1+len(name), p.ebuf...) // after the space
+	p.attrs[i].name = newName
+	p.attrs[i].end += delta
+	for j := i + 1; j < len(p.attrs); j++ {
+		p.attrs[j].off += delta
+		p.attrs[j].end += delta
+	}
+}
+
+// attrIndex returns the index in p.attrs of the attribute name of the start
+// tag in p.buf, or -1.
+func (p *polyglot) attrIndex(name string) int {
+	return slices.IndexFunc(p.attrs, func(a attrRange) bool { return a.name == name })
 }
 
 // fail records an error wrapping ErrInvalidOp with the message, unless an

@@ -858,6 +858,7 @@ func TestHooks(t *testing.T) {
 	}
 
 	t.Run("Attrs", testAttrs)
+	t.Run("RenameAttr", testRenameAttr)
 	t.Run("ReopenedPrefixes", testReopenedPrefixes)
 	t.Run("Declare", testDeclare)
 	t.Run("LookupPrefix", testLookupPrefix)
@@ -934,6 +935,165 @@ func testAttrs(t *testing.T) {
 	}
 	if got != want {
 		t.Errorf("edited attributes:\n got %s\nwant %s", got, want)
+	}
+}
+
+// testRenameAttr checks RenameAttr: the attribute renamed in place, keeping
+// its position (among the attributes of the input, those set by the hook and
+// the declarations added by Declare) and its value as written, an attribute
+// already named newName removed, lang and xml:lang kept together on HTML
+// elements (not on foreign ones), renames to prefixed names (bound by the
+// input, by Declare on the tag or by the conversion's xlink declaration) and
+// back, renames repeated by the reopened copies of a formatting element, and
+// renames on the tags the conversion adds and on void elements.
+func testRenameAttr(t *testing.T) {
+	has := func(e *Tag, name string) bool {
+		_, ok := e.Token.Attr(name)
+		return ok
+	}
+	for _, tc := range []struct {
+		name, in, want string
+		warnings       []string
+		hook           func(e *Tag)
+	}{
+		{"InPlace", `<p data-x="a &amp; &quot;b&#9;" class="c" id="i">t</p>`,
+			`<p title="a &amp; &quot;b&#9;" class="c" id="i">t</p>`, nil,
+			func(e *Tag) {
+				if e.Name == "p" {
+					e.RenameAttr("data-x", "title")
+				}
+			}},
+		{"SetByHook", `<p class="c">t</p>`,
+			`<p class="c" id="1">t</p>`, nil,
+			func(e *Tag) {
+				if e.Name == "p" {
+					e.SetAttr("data-x", "1")
+					e.RenameAttr("data-x", "id")
+					e.RenameAttr("missing", "title")
+					e.RenameAttr("class", "class")
+					e.RenameAttr("id", "id")
+				}
+			}},
+		{"Existing", `<p a="1" b="2" c="3">t</p><span c="3" a="1" b="2">u</span>`,
+			`<p b="2" a="3">t</p><span a="3" b="2">u</span>`, nil,
+			func(e *Tag) {
+				if e.Name == "p" || e.Name == "span" {
+					e.RenameAttr("c", "a")
+				}
+			}},
+		{"Lang", `<p lang="en" title="t">1</p><p data-l="de" title="t">2</p><p lang="fr" xml:lang="de" title="t">3</p><p xml:lang="it" title="t">4</p>`,
+			`<p data-l="en" title="t">1</p><p lang="de" title="t" xml:lang="de">2</p><p xml:lang="fr" title="t" lang="fr">3</p><p data-l="it" title="t">4</p>`,
+			[]string{`58: wrote xml:lang differing from lang with the value of lang (to match the lang HTML parsers use) (will not warn again)`},
+			func(e *Tag) {
+				if e.Name != "p" {
+					return
+				}
+				switch {
+				case has(e, "data-l"):
+					e.RenameAttr("data-l", "lang")
+				case has(e, "lang") && has(e, "xml:lang"):
+					e.RenameAttr("lang", "xml:lang")
+				case has(e, "lang"):
+					e.RenameAttr("lang", "data-l")
+				default:
+					e.RenameAttr("xml:lang", "data-l")
+				}
+			}},
+		{"Foreign", `<svg viewBox="0 0 1 1" class="c"><use href="#a" x="1"/><rect y="2" lang="en"/></svg><math><mi href="#b" class="c">x</mi></math>`,
+			`<svg preserveAspectRatio="0 0 1 1" class="c" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><use xlink:href="#a" x="1"></use><rect y="2" xml:lang="en"></rect></svg><math xmlns="http://www.w3.org/1998/Math/MathML"><mi xlink:href="#b" class="c" xmlns:xlink="http://www.w3.org/1999/xlink">x</mi></math>`, nil,
+			func(e *Tag) {
+				switch e.Name {
+				case "svg":
+					e.RenameAttr("viewBox", "preserveAspectRatio")
+				case "use":
+					e.RenameAttr("href", "xlink:href")
+				case "rect":
+					e.RenameAttr("lang", "xml:lang")
+				case "mi":
+					e.Declare("xlink", htmlstream.NamespaceXLink)
+					e.RenameAttr("href", "xlink:href")
+				}
+			}},
+		{"Prefixed", `<div xmlns:x="u"><p type="a" class="c">1</p><span x:a="1" b="2">2</span></div><p class="c" title="t">3</p>`,
+			`<div xmlns:x="u"><p x:type="a" class="c">1</p><span a="1" b="2">2</span></div><p epub:type="c" title="t" xmlns:epub="http://www.idpf.org/2007/ops" data-y="2">3</p>`,
+			[]string{`44: attribute "x:a" is in namespace "u" for XML parsers and in no namespace for HTML parsers (will not warn again for this prefix and namespace)`},
+			func(e *Tag) {
+				switch e.Name {
+				case "p":
+					if has(e, "type") {
+						e.RenameAttr("type", "x:type")
+						return
+					}
+					e.Declare("epub", "http://www.idpf.org/2007/ops")
+					e.SetAttr("data-y", "2")
+					e.RenameAttr("class", "epub:type")
+				case "span":
+					e.RenameAttr("x:a", "a")
+				}
+			}},
+		{"Reopened", `<p><b data-x="1" class="c">1</p><p>2</b>`,
+			`<p><b id="1" class="c">1</b></p><p><b id="1" class="c">2</b></p>`, nil,
+			func(e *Tag) {
+				if e.Name == "b" {
+					e.RenameAttr("data-x", "id")
+				}
+			}},
+		{"ReopenedPrefix", `<div xmlns:x="u"><b a="1" c="2">1</div>2</b>`,
+			`<div xmlns:x="u"><b x:a="1" c="2">1</b></div><b x:a="1" c="2" xmlns:x="u">2</b>`,
+			[]string{`39: reopened b declares the prefix "x" of its attributes (the prefix isn't bound to namespace "u" where it's reopened, and HTML parsers will see an extra xmlns:x attribute when parsing the output)`},
+			func(e *Tag) {
+				if e.Name == "b" {
+					e.RenameAttr("a", "x:a")
+				}
+			}},
+		{"Added", `<p>x`,
+			`<html xmlns="http://www.w3.org/1999/xhtml" title="a" id="b"><head><meta charset="UTF-8" /></head><body id="k"><p>x</p></body></html>`, nil,
+			func(e *Tag) {
+				switch e.Name {
+				case "html":
+					e.SetAttr("class", "a")
+					e.SetAttr("id", "b")
+					e.RenameAttr("class", "title")
+				case "body":
+					e.SetAttr("class", "k")
+					e.RenameAttr("class", "id")
+				}
+			}},
+		{"Void", `<br data-x="1" class="c">`,
+			`<br id="1" class="c" />`, nil,
+			func(e *Tag) {
+				if e.Name == "br" {
+					e.RenameAttr("data-x", "id")
+				}
+			}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var warnings []string
+			got, err := convertHookedErr(tc.in, Options{
+				DoctypeMode: NoDoctype,
+				Warn: func(w Warning) {
+					warnings = append(warnings, fmt.Sprintf("%d: %s", w.Pos, w.Msg))
+				},
+				OnTag: func(e *Tag) {
+					if e.Start && !e.Reopened {
+						tc.hook(e)
+					}
+				},
+			}, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := tc.want
+			if !strings.HasPrefix(want, "<html") {
+				want = `<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body>` + want + `</body></html>`
+			}
+			if got != want {
+				t.Errorf("output:\n got %s\nwant %s", got, want)
+			}
+			if !slices.Equal(warnings, tc.warnings) {
+				t.Errorf("warnings:\n got %q\nwant %q", warnings, tc.warnings)
+			}
+		})
 	}
 }
 
@@ -1750,6 +1910,73 @@ func testHookErrors(t *testing.T) {
 		{"RemoveAttr xmlns", `<p xmlns:x="u">x</p>`, "namespace declaration", func(e *Tag) error {
 			if e.Start && e.Name == "p" {
 				e.RemoveAttr("xmlns:x")
+			}
+			return nil
+		}},
+		{"RenameAttr on an end tag", `<p class="c">x</p>`, "end tag", func(e *Tag) error {
+			if !e.Start && e.Name == "p" {
+				e.RenameAttr("class", "id")
+			}
+			return nil
+		}},
+		{"RenameAttr on a reopened element", `<p><b class="c">1</p><p>2</b>`, "reopened", func(e *Tag) error {
+			if e.Reopened && e.Start {
+				e.RenameAttr("class", "id")
+			}
+			return nil
+		}},
+		{"RenameAttr on the charset meta", `<p>x</p>`, "charset meta", func(e *Tag) error {
+			if e.Start && e.Name == "meta" {
+				e.RenameAttr("charset", "id")
+			}
+			return nil
+		}},
+		{"RenameAttr from xmlns", `<p xmlns:x="u">x</p>`, "namespace declaration", func(e *Tag) error {
+			if e.Start && e.Name == "p" {
+				e.RenameAttr("xmlns:x", "id")
+			}
+			return nil
+		}},
+		{"RenameAttr to xmlns", `<p class="c">x</p>`, "namespace declaration", func(e *Tag) error {
+			if e.Start && e.Name == "p" {
+				e.RenameAttr("class", "xmlns:x")
+			}
+			return nil
+		}},
+		{"RenameAttr from an invalid name", `<p class="c">x</p>`, "isn't an XML name", func(e *Tag) error {
+			if e.Start && e.Name == "p" {
+				e.RenameAttr("1a", "id")
+			}
+			return nil
+		}},
+		{"RenameAttr to an invalid name", `<p class="c">x</p>`, "isn't an XML name", func(e *Tag) error {
+			if e.Start && e.Name == "p" {
+				e.RenameAttr("class", "1a")
+			}
+			return nil
+		}},
+		{"RenameAttr to an unbound prefix", `<p class="c">x</p>`, "unbound prefix", func(e *Tag) error {
+			if e.Start && e.Name == "p" {
+				e.RenameAttr("class", "x:a")
+			}
+			return nil
+		}},
+		{"RenameAttr to a name HTML parsers lowercase", `<p class="c">x</p>`, `"Class" isn't the name HTML parsers give it`, func(e *Tag) error {
+			if e.Start && e.Name == "p" {
+				e.RenameAttr("class", "Class")
+			}
+			return nil
+		}},
+		{"RenameAttr to an SVG name without its case", `<svg viewBox="0 0 1 1"></svg>`, `"viewbox" isn't the name HTML parsers give it`, func(e *Tag) error {
+			if e.Start && e.Name == "svg" {
+				e.RenameAttr("viewBox", "viewbox")
+			}
+			return nil
+		}},
+		{"Declare after RenameAttr to the prefix", `<div xmlns:x="u"><p a="1">x</p></div>`, "its name or attributes use the prefix", func(e *Tag) error {
+			if e.Start && e.Name == "p" {
+				e.RenameAttr("a", "x:a")
+				e.Declare("x", "v")
 			}
 			return nil
 		}},

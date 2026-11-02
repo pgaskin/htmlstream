@@ -1346,9 +1346,12 @@ func (c *hookChecker) text(x *polyglot.Text) {
 // polyglot markup by the documented contract: elements renamed (see
 // renameRandom), attributes set to DOM-neutral
 // names (class, id, data-*, title, role, style, lang) with arbitrary values,
-// attributes of the input removed (except those which change parsing: xmlns
-// and prefixed names, type on input, script and style, encoding on
-// annotation-xml, and charset, http-equiv and content on meta), elements of
+// attributes of the input removed or renamed to DOM-neutral names (except
+// those which change parsing: xmlns and prefixed names, type on input, script
+// and style, encoding on annotation-xml, and charset, http-equiv and content
+// on meta), attributes set by the hooks renamed to other DOM-neutral names,
+// attributes renamed to xlink:href where the xlink prefix is bound to the
+// XLink namespace (see below), elements of
 // the input removed (except html, head and body, and the first child element
 // of a template, which Remove refuses), elements unwrapped where
 // their contents parse the same without them (see unwrapSound; reopened
@@ -1467,7 +1470,11 @@ func (ed *editingHooks) tag(e *polyglot.Tag) {
 			return
 		}
 		if uri, ok := e.LookupPrefix("xlink"); ok && uri == htmlstream.NamespaceXLink {
-			e.SetAttr("xlink:href", "#h")
+			if name := ed.removable(e); name != "" && ed.rnd.IntN(2) == 0 {
+				e.RenameAttr(name, "xlink:href")
+			} else {
+				e.SetAttr("xlink:href", "#h")
+			}
 		}
 	case n < 60:
 		// the charset meta element can't be edited
@@ -1477,21 +1484,19 @@ func (ed *editingHooks) tag(e *polyglot.Tag) {
 		name := neutralAttrs[ed.rnd.IntN(len(neutralAttrs))]
 		value := []string{"", "x", `a "b" <c> & d`, " ", "\t\n", "é"}[ed.rnd.IntN(6)]
 		e.SetAttr(name, value)
+		if ed.rnd.IntN(3) == 0 {
+			e.RenameAttr(name, neutralAttrs[ed.rnd.IntN(len(neutralAttrs))])
+		}
 	case n < 70:
-		if e.Token == nil {
+		name := ed.removable(e)
+		if name == "" {
 			return
 		}
-		var names []string
-		for a := range e.Token.Attrs() {
-			if name := removableAttr(e, a); name != "" {
-				names = append(names, name)
-			}
+		if ed.rnd.IntN(2) == 0 {
+			e.RenameAttr(name, neutralAttrs[ed.rnd.IntN(len(neutralAttrs))])
+		} else {
+			e.RemoveAttr(name)
 		}
-		if len(names) == 0 {
-			return
-		}
-		name := names[ed.rnd.IntN(len(names))]
-		e.RemoveAttr(name)
 	case n < 85:
 		if e.Token == nil || e.NS == htmlstream.NamespaceXHTML && (e.Name == "html" || e.Name == "head" || e.Name == "body") {
 			return
@@ -1510,6 +1515,24 @@ func (ed *editingHooks) tag(e *polyglot.Tag) {
 		e.Unwrap()
 		ed.unwrapped = true
 	}
+}
+
+// removable returns the name of a random attribute of the input start tag
+// which can be removed or renamed (see removableAttr), or an empty string.
+func (ed *editingHooks) removable(e *polyglot.Tag) string {
+	if e.Token == nil {
+		return ""
+	}
+	var names []string
+	for a := range e.Token.Attrs() {
+		if name := removableAttr(e, a); name != "" {
+			names = append(names, name)
+		}
+	}
+	if len(names) == 0 {
+		return ""
+	}
+	return names[ed.rnd.IntN(len(names))]
 }
 
 // removableAttr returns the name of the attribute as written if it can be

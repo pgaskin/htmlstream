@@ -215,6 +215,26 @@ func ExampleTag_Declare() {
 	// <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops"><head><meta charset="UTF-8" /></head><body><h1>Chapter 1</h1><p>Text<a href="#n1" epub:type="noteref">1</a></p><aside id="n1" epub:type="footnote">Note</aside></body></html>
 }
 
+// RenameAttr renames an attribute in place, keeping its value: here, the
+// data-src attribute of lazily loaded images replaces their placeholder src.
+func ExampleTag_RenameAttr() {
+	const page = `<p><img src="blank.gif" data-src="a.png" alt="A"> <img src="b.png" alt="B"></p>`
+
+	err := polyglot.Convert(os.Stdout, strings.NewReader(page), polyglot.Options{
+		DoctypeMode: polyglot.NoDoctype,
+		OnTag: func(e *polyglot.Tag) {
+			if e.Start && e.NS == htmlstream.NamespaceXHTML && e.Name == "img" {
+				e.RenameAttr("data-src", "src")
+			}
+		},
+	})
+	if err != nil {
+		panic(err)
+	}
+	// Output:
+	// <html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p><img src="a.png" alt="A" /> <img src="b.png" alt="B" /></p></body></html>
+}
+
 // The Text hook replaces text as it is written. SetText escapes the new text,
 // like the text of the input.
 func ExampleText() {
