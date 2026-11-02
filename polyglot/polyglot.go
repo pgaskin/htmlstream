@@ -1439,7 +1439,9 @@ func Convert(w io.Writer, r io.Reader, opt Options) error {
 // HTML parsers (older ones too) and XML parsers read the same. A first
 // doctype with an internal subset is read to the end of the subset, past a >
 // in it, where HTML parsers end the doctype, and the declarations in it
-// aren't applied, with a warning for each.
+// aren't applied, with a warning for each. One whose internal subset reaches
+// the end of the input ends at the first > in it, as in HTML parsers, and is
+// unsound (see [htmlstream.Token.Unsound]): an error with [Options.Strict].
 //
 // The Reader reads the contents of script, style, title and textarea as text
 // with XML syntax too, with the markers of CDATA sections in them: a CDATA

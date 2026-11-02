@@ -120,15 +120,15 @@ first ">".
 1 EndTag p "</p>"
 -- PrologUnterminated universal --
 After an XML declaration, one before the first tag without "?>" up to the end
-of the input ends at the first ">" after all, as a bogus comment, and an
-incomplete bogus comment without a ">".
+of the input ends at the first ">" after all, as an unsound bogus comment, and
+an incomplete bogus comment without a ">".
 -- in --
 <?xml version="1.0"?><?a><?b x>
 <?c
 -- tokens --
 0 ProcInst xml "<?xml version=\"1.0\"?>" data=" version=\"1.0\""
-0 Comment [bogus] "<?a>" text="?a"
-0 Comment [bogus] "<?b x>" text="?b x"
+0 Comment [bogus] [unsound] "<?a>" text="?a"
+0 Comment [bogus] [unsound] "<?b x>" text="?b x"
 0 Text "\n" text="\n"
 0 Comment [incomplete] [bogus] [unsound] "<?c" text="?c"
 -- XHTML universal --

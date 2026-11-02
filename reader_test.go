@@ -2279,6 +2279,89 @@ func TestUnsoundError(t *testing.T) {
 	}
 }
 
+// TestUnsoundCutShort checks the doctypes and processing instructions ended
+// at the first ">" in them because their internal subset, quoted literal or
+// processing instruction reached the end of the input (see Universal and
+// Reader.SetXMLSyntax): they are unsound, with an error saying why, the
+// Reader reads past them in strict mode, and the same constructs are sound
+// where HTML parsers end them at that ">" too, and incomplete in XML mode.
+func TestUnsoundCutShort(t *testing.T) {
+	const (
+		decl    = `<?xml version="1.0"?>`
+		subset  = "doctype's internal subset is cut off by the end of the input"
+		literal = "doctype's quoted literal is cut off by the end of the input"
+		pi      = "processing instruction has no ?> before the end of the input"
+	)
+	for _, tc := range []struct {
+		mode      Mode
+		xmlSyntax bool
+		in        string
+		want      []string // the unsound tokens other than implied end tags, as raw: message
+	}{
+		// HTML mode with XML syntax, and Universal mode without an XML
+		// declaration: a doctype whose internal subset reaches the end of
+		// the input
+		{HTML, true, `<!DOCTYPE x [<!ENTITY a "b"><p>`, []string{`<!DOCTYPE x [<!ENTITY a "b">: ` + subset}},
+		{HTML, true, `<!DOCTYPE x [ > <p>`, []string{`<!DOCTYPE x [ >: ` + subset}},
+		{HTML, true, `<!DOCTYPE[><A] [>`, []string{`<!DOCTYPE[>: ` + subset}},
+		{Universal, false, `<!DOCTYPE x [<!ENTITY a "b"><p>`, []string{`<!DOCTYPE x [<!ENTITY a "b">: ` + subset}},
+		// Universal mode after an XML declaration: also a doctype whose
+		// quoted literal reaches the end of the input, and a processing
+		// instruction without "?>"
+		{Universal, false, decl + `<!DOCTYPE x [<!ENTITY a "b"><p>`, []string{`<!DOCTYPE x [<!ENTITY a "b">: ` + subset}},
+		{Universal, false, decl + `<!DOCTYPE x [<!ENTITY a "b>`, []string{`<!DOCTYPE x [<!ENTITY a "b>: ` + subset}},
+		{Universal, false, decl + `<!DOCTYPE x PUBLIC "a>b`, []string{`<!DOCTYPE x PUBLIC "a>: ` + literal}},
+		{Universal, false, decl + `<!DOCTYPE x [ ] "a>b`, []string{`<!DOCTYPE x [ ] "a>: ` + literal}},
+		{Universal, false, decl + `<!DOCTYPE x "a>" [ <p>`, []string{`<!DOCTYPE x "a>: ` + subset}},
+		{Universal, false, decl + `<?php echo 1; ><p>`, []string{`<?php echo 1; >: ` + pi}},
+		{Universal, false, decl + `<?a><?b x>` + "\n" + `<?c`, []string{`<?a>: ` + pi, `<?b x>: ` + pi, `<?c: comment is cut off by the end of the input`}},
+		// sound: HTML parsers end them at that ">" too
+		{HTML, false, `<!DOCTYPE x [<!ENTITY a "b"><p>`, nil},
+		{HTML, false, `<!DOCTYPE x PUBLIC "a>b`, nil},
+		{HTML, false, `<?php echo 1; ><p>`, nil},
+		{HTML, true, `<!DOCTYPE x PUBLIC "a>b`, nil},
+		{HTML, true, `<?php echo 1; ><p>`, nil},
+		{Universal, false, `<!DOCTYPE x PUBLIC "a>b`, nil},
+		{Universal, false, `<?php echo 1; ><p>`, nil},
+		// sound: later doctypes end at the first ">"
+		{HTML, true, `<!DOCTYPE x><!DOCTYPE y [<!ENTITY a "b"><p>`, nil},
+		{Universal, false, decl + `<!DOCTYPE x><!DOCTYPE y [<!ENTITY a "b"><p>`, nil},
+		// sound: complete
+		{HTML, true, `<!DOCTYPE x [<!ENTITY a "b">]><p>`, nil},
+		{Universal, false, decl + `<!DOCTYPE x PUBLIC "a>b"><?php echo 1; ?><p>`, nil},
+		// XML mode: incomplete, without the fallback
+		{XML, false, `<!DOCTYPE x [<!ENTITY a "b"><p>`, []string{`<!DOCTYPE x [<!ENTITY a "b"><p>: doctype is cut off by the end of the input`}},
+		{XML, false, `<?php echo 1; ><p>`, []string{`<?php echo 1; ><p>: processing instruction is cut off by the end of the input`}},
+	} {
+		for _, strict := range []bool{false, true} {
+			r := NewReader(strings.NewReader(tc.in))
+			r.SetMode(tc.mode)
+			r.SetXMLSyntax(tc.xmlSyntax)
+			r.SetStrict(strict)
+			var got []string
+			for r.Next() {
+				tok := r.Token()
+				if tok.Kind() == EndTag && tok.Implied() {
+					continue
+				}
+				if err := tok.UnsoundError(); err != nil {
+					var serr *SyntaxError
+					if !errors.As(err, &serr) || serr.Pos != tok.Pos() {
+						t.Errorf("%s, xml syntax %v, strict %v, %q: %v isn't a SyntaxError at %d", tc.mode, tc.xmlSyntax, strict, tc.in, err, tok.Pos())
+					}
+					got = append(got, string(tok.Raw())+": "+serr.Msg)
+				}
+			}
+			if !slices.Equal(got, tc.want) {
+				t.Errorf("%s, xml syntax %v, strict %v, %q:\n got %q\nwant %q", tc.mode, tc.xmlSyntax, strict, tc.in, got, tc.want)
+			}
+			if r.Err() != nil {
+				t.Errorf("%s, xml syntax %v, strict %v, %q: %v", tc.mode, tc.xmlSyntax, strict, tc.in, r.Err())
+			}
+		}
+	}
+}
+
 // TestStrictUntrackedLimit checks that the untracked elements whose ends
 // operations depend on in strict mode are limited to the maximum depth.
 func TestStrictUntrackedLimit(t *testing.T) {

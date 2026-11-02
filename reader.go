@@ -467,14 +467,15 @@ const (
 	// ends of XML 1.1 in documents declared as XML 1.1. One of them which
 	// reaches the end of the input that way ends at the first ">" in it after
 	// all, as in HTML mode with XML syntax (a processing instruction is then a
-	// bogus comment, and an incomplete one without a ">"), and the rules are
-	// chosen after it as usual. Before the rules are chosen, and in documents
-	// read like in HTML mode, only the first doctype of the input is read with
-	// an internal subset or quoted literals, as with XML syntax; in documents
-	// read like in XML mode, the doctypes after the first start tag are read
-	// like in XML mode. As in HTML mode, comments also end at "--!>", and a
-	// start tag whose name doesn't start with an ASCII letter (e.g., <_x>) is
-	// text.
+	// bogus comment, and an incomplete one without a ">"), as an unsound token
+	// (see [Token.Unsound]), since where it ends depends on the input after
+	// it, and the rules are chosen after it as usual. Before the rules are
+	// chosen, and in documents read like in HTML mode, only the first doctype
+	// of the input is read with an internal subset or quoted literals, as with
+	// XML syntax; in documents read like in XML mode, the doctypes after the
+	// first start tag are read like in XML mode. As in HTML mode, comments
+	// also end at "--!>", and a start tag whose name doesn't start with an
+	// ASCII letter (e.g., <_x>) is text.
 	Universal
 )
 
@@ -672,6 +673,7 @@ type Reader struct {
 	xml11     bool  // the XML declaration declares version 1.1
 	doctype   bool  // a doctype was lexed (see Reader.lexDoctype)
 	piNoEnd   int64 // the input offset from which the input has no "?>", or 0 if unknown (see Reader.procInstBogus)
+	piBogus   bool  // the bogus comment being lexed is a processing instruction without "?>" (see Reader.procInstBogus)
 
 	// lexer state
 	raw     rawKind     // raw text state for the next Text token
@@ -835,17 +837,19 @@ func (r *Reader) EffectiveMode() Mode { return r.mode }
 // declaration this long isn't recognized, so the document is read like in
 // HTML mode. A doctype ends at the first ">" outside its internal subset,
 // also in a quoted literal, as in HTML parsers, and one whose internal
-// subset reaches the end of the input at the first ">" in it. Only the first
-// doctype of the input is read with an internal subset: later ones, which
-// HTML parsers ignore, end at the first ">". Void elements without
-// self-closing syntax open an element, closed by their end tag if it is the
-// next token or follows whitespace, as in XML, and otherwise by an implied
-// end tag before the next token (see Element model in the package
-// documentation): <br>, <br></br>, <br> </br> and <br/> are all one br
-// element, while HTML parsers read </br> as another one. It has no effect in
-// [XML] mode, which always accepts XML syntax, and in [Universal] mode, which
-// applies it to the documents it reads like in HTML mode. It must be called
-// before the first call to Next, and panics otherwise.
+// subset reaches the end of the input at the first ">" in it, as an unsound
+// token (see [Token.Unsound]), since where it ends depends on the input
+// after it. Only the first doctype of the input is read with an internal
+// subset: later ones, which HTML parsers ignore, end at the first ">". Void
+// elements without self-closing syntax open an element, closed by their end
+// tag if it is the next token or follows whitespace, as in XML, and
+// otherwise by an implied end tag before the next token (see Element model
+// in the package documentation): <br>, <br></br>, <br> </br> and <br/> are
+// all one br element, while HTML parsers read </br> as another one. It has
+// no effect in [XML] mode, which always accepts XML syntax, and in
+// [Universal] mode, which applies it to the documents it reads like in HTML
+// mode. It must be called before the first call to Next, and panics
+// otherwise.
 //
 // Enable it for documents written as XHTML (e.g., with an XML declaration or
 // the XHTML namespace declaration, and self-closing tags meant as empty
@@ -1277,8 +1281,9 @@ func (r *Reader) decide() {
 // like in XML mode before the document's rules are chosen in Universal mode
 // (see Reader.decide): after an XML declaration. One reaching the end of the
 // input ends at the first '>' in it after all, as in HTML mode with XML
-// syntax, and a processing instruction without one is an incomplete bogus
-// comment (see Reader.lexDoctype and Reader.procInstBogus).
+// syntax, as an unsound token, and a processing instruction without one is
+// an incomplete bogus comment (see Reader.lexDoctype and
+// Reader.procInstBogus).
 func (r *Reader) xmlProlog() bool {
 	return r.mode == Universal && r.xmlDecl
 }
@@ -1920,6 +1925,12 @@ func (r *Reader) lexBogus(ds int) {
 			t.data = span{dsr, r.rel(r.p + i)}
 			r.p += i + 1
 			t.raw = span{0, r.rel(r.p)}
+			if r.piBogus {
+				// Where it ends depends on the input after it (see
+				// Reader.procInstBogus).
+				t.flags |= tokUnsound | tokCutShort
+				r.piBogus = false
+			}
 			return
 		}
 		if split := r.splitPoint(r.end-1, dsr); split > 0 {
@@ -1938,6 +1949,7 @@ func (r *Reader) lexBogus(ds int) {
 			t.data = span{dsr, r.rel(r.p)}
 			t.raw = span{0, r.rel(r.p)}
 			t.flags |= tokIncomplete | tokUnsound
+			r.piBogus = false
 			return
 		}
 	}
@@ -1991,6 +2003,8 @@ func (r *Reader) lexDoctype() {
 	xml := r.mode == XML || r.xmlProlog()
 	first := !r.doctype
 	r.doctype = true
+	var q byte      // the quote of the literal being read, if any
+	subset := false // in the internal subset
 	// Except in XML mode, only the first doctype is read with an internal
 	// subset or quoted literals, and later ones, which HTML parsers ignore,
 	// end at the first ">": otherwise each of them could be read to the end
@@ -2016,8 +2030,6 @@ func (r *Reader) lexDoctype() {
 		// doctype also in a quoted literal, as in HTML parsers, which end it
 		// at the first ">", so a malformed literal doesn't take the rest of
 		// the input.
-		var q byte // the quote of the literal being read, if any
-		subset := false
 		decl := false // in a markup declaration in the internal subset
 		cond := 0     // conditional sections open in the internal subset
 		for {
@@ -2078,11 +2090,16 @@ func (r *Reader) lexDoctype() {
 	// Except in XML mode, a doctype reaching the end of the input with a
 	// ">" in it (in an internal subset, or in a quoted literal after an XML
 	// declaration in Universal mode) ends at the first one after all, as in
-	// HTML parsers.
+	// HTML parsers. Where it ends then depends on the input after it, so it
+	// is unsound.
 	if i := bytes.IndexByte(r.buf[r.start+int(ds):r.p], '>'); i >= 0 && r.mode != XML {
 		r.p = r.start + int(ds) + i + 1
 		t.data = span{ds, r.rel(r.p - 1)}
 		t.raw = span{0, r.rel(r.p)}
+		t.flags |= tokUnsound | tokCutShort
+		if !subset && q != 0 {
+			t.flags |= tokInLiteral
+		}
 		return
 	}
 	t.data = span{ds, r.rel(r.p)}
@@ -2170,8 +2187,10 @@ func (r *Reader) lexProcInst() {
 // input. Before the rules are chosen after an XML declaration in Universal
 // mode (see Reader.xmlProlog), it is a bogus comment after all, as in HTML
 // mode with XML syntax: one with a '>' in it ends at the first one, so that
-// it doesn't take the rest of the input, and one without is an incomplete
-// bogus comment. It reports whether it lexed the bogus comment.
+// it doesn't take the rest of the input, and is unsound, as where it ends
+// depends on the input after it (see Reader.lexBogus), and one without is
+// an incomplete bogus comment. It reports whether it lexed the bogus
+// comment.
 //
 // The input then has no "?>" after the "<?" of the processing instruction,
 // which is recorded in r.piNoEnd: a later processing instruction past it is
@@ -2183,6 +2202,7 @@ func (r *Reader) procInstBogus() bool {
 	r.piNoEnd = r.off + int64(r.start) + 2
 	r.tok.nspan = span{}
 	r.p = r.start + 2
+	r.piBogus = true
 	r.lexBogus(r.p - 1)
 	return true
 }
@@ -2517,6 +2537,8 @@ const (
 	tokXML11                // XML 1.1 line ends (see Reader.planTok)
 	tokXMLSyntax            // read with Reader.SetXMLSyntax or as HTML in Universal mode (lexed tokens, not implied end tags)
 	tokUniversal            // read in Universal mode
+	tokCutShort             // doctype or bogus comment ended at the first ">" because the construct reached the end of the input (see Reader.lexDoctype and Reader.procInstBogus)
+	tokInLiteral            // tokCutShort: a quoted literal of the doctype reached the end of the input, not its internal subset
 )
 
 type textMode uint8
@@ -2771,7 +2793,16 @@ func (t *Token) InRawText() bool { return t.kind == Text && t.text == textRaw }
 // ancestor's end tag, a misnested end tag, or the end of the input), a tag
 // which was cut off or contains quotes or '<' in attribute names or unquoted
 // values (usually a missing quote), a construct cut off by the end of the
-// input, or the text of a raw text element without an end tag.
+// input, the text of a raw text element without an end tag, or a doctype or
+// processing instruction ended at the first ">" in it because its internal
+// subset, a quoted literal or the processing instruction reached the end of
+// the input, so where it ends depends on the input after it (see
+// [Reader.SetXMLSyntax] and [Universal]).
+//
+// In strict mode, the Reader returns an error for operations depending on
+// an unsound token (see [Reader.SetStrict]), and the strict modes of
+// [github.com/pgaskin/htmlstream/sax] and
+// [github.com/pgaskin/htmlstream/polyglot] stop at every unsound token.
 func (t *Token) Unsound() bool { return t.flags&tokUnsound != 0 }
 
 // UnsoundError returns a [SyntaxError] saying why the token is structurally
@@ -2788,6 +2819,12 @@ func (t *Token) UnsoundError() error {
 		msg = "can't tell where an element nested past the stack limits ends"
 	case t.kind == EndTag && t.Implied():
 		msg = "element " + name + " at offset " + strconv.FormatInt(int64(t.spos), 10) + " closed without its end tag"
+	case t.flags&tokCutShort != 0 && t.kind == Doctype && t.flags&tokInLiteral != 0:
+		msg = "doctype's quoted literal is cut off by the end of the input"
+	case t.flags&tokCutShort != 0 && t.kind == Doctype:
+		msg = "doctype's internal subset is cut off by the end of the input"
+	case t.flags&tokCutShort != 0:
+		msg = "processing instruction has no ?> before the end of the input"
 	case t.Incomplete():
 		var what string
 		switch t.kind {

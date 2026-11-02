@@ -84,11 +84,11 @@ the declarations of the subset protect ">" in it.
 1 EndTag p "</p>"
 -- HTMLSyntaxUnterminated universal --
 Outside XML mode, a doctype whose internal subset reaches the end of the input
-ends at the first ">" in it.
+ends at the first ">" in it, as an unsound token.
 -- in --
 <!DOCTYPE a [<!ENTITY a "b"><p>x</p>
 -- tokens --
-0 Doctype "<!DOCTYPE a [<!ENTITY a \"b\">"
+0 Doctype [unsound] "<!DOCTYPE a [<!ENTITY a \"b\">"
 1 StartTag p "<p>" ns="http://www.w3.org/1999/xhtml"
 1 Text "x" text="x"
 1 EndTag p "</p>"
@@ -126,6 +126,29 @@ After an XML declaration, later doctypes end at the first ">".
 0 Doctype "<!DOCTYPE a SYSTEM \"a>b\">"
 0 Doctype "<!DOCTYPE a [<!ENTITY a \"b\">"
 0 Text "]>" text="]>"
+1 StartTag p "<p>" ns="http://www.w3.org/1999/xhtml"
+1 Text "x" text="x"
+1 EndTag p "</p>"
+-- XMLPrologUnterminatedSubset universal --
+After an XML declaration, a doctype whose internal subset reaches the end of
+the input ends at the first ">" in it after all, as an unsound token.
+-- in --
+<?xml version="1.0"?><!DOCTYPE a [<!ENTITY a "b"><p>x</p>
+-- tokens --
+0 ProcInst xml "<?xml version=\"1.0\"?>" data=" version=\"1.0\""
+0 Doctype [unsound] "<!DOCTYPE a [<!ENTITY a \"b\">"
+1 StartTag p "<p>" ns="http://www.w3.org/1999/xhtml"
+1 Text "x" text="x"
+1 EndTag p "</p>"
+-- XMLPrologUnterminatedLiteral universal --
+After an XML declaration, a doctype whose quoted literal reaches the end of
+the input ends at the first ">" in it after all, as an unsound token.
+-- in --
+<?xml version="1.0"?><!DOCTYPE a SYSTEM "a>b<p>x</p>
+-- tokens --
+0 ProcInst xml "<?xml version=\"1.0\"?>" data=" version=\"1.0\""
+0 Doctype [unsound] "<!DOCTYPE a SYSTEM \"a>"
+0 Text "b" text="b"
 1 StartTag p "<p>" ns="http://www.w3.org/1999/xhtml"
 1 Text "x" text="x"
 1 EndTag p "</p>"

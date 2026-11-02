@@ -208,6 +208,17 @@ func TestStrict(t *testing.T) {
 		{htmlstream.HTML, `<p>a</p>b<a href="x>c`,
 			`<html?> <head?> </head?> <body?> <p> "a" </p> "b" !Warning(dropped incomplete <a>) </body?> </html?>`,
 			`<html?> <head?> </head?> <body?> <p> "a" </p> "b" !SyntaxError(start tag "a" is cut off by the end of the input) ERR htmlstream: syntax error at offset 9: start tag "a" is cut off by the end of the input`},
+		// a doctype or processing instruction ended at the first ">" in it by
+		// the end of the input (see htmlstream.Universal)
+		{htmlstream.Universal, `<!DOCTYPE x [<!ENTITY a "b"><p>x`,
+			`!Doctype(x [<!ENTITY a "b") <html?> <head?> </head?> <body?> <p> "x" </p?> </body?> </html?>`,
+			`!SyntaxError(doctype's internal subset is cut off by the end of the input) ERR htmlstream: syntax error at offset 0: doctype's internal subset is cut off by the end of the input`},
+		{htmlstream.Universal, `<?xml version="1.0"?><!DOCTYPE x PUBLIC "a>b`,
+			`!ProcInst(version="1.0") !Doctype(x PUBLIC "a) <html?> <head?> </head?> <body?> "b" </body?> </html?>`,
+			`!ProcInst(version="1.0") !SyntaxError(doctype's quoted literal is cut off by the end of the input) ERR htmlstream: syntax error at offset 21: doctype's quoted literal is cut off by the end of the input`},
+		{htmlstream.Universal, `<?xml version="1.0"?><?php echo 1; ><p>x`,
+			`!ProcInst(version="1.0") !Comment(?php echo 1; ) <html?> <head?> </head?> <body?> <p> "x" </p?> </body?> </html?>`,
+			`!ProcInst(version="1.0") !SyntaxError(processing instruction has no ?> before the end of the input) ERR htmlstream: syntax error at offset 21: processing instruction has no ?> before the end of the input`},
 	} {
 		_, s := newReader(c.mode, c.in)
 		if got := dump(s); got != c.lax {

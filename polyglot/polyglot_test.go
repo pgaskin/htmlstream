@@ -2353,6 +2353,26 @@ func TestStrictScriptType(t *testing.T) {
 	}
 }
 
+// TestStrictDoctypeCutShort checks that a doctype whose internal subset
+// reaches the end of the input, which the Reader ends at the first ">" in it
+// with XML syntax, is an error with Strict, and converted without a warning
+// otherwise, as HTML parsers end it there too.
+func TestStrictDoctypeCutShort(t *testing.T) {
+	const in = `<!DOCTYPE html [<!ENTITY a "b"><p>x</p>`
+	out, warnings, err := convertWarnings(strings.NewReader(in), Options{XMLSyntax: true})
+	if want := "<!DOCTYPE html>\n" + `<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><p>x</p></body></html>`; err != nil || out != want || warnings != "" {
+		t.Errorf("%q: got %q, %v, warnings %q", in, out, err, warnings)
+	}
+	err = Convert(io.Discard, strings.NewReader(in), Options{XMLSyntax: true, Strict: true})
+	var serr *htmlstream.SyntaxError
+	if !errors.As(err, &serr) || serr.Pos != 0 || serr.Msg != "doctype's internal subset is cut off by the end of the input" {
+		t.Errorf("%q: strict error %v", in, err)
+	}
+	if err := Convert(io.Discard, strings.NewReader(in), Options{Strict: true}); err != nil {
+		t.Errorf("%q: strict error without XML syntax: %v", in, err)
+	}
+}
+
 // scriptTypeWarning reports whether the warnings have the one for scripts
 // written unchanged although they contain <, & or "]]>", which makes the
 // output not well-formed.
