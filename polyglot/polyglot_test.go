@@ -860,6 +860,7 @@ func TestHooks(t *testing.T) {
 	t.Run("Attrs", testAttrs)
 	t.Run("ReopenedPrefixes", testReopenedPrefixes)
 	t.Run("Declare", testDeclare)
+	t.Run("LookupPrefix", testLookupPrefix)
 	t.Run("Rename", testRename)
 	t.Run("Unwrap", testUnwrap)
 	t.Run("Remove", testRemove)
@@ -1150,6 +1151,104 @@ func testDeclare(t *testing.T) {
 			}
 			if !slices.Equal(warnings, tc.warnings) {
 				t.Errorf("warnings:\n got %q\nwant %q", warnings, tc.warnings)
+			}
+		})
+	}
+}
+
+// testLookupPrefix checks LookupPrefix: the declarations of the input (kept
+// or dropped), those added by the conversion (xlink on svg and on elements
+// with xlink attributes, and those a reopened formatting element repeats or
+// adds), and those made with Declare (on the tag so far, also on the elements
+// the conversion adds) are in scope on the start tag, in the element and on
+// its end tag, and not after it; the xml prefix is bound, the xmlns prefix
+// isn't, and the empty prefix is the default namespace.
+func testLookupPrefix(t *testing.T) {
+	short := map[string]string{htmlstream.NamespaceXHTML: "XHTML", htmlstream.NamespaceSVG: "SVG", htmlstream.NamespaceMathML: "MathML", htmlstream.NamespaceXLink: "XLink", htmlstream.NamespaceXML: "XML"}
+	for _, tc := range []struct {
+		name, in string
+		names    []string // the tags logged
+		prefixes []string // the prefixes looked up on them
+		want     []string
+		edit     func(e *Tag, log func(string))
+	}{
+		{"Input", `<html xmlns:a="u"><p xmlns:a="v" xmlns:b=""><span>x</span></p><span>y</span>`,
+			[]string{"html", "p", "span"}, []string{"a", "b", "xml", "xmlns"},
+			[]string{"<html a=u b=- xml=XML xmlns=-", "<p a=v b=- xml=XML xmlns=-", "<span a=v b=- xml=XML xmlns=-", "</span a=v b=- xml=XML xmlns=-", "</p a=v b=- xml=XML xmlns=-", "<span a=u b=- xml=XML xmlns=-", "</span a=u b=- xml=XML xmlns=-", "</html a=u b=- xml=XML xmlns=-"}, nil},
+		{"XLink", `<svg><use/></svg><p xlink:href="#b"></p><p></p>`,
+			[]string{"svg", "use", "p"}, []string{"xlink"},
+			[]string{"<svg xlink=XLink", "<use xlink=XLink", "</use xlink=XLink", "</svg xlink=XLink", "<p xlink=XLink", "</p xlink=XLink", "<p xlink=-", "</p xlink=-"}, nil},
+		{"SelfClosed", `<svg xmlns:z="w"/><span xmlns:q="r"/>`,
+			[]string{"svg", "span"}, []string{"xlink", "z", "q"},
+			[]string{"<svg xlink=XLink z=w q=-", "</svg xlink=XLink z=w q=-", "<span xlink=- z=- q=r", "</span xlink=- z=- q=r"}, nil},
+		{"Declare", `<p>x</p><br xmlns:y="v" /><p>y</p>`,
+			[]string{"body", "p", "br"}, []string{"x", "y"},
+			[]string{"before Declare: false", "<body x=u y=-", "<p x=u y=-", "</p x=u y=-", "<br x=u y=v", "</br x=u y=v", "<p x=u y=-", "</p x=u y=-", "</body x=u y=-"},
+			func(e *Tag, log func(string)) {
+				if e.Start && e.Name == "body" {
+					_, ok := e.LookupPrefix("x")
+					log(fmt.Sprintf("before Declare: %v", ok))
+					e.Declare("x", "u")
+				}
+			}},
+		{"Implied", `<table><td>x</td></table>y</p>`,
+			[]string{"tbody", "tr", "td", "p"}, []string{"a"},
+			[]string{"<tbody a=u", "<tr a=u", "<td a=u", "</td a=u", "</tr a=u", "</tbody a=u", "<p a=w", "</p a=w"},
+			func(e *Tag, log func(string)) {
+				if e.Start && e.Token == nil {
+					switch e.Name {
+					case "tbody":
+						e.Declare("a", "u")
+					case "p":
+						e.Declare("a", "w")
+					}
+				}
+			}},
+		{"Reopened", `<div xmlns:x="u"><b x:a="1">1<i>2</div>3</i>4</b><div xmlns:y="w"><b>5</div>6</b>`,
+			[]string{"div", "b", "i"}, []string{"x", "y"},
+			[]string{"<div x=u y=-", "<b x=u y=-", "<i x=u y=-", "</i x=u y=-", "</b x=u y=-", "</div x=u y=-", "<b* x=u y=-", "<i* x=u y=-", "</i* x=u y=-", "</b* x=u y=-", "<div x=- y=w", "<b x=- y=w", "</b x=- y=w", "</div x=- y=w", "<b* x=- y=-", "</b* x=- y=-"}, nil},
+		{"Default", `<svg><rect/><foreignObject><div><svg/></div></foreignObject></svg><math><mi><span>x</span></mi></math><div xmlns:x="u"><x:p>y</x:p></div>`,
+			[]string{"body", "svg", "rect", "foreignObject", "div", "math", "mi", "span", "x:p"}, []string{""},
+			[]string{"<body =XHTML", "<svg =SVG", "<rect =SVG", "</rect =SVG", "<foreignObject =SVG", "<div =XHTML", "<svg =SVG", "</svg =SVG", "</div =XHTML", "</foreignObject =SVG", "</svg =SVG", "<math =MathML", "<mi =MathML", "<span =XHTML", "</span =XHTML", "</mi =MathML", "</math =MathML", "<div =XHTML", "<x:p =XHTML", "</x:p =XHTML", "</div =XHTML", "</body =XHTML"}, nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var got []string
+			log := func(s string) { got = append(got, s) }
+			_, err := convertHookedErr(tc.in, Options{
+				DoctypeMode: NoDoctype,
+				OnTag: func(e *Tag) {
+					if tc.edit != nil {
+						tc.edit(e, log)
+					}
+					if !slices.Contains(tc.names, e.Name) {
+						return
+					}
+					s := "<"
+					if !e.Start {
+						s = "</"
+					}
+					s += e.Name
+					if e.Reopened {
+						s += "*"
+					}
+					for _, prefix := range tc.prefixes {
+						uri, ok := e.LookupPrefix(prefix)
+						switch {
+						case !ok:
+							uri = "-"
+						case short[uri] != "":
+							uri = short[uri]
+						}
+						s += " " + prefix + "=" + uri
+					}
+					log(s)
+				},
+			}, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !slices.Equal(got, tc.want) {
+				t.Errorf("lookups:\n got %q\nwant %q", got, tc.want)
 			}
 		})
 	}
@@ -1904,6 +2003,9 @@ func testHookErrors(t *testing.T) {
 	}
 	if err != errHook {
 		t.Errorf("stale event method: got %v, want %v", err, errHook)
+	}
+	if _, ok := saved.LookupPrefix("xml"); ok {
+		t.Error("stale LookupPrefix reported the prefix bound")
 	}
 	// after the conversion, the next call returns the error
 	saved.SetAttr("a", "b")

@@ -442,7 +442,8 @@ func (e *Error) Error() string {
 //     and not inside svg or math (except in an integration point like
 //     foreignObject, where the enclosing element is an HTML element), and
 //     declare any prefix it uses, unless the prefix is bound where the
-//     markup is inserted (by a declaration of the input, or with Declare).
+//     markup is inserted (by a declaration of the input, or with Declare;
+//     see LookupPrefix).
 //   - It avoids the places where HTML parsers restructure or ignore
 //     content: table content outside cells (moved before the table), select,
 //     the head (elements other than head content start the body), before
@@ -568,9 +569,9 @@ func (e *Tag) InsertAfter(raw []byte) {
 // epub:type) aren't checked either: HTML parsers put these attributes in no
 // namespace, and XML parsers in the namespace of the prefix, which gives a
 // warning for such attributes of the input (see [Convert]). The prefix must
-// be bound where the tag is: by a declaration of the input on the element or
-// an enclosing one, or by Declare on this tag (before SetAttr) or on the tag
-// of an enclosing element.
+// be bound where the tag is (see LookupPrefix): by a declaration of the
+// input on the element or an enclosing one, or by Declare on this tag
+// (before SetAttr) or on the tag of an enclosing element.
 func (e *Tag) SetAttr(name, value string) {
 	if e.checkAttrEdit(name) != nil {
 		return
@@ -737,6 +738,57 @@ func (e *Tag) Declare(prefix, uri string) {
 	p.setAttr(name, p.raw)
 	p.addTagDecl(nsDecl{prefix: prefix, uri: uri, added: true})
 	e.edited = true
+}
+
+// LookupPrefix returns the namespace XML parsers bind the prefix to at the
+// tag, and whether it is bound, by the declarations written on the start tag
+// so far (those of the input kept in the output, the xlink declaration the
+// conversion adds to svg elements and to elements with xlink attributes,
+// those made with Declare, and those the reopened copies of a formatting
+// element repeat, or add for a prefix of their attributes which isn't bound
+// to the same namespace where they are reopened, with a warning; see
+// Reopened) and on the enclosing elements. At an end tag, the element's own
+// declarations are in scope (markup inserted after the end tag is outside the
+// element, where they aren't). A declaration of the input which is invalid
+// in XML isn't written and leaves the prefix unbound in the element (see
+// [Convert]), and LookupPrefix reports it unbound.
+//
+// The xml prefix is always bound to the XML namespace, and the xmlns prefix
+// is reported as unbound, like by [htmlstream.Reader.LookupPrefix]. The empty
+// prefix is the default namespace, declared by the conversion (see
+// [Convert]): the namespace of the innermost element with an unprefixed name
+// (the element itself when its Name has no prefix, so NS for HTML, SVG and
+// MathML elements).
+//
+// It doesn't fail the conversion, except when called after the hook returned
+// (see [Tag]), where it reports the prefix unbound.
+func (e *Tag) LookupPrefix(prefix string) (uri string, ok bool) {
+	if e.check() != nil {
+		return "", false
+	}
+	p := e.p
+	switch prefix {
+	case "":
+		// the conversion declares the default namespace on html, svg and
+		// math elements and on HTML elements in foreign content (see
+		// writeStart), so the elements with unprefixed names are in the
+		// default namespace in scope
+		if !strings.Contains(e.w.name, ":") {
+			return e.w.ns, true
+		}
+		for i := len(p.out) - 1; i >= 0; i-- {
+			if o := &p.out[i]; !strings.Contains(o.written, ":") {
+				if o.ns == "" {
+					return htmlstream.NamespaceXHTML, true
+				}
+				return o.ns, true
+			}
+		}
+		return "", false
+	case "xmlns":
+		return "", false
+	}
+	return p.lookupPrefix(prefix)
 }
 
 // Rename renames the element to name: its start and end tags are written
@@ -2745,7 +2797,7 @@ type polyglot struct {
 	once map[onceKey]bool // keys of the warnings given once (see firstWarning)
 	seq  int              // formatting elements opened from the input
 
-	tagDecls []nsDecl      // namespace declarations of the current start tag
+	tagDecls []nsDecl      // namespace declarations of the current start tag (of the tag being written during its hook, see Tag.LookupPrefix)
 	seen     []string      // attribute names written for the current start tag
 	expanded []xmlAttrName // their namespaces and local names for XML parsers
 
@@ -4094,7 +4146,13 @@ func (p *polyglot) popOut() outElem {
 		p.pClose = -1
 	}
 	p.buf = htmlstream.AppendEndTag(p.buf[:0], e.written)
+	// the element's declarations are in scope at its end tag (see
+	// Tag.LookupPrefix); those of a start tag being written are restored
+	// after it
+	tagDecls, tagIndexed := p.tagDecls, p.tagIndexed
+	p.tagDecls, p.tagIndexed = e.decls, false
 	p.tag(p.buf, Tag{Name: e.written, NS: e.hookNS, Reopened: e.reopened, ID: e.id, omit: e.unwrap})
+	p.tagDecls, p.tagIndexed = tagDecls, tagIndexed
 	if e.marker {
 		p.markers--
 		// formatting elements closed inside the marker aren't reopened
@@ -4254,7 +4312,9 @@ func (p *polyglot) reconstruct() {
 			r.start = append(r.start, '>')
 			r.bound = bound
 		}
+		p.tagDecls = r.decls // the copy's declarations, for Tag.LookupPrefix
 		p.tag(r.start, Tag{Start: true, Reopened: true, Name: r.written, NS: htmlstream.NamespaceXHTML, ID: r.id})
+		p.tagDecls = nil
 		p.pushOut(outElem{name: r.name, reopened: true, start: r.start, level: r.marker, key: r.key, seq: r.seq, decls: r.decls, bound: r.bound})
 	}
 	p.pending = p.pending[:n]
@@ -5469,7 +5529,7 @@ func (p *polyglot) startTag(tok *htmlstream.Token) {
 		} else {
 			// self-closed (a foreign element, or with XML syntax): its end
 			// tag follows
-			e := outElem{name: name}
+			e := outElem{name: name, decls: p.outDecls()}
 			if ns != htmlstream.NamespaceXHTML {
 				e.ns = ns
 			}
@@ -6577,7 +6637,8 @@ func (p *polyglot) outDecls() []nsDecl {
 var xlinkDecls = []nsDecl{{prefix: "xlink", uri: htmlstream.NamespaceXLink, added: true}}
 
 // lookupPrefix returns the namespace an XML parser binds a prefix to at the
-// current start tag in the output, using the declarations written (see
+// current start tag in the output (or at the tag being written during its
+// hook, see Tag.LookupPrefix), using the declarations written (see
 // startDecls). The Reader's declarations (LookupPrefix) also include those
 // which aren't written.
 func (p *polyglot) lookupPrefix(prefix string) (string, bool) {

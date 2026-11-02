@@ -1234,10 +1234,16 @@ type hookChecker struct {
 	in       string
 	mode     uint8
 	open     []polyglot.Tag // start tags without their end tag
+	scopes   []string       // for each of open, the namespaces of lookupPrefixes at the start tag (see scope)
 	textOpen bool
 	maxID    int
 	ids      map[int]bool // IDs of the start tags seen
 }
+
+// lookupPrefixes are the prefixes looked up on each tag event with
+// LookupPrefix, which must report the same namespaces on an element's end
+// tag as on its start tag (after its edits, see scope).
+var lookupPrefixes = []string{"", "xml", "xmlns", "xlink", "x", "ex", "a", "b"}
 
 func (c *hookChecker) tag(e *polyglot.Tag) {
 	t, in, mode := c.t, c.in, c.mode
@@ -1272,6 +1278,53 @@ func (c *hookChecker) tag(e *polyglot.Tag) {
 	if e.Token != nil && (!e.Start || e.Reopened || e.Token.Kind() != htmlstream.StartTag) {
 		t.Fatalf("%q, mode %#x: tag %+v with the token %s", in, mode, e, e.Token)
 	}
+	if uri, ok := e.LookupPrefix("xml"); !ok || uri != htmlstream.NamespaceXML {
+		t.Fatalf("%q, mode %#x: tag %+v: xml prefix bound to %q, %v", in, mode, e, uri, ok)
+	}
+	if uri, ok := e.LookupPrefix("xmlns"); ok {
+		t.Fatalf("%q, mode %#x: tag %+v: xmlns prefix bound to %q", in, mode, e, uri)
+	}
+	if prefix, _, ok := strings.Cut(e.Name, ":"); ok {
+		if uri, ok := e.LookupPrefix(prefix); !ok || uri != e.NS {
+			t.Fatalf("%q, mode %#x: tag %+v: its prefix is bound to %q, %v", in, mode, e, uri, ok)
+		}
+		if _, ok := e.LookupPrefix(""); !ok {
+			t.Fatalf("%q, mode %#x: tag %+v: no default namespace", in, mode, e)
+		}
+	} else if uri, ok := e.LookupPrefix(""); !ok || uri != e.NS {
+		t.Fatalf("%q, mode %#x: tag %+v: default namespace %q, %v", in, mode, e, uri, ok)
+	}
+	if e.NS == htmlstream.NamespaceSVG && e.Name == "svg" {
+		if uri, ok := e.LookupPrefix("xlink"); !ok || uri != htmlstream.NamespaceXLink {
+			t.Fatalf("%q, mode %#x: tag %+v: xlink prefix bound to %q, %v on svg", in, mode, e, uri, ok)
+		}
+	}
+	if e.Start {
+		c.scopes = append(c.scopes, "")
+		c.scope(e)
+	} else {
+		n := len(c.scopes)
+		if got := c.lookups(e); got != c.scopes[n-1] {
+			t.Fatalf("%q, mode %#x: end tag %+v: prefixes bound as %s, %s at the start tag", in, mode, e, got, c.scopes[n-1])
+		}
+		c.scopes = c.scopes[:n-1]
+	}
+}
+
+// scope records the namespaces of lookupPrefixes at the start tag e, after
+// its edits (the editing hooks call it again after Declare).
+func (c *hookChecker) scope(e *polyglot.Tag) {
+	c.scopes[len(c.scopes)-1] = c.lookups(e)
+}
+
+// lookups returns the namespaces of lookupPrefixes at the tag.
+func (c *hookChecker) lookups(e *polyglot.Tag) string {
+	var b strings.Builder
+	for _, prefix := range lookupPrefixes {
+		uri, ok := e.LookupPrefix(prefix)
+		fmt.Fprintf(&b, "%s=%q,%v ", prefix, uri, ok)
+	}
+	return b.String()
 }
 
 func (c *hookChecker) text(x *polyglot.Text) {
@@ -1304,9 +1357,10 @@ func (c *hookChecker) text(x *polyglot.Text) {
 // whitespace-only text whitespace-only, or a comment inserted before it), and
 // namespace prefixes declared: the xlink prefix on the html element, bound to
 // the XLink namespace, which the DOM comparison doesn't distinguish from no
-// namespace (xlink:href attributes are then set on elements in it), and on
-// other start tags, the xlink prefix or prefixes no attribute uses, bound to
-// other namespaces too.
+// namespace (xlink:href attributes are then set on elements where
+// LookupPrefix reports it bound to that namespace), and on other start tags,
+// the xlink prefix or prefixes no attribute uses, bound to other namespaces
+// too.
 type editingHooks struct {
 	rd  *htmlstream.Reader
 	rnd *rand.Rand
@@ -1314,7 +1368,6 @@ type editingHooks struct {
 	// Remove, Unwrap and Declare were called, which the conversion may refuse
 	// (see refused)
 	removed, unwrapped, declared bool
-	xlink                        bool // the html element declares xlink (by the input, or by Declare)
 }
 
 // refused reports whether the conversion error err is the refusal of an edit
@@ -1323,14 +1376,26 @@ type editingHooks struct {
 // whose integration point was dropped), a Remove of a template's first
 // child, a Declare of a prefix the tag declares otherwise in the input or
 // used by attributes of the input with the prefix bound otherwise by an
-// enclosing element, or a Declare after an Unwrap, and an xlink:href set
-// where an invalid declaration of the input leaves the xlink prefix unbound.
+// enclosing element, or a Declare after an Unwrap.
 func (ed *editingHooks) refused(err error) bool {
 	msg := err.Error()
 	return ed.removed && strings.Contains(msg, "invalid operation: removal of") && strings.Contains(msg, "first child element of a template") ||
 		ed.unwrapped && strings.Contains(msg, "invalid operation: unwrap of") ||
-		ed.declared && strings.Contains(msg, "invalid operation: declaration of the prefix") && (strings.Contains(msg, ": the tag declares it as") || strings.Contains(msg, ": its name or attributes use the prefix") || strings.Contains(msg, " on the unwrapped ")) ||
-		ed.xlink && strings.Contains(msg, `invalid operation: attribute name "xlink:href" has an unbound prefix`)
+		ed.declared && strings.Contains(msg, "invalid operation: declaration of the prefix") && (strings.Contains(msg, ": the tag declares it as") || strings.Contains(msg, ": its name or attributes use the prefix") || strings.Contains(msg, " on the unwrapped "))
+}
+
+// declare calls Declare on the start tag, and checks that LookupPrefix
+// reports the prefix bound to the namespace if it wasn't refused.
+func (ed *editingHooks) declare(e *polyglot.Tag, prefix, uri string) {
+	e.Declare(prefix, uri)
+	ed.declared = true
+	if e.Writer().Err() != nil {
+		return
+	}
+	if got, ok := e.LookupPrefix(prefix); !ok || got != uri {
+		ed.c.t.Fatalf("%q, mode %#x: tag %+v: prefix %q bound to %q, %v after Declare(%q, %q)", ed.c.in, ed.c.mode, e, prefix, got, ok, prefix, uri)
+	}
+	ed.c.scope(e)
 }
 
 // declarePrefixes are the prefixes and namespace names Declare is called
@@ -1382,8 +1447,7 @@ func (ed *editingHooks) tag(e *polyglot.Tag) {
 		o.Name, o.Local = e.Name, e.Local
 	}
 	if e.NS == htmlstream.NamespaceXHTML && e.Name == "html" && ed.rnd.IntN(2) == 0 {
-		e.Declare("xlink", htmlstream.NamespaceXLink)
-		ed.declared, ed.xlink = true, true
+		ed.declare(e, "xlink", htmlstream.NamespaceXLink)
 	}
 	switch n := ed.rnd.IntN(100); {
 	case n < 30:
@@ -1393,16 +1457,17 @@ func (ed *editingHooks) tag(e *polyglot.Tag) {
 			return
 		}
 		d := declarePrefixes[ed.rnd.IntN(len(declarePrefixes))]
-		e.Declare(d[0], d[1])
-		ed.declared = true
-		if d[0] == "xlink" && ed.rnd.IntN(2) == 0 {
+		ed.declare(e, d[0], d[1])
+		if d[0] == "xlink" && ed.rnd.IntN(2) == 0 && e.Writer().Err() == nil {
 			e.SetAttr("xlink:href", "#x")
 		}
-	case n < 50 && ed.xlink:
+	case n < 50:
 		if e.Token == nil && e.Name == "meta" {
 			return
 		}
-		e.SetAttr("xlink:href", "#h")
+		if uri, ok := e.LookupPrefix("xlink"); ok && uri == htmlstream.NamespaceXLink {
+			e.SetAttr("xlink:href", "#h")
+		}
 	case n < 60:
 		// the charset meta element can't be edited
 		if e.Token == nil && e.Name == "meta" {
