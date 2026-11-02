@@ -441,7 +441,8 @@ func (e *Error) Error() string {
 //     math content: insert HTML markup only where NS is the XHTML namespace
 //     and not inside svg or math (except in an integration point like
 //     foreignObject, where the enclosing element is an HTML element), and
-//     declare any prefix it uses.
+//     declare any prefix it uses, unless the prefix is bound where the
+//     markup is inserted (by a declaration of the input, or with Declare).
 //   - It avoids the places where HTML parsers restructure or ignore
 //     content: table content outside cells (moved before the table), select,
 //     the head (elements other than head content start the body), before
@@ -543,10 +544,10 @@ func (e *Tag) InsertAfter(raw []byte) {
 //
 // It fails the conversion for an end tag, a reopened element (edit the first
 // start tag, which the reopened copies repeat) and the charset meta element,
-// for a name which isn't an XML name, has an unbound prefix or is xmlns or
-// xmlns:* (changing namespace declarations changes how XML parsers read the
-// contents, and HTML parsers ignore them), and for a value with characters
-// not allowed in XML.
+// for a name which isn't an XML name, has an unbound prefix (see Declare) or
+// is xmlns or xmlns:* (the default namespace is written by the conversion,
+// see [Convert], and prefixes are declared with Declare), and for a value
+// with characters not allowed in XML.
 //
 // The name must be the one HTML parsers give the attribute: lowercase on HTML
 // elements, and with the case adjustments of SVG and MathML attributes
@@ -566,7 +567,10 @@ func (e *Tag) InsertAfter(raw []byte) {
 // Prefixed names other than xml:lang on HTML elements (e.g., xml:space or
 // epub:type) aren't checked either: HTML parsers put these attributes in no
 // namespace, and XML parsers in the namespace of the prefix, which gives a
-// warning for such attributes of the input (see [Convert]).
+// warning for such attributes of the input (see [Convert]). The prefix must
+// be bound where the tag is: by a declaration of the input on the element or
+// an enclosing one, or by Declare on this tag (before SetAttr) or on the tag
+// of an enclosing element.
 func (e *Tag) SetAttr(name, value string) {
 	if e.checkAttrEdit(name) != nil {
 		return
@@ -592,7 +596,8 @@ func (e *Tag) SetAttr(name, value string) {
 // RemoveAttr removes the attribute name from the start tag, if it has it. On
 // HTML elements, lang and xml:lang are removed together. It fails the
 // conversion like SetAttr (for a tag which can't be edited, and for a name
-// which isn't an XML name or is a namespace declaration).
+// which isn't an XML name or is a namespace declaration, which can't be
+// removed: the names in the element may use it).
 func (e *Tag) RemoveAttr(name string) {
 	if e.checkAttrEdit(name) != nil {
 		return
@@ -642,6 +647,96 @@ func (e *Tag) checkAttrEdit(name string) error {
 		return p.fail("attribute name " + strconv.Quote(name) + " isn't the name HTML parsers give it (" + strconv.Quote(lower) + ")")
 	}
 	return nil
+}
+
+// Declare declares the namespace prefix on the start tag, like a namespace
+// declaration of the input: the attribute xmlns:prefix with the namespace
+// name uri as its value (escaped like a value of the input) is added after
+// the attributes of the tag, and repeated by the reopened copies of a
+// formatting element (see Reopened). XML parsers bind the prefix to the
+// namespace in the element and its contents: the prefixed names of the input
+// in them are bound by it, with the warning for prefixed names (see [Convert])
+// when the namespace isn't the one HTML parsers give them, and attributes with
+// the prefix can be set with SetAttr on this tag (after Declare) and on the
+// tags in the element (e.g., xmlns:epub declared on the html element for
+// epub:type attributes set on the elements in it). HTML parsers read the
+// declaration as an attribute named xmlns:prefix in no namespace, as they
+// read the declarations of the input (except xmlns:xlink on SVG and MathML
+// elements, which they put in the XMLNS namespace like XML parsers).
+//
+// If the tag already declares the prefix with the same namespace name (in the
+// input, or by an earlier call), Declare does nothing. A prefix bound to
+// another namespace by an enclosing element is bound to uri in the element
+// and its contents. The namespace name isn't checked to be a URI.
+//
+// It fails the conversion for an end tag, a reopened element, the charset
+// meta element and an unwrapped or removed element (Unwrap after Declare
+// fails too, see there), for a tag declaring the prefix with another
+// namespace name, for a prefix bound by an enclosing element to another
+// namespace name when the tag's name or attributes (of the input, or set
+// before) use the prefix (they were written for that namespace), and for
+// declarations invalid in XML: an empty prefix (the default namespace is
+// written by the conversion, see [Convert]), a prefix which isn't an XML
+// name, the xmlns prefix, the xml prefix bound to a namespace other than the
+// XML namespace, another prefix bound to the XML or XMLNS namespace, an
+// empty namespace name, and a namespace name with characters not allowed in
+// XML.
+func (e *Tag) Declare(prefix, uri string) {
+	if e.check() != nil {
+		return
+	}
+	p := e.p
+	name := "xmlns:" + prefix
+	switch {
+	case !e.w.start:
+		p.fail("declaration of the prefix " + strconv.Quote(prefix) + " on an end tag")
+		return
+	case e.w.reopened:
+		p.fail("declaration of the prefix " + strconv.Quote(prefix) + " on a reopened " + e.w.name + " (declare it on its first start tag)")
+		return
+	case e.fixed:
+		p.fail("declaration of the prefix " + strconv.Quote(prefix) + " on the charset meta element")
+		return
+	case e.remove:
+		p.fail("declaration of the prefix " + strconv.Quote(prefix) + " on the removed " + e.w.name)
+		return
+	case e.omit:
+		p.fail("declaration of the prefix " + strconv.Quote(prefix) + " on the unwrapped " + e.w.name)
+		return
+	case prefix == "":
+		p.fail("declaration of the default namespace (written by the conversion)")
+		return
+	case !htmlstream.ValidXMLName(name):
+		p.fail("declaration of the prefix " + strconv.Quote(prefix) + ", which isn't an XML name")
+		return
+	}
+	p.raw = append(p.raw[:0], uri...)
+	if !htmlstream.ValidXMLChars(p.raw) {
+		p.fail("declaration of the prefix " + strconv.Quote(prefix) + " with a namespace name with characters XML doesn't allow")
+		return
+	}
+	if why := invalidDecl(prefix, uri); why != "" {
+		p.fail("declaration of the prefix " + strconv.Quote(prefix) + " as " + strconv.Quote(uri) + " (invalid in XML: " + why + ")")
+		return
+	}
+	if cur, ok, found := p.tagDecl(prefix); found && ok {
+		if cur == uri {
+			return
+		}
+		p.fail("declaration of the prefix " + strconv.Quote(prefix) + " as " + strconv.Quote(uri) + " on " + e.w.name + ": the tag declares it as " + strconv.Quote(cur))
+		return
+	}
+	if cur, ok := p.lookupPrefix(prefix); ok && cur != uri {
+		// the tag's names with the prefix were written for the namespace cur
+		// (see writeStart)
+		if tp, _, ok := strings.Cut(e.w.name, ":"); ok && tp == prefix || slices.ContainsFunc(p.attrs, func(a attrRange) bool { return strings.HasPrefix(a.name, prefix+":") }) {
+			p.fail("declaration of the prefix " + strconv.Quote(prefix) + " as " + strconv.Quote(uri) + " on " + e.w.name + ": its name or attributes use the prefix bound to " + strconv.Quote(cur) + " by an enclosing element")
+			return
+		}
+	}
+	p.setAttr(name, p.raw)
+	p.addTagDecl(nsDecl{prefix: prefix, uri: uri, added: true})
+	e.edited = true
 }
 
 // Rename renames the element to name: its start and end tags are written
@@ -767,9 +862,10 @@ var renameGroup = func() map[string]int {
 // depending on it), an svg, math or other foreign element (whose contents are
 // foreign content for HTML parsers because of it), an element in foreign
 // content (an integration point's child, whose start tag declares the XHTML
-// namespace) and an element declaring namespace prefixes (which its contents
-// may use). As for the input, it isn't checked that the contents are parsed
-// the same without the element: e.g., unwrapping the b in <option><b><option>
+// namespace) and an element declaring namespace prefixes, in the input or
+// with Declare (its contents may use them). As for the input, it isn't
+// checked that the contents are parsed the same without the element: e.g.,
+// unwrapping the b in <option><b><option>
 // gives <option><option>, where HTML parsers close the first option;
 // unwrapping a table, select, template or p changes how HTML parsers read the
 // contents.
@@ -1465,11 +1561,11 @@ func Convert(w io.Writer, r io.Reader, opt Options) error {
 // [Options.OnText] report the element tags and text nodes as written (the
 // structure HTML parsers give the input, with the elements the conversion
 // adds), and the methods of the events insert markup around the tags, edit
-// attributes, rename and leave out elements and replace the text (see [Tag]
-// and [Text]). Hold, HoldRelease and HoldDiscard hold back the output, so a
-// hook can decide what to write before the held output once it has seen what
-// follows, and Fail makes the conversion fail. The hooks must not call
-// WriteToken or Close.
+// attributes, declare namespace prefixes, rename and leave out elements and
+// replace the text (see [Tag] and [Text]). Hold, HoldRelease and HoldDiscard
+// hold back the output, so a hook can decide what to write before the held
+// output once it has seen what follows, and Fail makes the conversion fail.
+// The hooks must not call WriteToken or Close.
 //
 // [Options.MaxDepth] limits the depth of the output, and the Reader's
 // maximum depth ([htmlstream.Reader.SetMaxDepth]) that of the input; see
@@ -2360,8 +2456,9 @@ func (p *polyglot) startPending() {
 }
 
 // tagString is tag for a constant tag, which has no attributes to edit. A
-// start tag has no namespace declarations (those of the last input start tag
-// were kept with its element, see outDecls).
+// start tag has no namespace declarations before the hook (those of the last
+// input start tag were kept with its element, see outDecls); the hook can
+// declare prefixes on it (see Tag.Declare), which its element keeps.
 func (p *polyglot) tagString(s string, e Tag) {
 	p.buf = append(p.buf[:0], s...)
 	p.attrs = p.attrs[:0]
@@ -3324,18 +3421,18 @@ func isXMLDecl(data []byte) bool {
 func (p *polyglot) structure(ev htmlutil.DocumentEvent) {
 	if ev&htmlutil.ImpliedHTML != 0 {
 		p.tagString(`<html xmlns="`+htmlstream.NamespaceXHTML+`">`, htmlTag("html", true))
-		p.pushOut(outElem{name: "html", synthetic: true})
+		p.pushOut(outElem{name: "html", synthetic: true, decls: p.outDecls()})
 	}
 	if ev&htmlutil.ImpliedHead != 0 {
 		p.charsetNext, p.headPos = true, p.pos
 		p.tagString("<head>", htmlTag("head", true))
-		p.pushOut(outElem{name: "head", synthetic: true})
+		p.pushOut(outElem{name: "head", synthetic: true, decls: p.outDecls()})
 		p.writeCharset()
 	}
 	if ev&htmlutil.ImpliedBody != 0 {
 		p.closeHead()
 		p.tagString("<body>", htmlTag("body", true))
-		p.pushOut(outElem{name: "body", synthetic: true})
+		p.pushOut(outElem{name: "body", synthetic: true, decls: p.outDecls()})
 	}
 }
 
@@ -5627,15 +5724,15 @@ func (p *polyglot) tableFixup(name string) bool {
 	p.tagDecls, p.tagIndexed = nil, false
 	if name == "col" {
 		p.tagString("<colgroup>", htmlTag("colgroup", true))
-		p.pushOut(outElem{name: "colgroup", synthetic: true})
+		p.pushOut(outElem{name: "colgroup", synthetic: true, decls: p.outDecls()})
 	} else {
 		if p.topIs("table", false) {
 			p.tagString("<tbody>", htmlTag("tbody", true))
-			p.pushOut(outElem{name: "tbody", synthetic: true})
+			p.pushOut(outElem{name: "tbody", synthetic: true, decls: p.outDecls()})
 		}
 		if name == "td" || name == "th" {
 			p.tagString("<tr>", htmlTag("tr", true))
-			p.pushOut(outElem{name: "tr", synthetic: true})
+			p.pushOut(outElem{name: "tr", synthetic: true, decls: p.outDecls()})
 		}
 	}
 	p.tagDecls, p.tagIndexed = tagDecls, tagIndexed

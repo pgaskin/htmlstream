@@ -186,6 +186,35 @@ func ExampleTag() {
 	// <div class="scroll"><table><tbody><tr><td>1</td></tr></tbody></table></div><img src="a.png" loading="lazy" /></body></html>
 }
 
+// Declare declares a namespace prefix on the html element (here, the EPUB
+// one, kept if the input declares it already), for the attributes set with
+// it on the elements in it.
+func ExampleTag_Declare() {
+	const page = `<h1>Chapter 1</h1><p>Text<a href="#n1">1</a></p><aside id="n1">Note</aside>`
+
+	err := polyglot.Convert(os.Stdout, strings.NewReader(page), polyglot.Options{
+		DoctypeMode: polyglot.NoDoctype,
+		OnTag: func(e *polyglot.Tag) {
+			if !e.Start || e.NS != htmlstream.NamespaceXHTML {
+				return
+			}
+			switch e.Name {
+			case "html":
+				e.Declare("epub", "http://www.idpf.org/2007/ops")
+			case "a":
+				e.SetAttr("epub:type", "noteref")
+			case "aside":
+				e.SetAttr("epub:type", "footnote")
+			}
+		},
+	})
+	if err != nil {
+		panic(err)
+	}
+	// Output:
+	// <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops"><head><meta charset="UTF-8" /></head><body><h1>Chapter 1</h1><p>Text<a href="#n1" epub:type="noteref">1</a></p><aside id="n1" epub:type="footnote">Note</aside></body></html>
+}
+
 // The Text hook replaces text as it is written. SetText escapes the new text,
 // like the text of the input.
 func ExampleText() {

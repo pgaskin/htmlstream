@@ -1300,26 +1300,47 @@ func (c *hookChecker) text(x *polyglot.Text) {
 // their contents parse the same without them (see unwrapSound; reopened
 // copies, foreign content and elements declaring prefixes are left alone),
 // comments inserted around tags outside elements whose contents are text
-// for HTML parsers, and text changed (letters upper-cased, which keeps
-// whitespace-only text whitespace-only, or a comment inserted before it).
+// for HTML parsers, text changed (letters upper-cased, which keeps
+// whitespace-only text whitespace-only, or a comment inserted before it), and
+// namespace prefixes declared: the xlink prefix on the html element, bound to
+// the XLink namespace, which the DOM comparison doesn't distinguish from no
+// namespace (xlink:href attributes are then set on elements in it), and on
+// other start tags, the xlink prefix or prefixes no attribute uses, bound to
+// other namespaces too.
 type editingHooks struct {
 	rd  *htmlstream.Reader
 	rnd *rand.Rand
 	c   *hookChecker
-	// Remove and Unwrap were called, which the conversion may refuse (see
-	// refused)
-	removed, unwrapped bool
+	// Remove, Unwrap and Declare were called, which the conversion may refuse
+	// (see refused)
+	removed, unwrapped, declared bool
+	xlink                        bool // the html element declares xlink (by the input, or by Declare)
 }
 
 // refused reports whether the conversion error err is the refusal of an edit
 // the hooks don't rule out: an Unwrap in foreign content (the parent in the
 // output may differ from the input's, e.g., for an element in foreign content
-// whose integration point was dropped), or a Remove of a template's first
-// child.
+// whose integration point was dropped), a Remove of a template's first
+// child, a Declare of a prefix the tag declares otherwise in the input or
+// used by attributes of the input with the prefix bound otherwise by an
+// enclosing element, or a Declare after an Unwrap, and an xlink:href set
+// where an invalid declaration of the input leaves the xlink prefix unbound.
 func (ed *editingHooks) refused(err error) bool {
 	msg := err.Error()
 	return ed.removed && strings.Contains(msg, "invalid operation: removal of") && strings.Contains(msg, "first child element of a template") ||
-		ed.unwrapped && strings.Contains(msg, "invalid operation: unwrap of")
+		ed.unwrapped && strings.Contains(msg, "invalid operation: unwrap of") ||
+		ed.declared && strings.Contains(msg, "invalid operation: declaration of the prefix") && (strings.Contains(msg, ": the tag declares it as") || strings.Contains(msg, ": its name or attributes use the prefix") || strings.Contains(msg, " on the unwrapped ")) ||
+		ed.xlink && strings.Contains(msg, `invalid operation: attribute name "xlink:href" has an unbound prefix`)
+}
+
+// declarePrefixes are the prefixes and namespace names Declare is called
+// with on start tags other than html (see editingHooks).
+var declarePrefixes = [][2]string{
+	{"xlink", htmlstream.NamespaceXLink},
+	{"x", "u"},
+	{"x", "v"},
+	{"ex", "urn:ex"},
+	{"ex", "u"},
 }
 
 // textish are the elements whose contents are text for HTML parsers (with
@@ -1360,8 +1381,28 @@ func (ed *editingHooks) tag(e *polyglot.Tag) {
 		o := &ed.c.open[len(ed.c.open)-1]
 		o.Name, o.Local = e.Name, e.Local
 	}
+	if e.NS == htmlstream.NamespaceXHTML && e.Name == "html" && ed.rnd.IntN(2) == 0 {
+		e.Declare("xlink", htmlstream.NamespaceXLink)
+		ed.declared, ed.xlink = true, true
+	}
 	switch n := ed.rnd.IntN(100); {
+	case n < 30:
 	case n < 40:
+		// the charset meta element can't be edited
+		if e.Token == nil && e.Name == "meta" {
+			return
+		}
+		d := declarePrefixes[ed.rnd.IntN(len(declarePrefixes))]
+		e.Declare(d[0], d[1])
+		ed.declared = true
+		if d[0] == "xlink" && ed.rnd.IntN(2) == 0 {
+			e.SetAttr("xlink:href", "#x")
+		}
+	case n < 50 && ed.xlink:
+		if e.Token == nil && e.Name == "meta" {
+			return
+		}
+		e.SetAttr("xlink:href", "#h")
 	case n < 60:
 		// the charset meta element can't be edited
 		if e.Token == nil && e.Name == "meta" {

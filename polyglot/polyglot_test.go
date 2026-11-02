@@ -859,6 +859,7 @@ func TestHooks(t *testing.T) {
 
 	t.Run("Attrs", testAttrs)
 	t.Run("ReopenedPrefixes", testReopenedPrefixes)
+	t.Run("Declare", testDeclare)
 	t.Run("Rename", testRename)
 	t.Run("Unwrap", testUnwrap)
 	t.Run("Remove", testRemove)
@@ -969,6 +970,188 @@ func testReopenedPrefixes(t *testing.T) {
 	}
 	if !slices.Equal(warnings, wantWarnings) {
 		t.Errorf("warnings:\n got %q\nwant %q", warnings, wantWarnings)
+	}
+}
+
+// testDeclare checks Declare: the declaration is written after the
+// attributes and binds the prefix for SetAttr on the tag and in the element,
+// and for the prefixed names of the input in it, a declaration the tag
+// already has (in the input, or by an earlier call, also the xlink
+// declaration added to svg) is kept, an invalid one of the input is replaced,
+// a prefix bound by an enclosing element is rebound, elements the conversion
+// adds (the implied html, head and body, tbody and tr, and the p and br of
+// stray end tags) and void elements can declare prefixes, and a formatting
+// element reopened outside the element declaring the prefix of an attribute
+// set on it declares the prefix itself.
+func testDeclare(t *testing.T) {
+	for _, tc := range []struct {
+		name, in, want string
+		warnings       []string
+		hook           func(e *Tag)
+	}{
+		{"Root", `<html xmlns:a="u"><head><title>t</title></head><body><p>x<span>y</span><a:b/><c:d/></p><a:b/>`,
+			`<html xmlns:a="u" xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops"><head><meta charset="UTF-8" /><title>t</title></head><body><p epub:type="chapter">x<span epub:type="x">y</span><a:b></a:b></p><a:b></a:b></body></html>`,
+			[]string{
+				`71: element "a:b" is in namespace "u" for XML parsers and in namespace "http://www.w3.org/1999/xhtml" for HTML parsers (will not warn again for this prefix and namespace)`,
+				`77: dropped element "c:d" (can't be represented in XML)`,
+			},
+			func(e *Tag) {
+				switch e.Name {
+				case "html":
+					e.Declare("a", "u")                               // declared by the input
+					e.Declare("epub", "http://www.idpf.org/2007/ops") // added
+					e.Declare("epub", "http://www.idpf.org/2007/ops") // declared above
+				case "p":
+					e.SetAttr("epub:type", "chapter")
+				case "span":
+					e.SetAttr("epub:type", "x")
+				}
+			}},
+		{"Implied", `<p>x`,
+			`<html xmlns="http://www.w3.org/1999/xhtml" xmlns:a="u"><head xmlns:b="v"><meta charset="UTF-8" /></head><body xmlns:c="w"><p a:x="1" c:z="3">x</p></body></html>`, nil,
+			func(e *Tag) {
+				switch e.Name {
+				case "html":
+					e.Declare("a", "u")
+				case "head":
+					e.Declare("b", "v")
+				case "body":
+					e.Declare("c", "w")
+				case "p":
+					e.SetAttr("a:x", "1")
+					e.SetAttr("c:z", "3")
+				}
+			}},
+		{"OnTag", `<div><p x:a="1">x<br>y<b>z</b></p></div><p>w`,
+			`<div xmlns:x="u"><p x:a="1" x:b="2">x<br xmlns:y="v" />y<b x:c="3">z</b></p></div><p>w</p>`,
+			[]string{`5: attribute "x:a" is in namespace "u" for XML parsers and in no namespace for HTML parsers (will not warn again for this prefix and namespace)`},
+			func(e *Tag) {
+				switch e.Name {
+				case "div":
+					e.Declare("x", "u")
+				case "p":
+					if e.Depth == 3 {
+						e.SetAttr("x:b", "2")
+					}
+				case "br":
+					e.Declare("y", "v")
+				case "b":
+					e.SetAttr("x:c", "3")
+				}
+			}},
+		{"SameTag", `<p>x`, `<p xmlns:x="u" x:a="1">x</p>`, nil,
+			func(e *Tag) {
+				if e.Name == "p" {
+					e.Declare("x", "u")
+					e.SetAttr("x:a", "1")
+				}
+			}},
+		{"Rebound", `<div xmlns:x="u" x:a="1"><p><span x:b="2">x</span></p><span x:c="3">y</span></div>`,
+			`<div xmlns:x="u" x:a="1"><p xmlns:x="v"><span x:b="2" x:d="4">x</span></p><span x:c="3">y</span></div>`,
+			[]string{`0: attribute "x:a" is in namespace "u" for XML parsers and in no namespace for HTML parsers (will not warn again for this prefix and namespace)`,
+				`28: attribute "x:b" is in namespace "v" for XML parsers and in no namespace for HTML parsers (will not warn again for this prefix and namespace)`},
+			func(e *Tag) {
+				switch e.Name {
+				case "p":
+					e.Declare("x", "v")
+				case "span":
+					if _, ok := e.Token.Attr("x:b"); ok {
+						e.SetAttr("x:d", "4")
+					}
+				}
+			}},
+		{"Dropped", `<p xmlns:x="" x:a="1"><span x:b="2">x</span></p>`,
+			`<p xmlns:x="u" x:c="3"><span x:b="2">x</span></p>`,
+			[]string{`0: dropped namespace declaration "xmlns:x" (invalid in XML: a prefix can't be undeclared with an empty namespace name)`,
+				`0: dropped attribute "x:a" (can't be represented in XML)`,
+				`22: attribute "x:b" is in namespace "u" for XML parsers and in no namespace for HTML parsers (will not warn again for this prefix and namespace)`},
+			func(e *Tag) {
+				if e.Name == "p" {
+					e.Declare("x", "u")
+					e.SetAttr("x:c", "3")
+				}
+			}},
+		{"XLink", `<svg><use xlink:href="#a"/></svg><p xlink:href="#b">x</p><p>y`,
+			`<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><use xlink:href="#a"></use></svg><p xlink:href="#b" xmlns:xlink="http://www.w3.org/1999/xlink">x</p><p xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#c">y</p>`,
+			[]string{`33: attribute "xlink:href" is in namespace "http://www.w3.org/1999/xlink" for XML parsers and in no namespace for HTML parsers (will not warn again for this prefix and namespace)`},
+			func(e *Tag) {
+				switch e.Name {
+				case "svg", "p":
+					e.Declare("xlink", htmlstream.NamespaceXLink)
+					if e.Name == "p" && e.Token.NumAttrs() == 0 {
+						e.SetAttr("xlink:href", "#c")
+					}
+				}
+			}},
+		{"Table", `<table><td>x</td><td>y<table><tr><td>z`,
+			`<table><tbody xmlns:a="u"><tr xmlns:b="v"><td a:x="1" b:y="2">x</td><td a:x="1" b:y="2">y<table><tbody xmlns:a="u"><tr><td a:x="1">z</td></tr></tbody></table></td></tr></tbody></table>`, nil,
+			func(e *Tag) {
+				switch e.Name {
+				case "tbody":
+					e.Declare("a", "u")
+				case "tr":
+					if e.Token == nil {
+						e.Declare("b", "v")
+					}
+				case "td":
+					e.SetAttr("a:x", "1")
+					if e.Depth == 5 {
+						e.SetAttr("b:y", "2")
+					}
+				}
+			}},
+		{"StrayEnd", `x</p>y</br>`,
+			`x<p xmlns:a="u"></p>y<br xmlns:b="v" />`,
+			[]string{`6: wrote br for </br> (XML parsers would have read it as an end tag)`},
+			func(e *Tag) {
+				switch e.Name {
+				case "p":
+					e.Declare("a", "u")
+				case "br":
+					e.Declare("b", "v")
+				}
+			}},
+		{"Reopened", `<div><b>1<i>2</div>3</i>4</b>`,
+			`<div xmlns:x="u"><b x:a="1">1<i x:b="2">2</i></b></div><b x:a="1" xmlns:x="u"><i x:b="2">3</i>4</b>`,
+			[]string{`19: reopened b declares the prefix "x" of its attributes (the prefix isn't bound to namespace "u" where it's reopened, and HTML parsers will see an extra xmlns:x attribute when parsing the output)`},
+			func(e *Tag) {
+				switch e.Name {
+				case "div":
+					e.Declare("x", "u")
+				case "b":
+					e.SetAttr("x:a", "1")
+				case "i":
+					e.SetAttr("x:b", "2")
+				}
+			}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var warnings []string
+			got, err := convertHookedErr(tc.in, Options{
+				DoctypeMode: NoDoctype,
+				Warn: func(w Warning) {
+					warnings = append(warnings, fmt.Sprintf("%d: %s", w.Pos, w.Msg))
+				},
+				OnTag: func(e *Tag) {
+					if e.Start && !e.Reopened {
+						tc.hook(e)
+					}
+				},
+			}, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := tc.want
+			if !strings.HasPrefix(want, "<html") {
+				want = `<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body>` + want + `</body></html>`
+			}
+			if got != want {
+				t.Errorf("output:\n got %s\nwant %s", got, want)
+			}
+			if !slices.Equal(warnings, tc.warnings) {
+				t.Errorf("warnings:\n got %q\nwant %q", warnings, tc.warnings)
+			}
+		})
 	}
 }
 
@@ -1445,6 +1628,141 @@ func testHookErrors(t *testing.T) {
 		{"SetAttr with the prefix of the last start tag on the p of a stray end tag", `<p xmlns:x="u">x</p></p>`, "unbound prefix", func(e *Tag) error {
 			if e.Start && e.Name == "p" && e.Token == nil {
 				e.SetAttr("x:a", "1")
+			}
+			return nil
+		}},
+		{"SetAttr after the declaring element", `<p>x</p><p>y</p>`, `attribute name "x:a" has an unbound prefix`, func(e *Tag) error {
+			if e.Start && e.Name == "p" {
+				if e.Token.Pos() == 0 {
+					e.Declare("x", "u")
+				} else {
+					e.SetAttr("x:a", "1")
+				}
+			}
+			return nil
+		}},
+		{"SetAttr before Declare", `<p>x</p>`, `attribute name "x:a" has an unbound prefix`, func(e *Tag) error {
+			if e.Start && e.Name == "p" {
+				e.SetAttr("x:a", "1")
+				e.Declare("x", "u")
+			}
+			return nil
+		}},
+		{"RemoveAttr xmlns", `<p xmlns:x="u">x</p>`, "namespace declaration", func(e *Tag) error {
+			if e.Start && e.Name == "p" {
+				e.RemoveAttr("xmlns:x")
+			}
+			return nil
+		}},
+		{"Declare on an end tag", `<p>x</p>`, "end tag", func(e *Tag) error {
+			if !e.Start && e.Name == "p" {
+				e.Declare("x", "u")
+			}
+			return nil
+		}},
+		{"Declare on a reopened element", `<p><b>1</p><p>2</b>`, "reopened", func(e *Tag) error {
+			if e.Reopened && e.Start {
+				e.Declare("x", "u")
+			}
+			return nil
+		}},
+		{"Declare on the charset meta", `<p>x</p>`, "charset meta", func(e *Tag) error {
+			if e.Start && e.Name == "meta" {
+				e.Declare("x", "u")
+			}
+			return nil
+		}},
+		{"Declare after Unwrap", `<div><p>x</p></div>`, "on the unwrapped div", func(e *Tag) error {
+			if e.Start && e.Name == "div" {
+				e.Unwrap()
+				e.Declare("x", "u")
+			}
+			return nil
+		}},
+		{"Declare after Remove", `<div><p>x</p></div>`, "on the removed div", func(e *Tag) error {
+			if e.Start && e.Name == "div" {
+				e.Remove()
+				e.Declare("x", "u")
+			}
+			return nil
+		}},
+		{"Unwrap after Declare", `<div><p>x</p></div>`, "unwrap of div declaring namespace prefixes", func(e *Tag) error {
+			if e.Start && e.Name == "div" {
+				e.Declare("x", "u")
+				e.Unwrap()
+			}
+			return nil
+		}},
+		{"Declare the default namespace", `<p>x</p>`, "default namespace", func(e *Tag) error {
+			if e.Start && e.Name == "p" {
+				e.Declare("", "u")
+			}
+			return nil
+		}},
+		{"Declare an invalid prefix", `<p>x</p>`, `prefix "a:b", which isn't an XML name`, func(e *Tag) error {
+			if e.Start && e.Name == "p" {
+				e.Declare("a:b", "u")
+			}
+			return nil
+		}},
+		{"Declare xmlns", `<p>x</p>`, "the xmlns prefix can't be declared", func(e *Tag) error {
+			if e.Start && e.Name == "p" {
+				e.Declare("xmlns", "u")
+			}
+			return nil
+		}},
+		{"Declare xml", `<p>x</p>`, "the xml prefix can't be bound to another namespace", func(e *Tag) error {
+			if e.Start && e.Name == "p" {
+				e.Declare("xml", "u")
+			}
+			return nil
+		}},
+		{"Declare an empty namespace name", `<p>x</p>`, "can't be undeclared", func(e *Tag) error {
+			if e.Start && e.Name == "p" {
+				e.Declare("x", "")
+			}
+			return nil
+		}},
+		{"Declare the XML namespace", `<p>x</p>`, "only the xml prefix", func(e *Tag) error {
+			if e.Start && e.Name == "p" {
+				e.Declare("x", htmlstream.NamespaceXML)
+			}
+			return nil
+		}},
+		{"Declare the XMLNS namespace", `<p>x</p>`, "no prefix can be bound to the xmlns namespace", func(e *Tag) error {
+			if e.Start && e.Name == "p" {
+				e.Declare("x", htmlstream.NamespaceXMLNS)
+			}
+			return nil
+		}},
+		{"Declare an invalid namespace name", `<p>x</p>`, "characters XML doesn't allow", func(e *Tag) error {
+			if e.Start && e.Name == "p" {
+				e.Declare("x", "\x01")
+			}
+			return nil
+		}},
+		{"Declare a prefix of the input otherwise", `<p xmlns:x="u">x</p>`, `declaration of the prefix "x" as "v" on p: the tag declares it as "u"`, func(e *Tag) error {
+			if e.Start && e.Name == "p" {
+				e.Declare("x", "v")
+			}
+			return nil
+		}},
+		{"Declare a prefix twice otherwise", `<p>x</p>`, `declaration of the prefix "x" as "v" on p: the tag declares it as "u"`, func(e *Tag) error {
+			if e.Start && e.Name == "p" {
+				e.Declare("x", "u")
+				e.Declare("x", "v")
+			}
+			return nil
+		}},
+		{"Declare a prefix of the attributes otherwise", `<div xmlns:x="u"><p x:a="1">x</p></div>`, `declaration of the prefix "x" as "v" on p: its name or attributes use the prefix bound to "u"`, func(e *Tag) error {
+			if e.Start && e.Name == "p" {
+				e.Declare("x", "v")
+			}
+			return nil
+		}},
+		{"Declare a prefix of the element name otherwise", `<div xmlns:x="u"><x:p>x</x:p></div>`, `declaration of the prefix "x" as "v" on x:p: its name or attributes use the prefix bound to "u"`, func(e *Tag) error {
+			if e.Start && e.Name == "x:p" {
+				e.Declare("x", "v")
 			}
 			return nil
 		}},
