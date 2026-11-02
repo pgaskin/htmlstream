@@ -858,6 +858,7 @@ func TestHooks(t *testing.T) {
 	}
 
 	t.Run("Attrs", testAttrs)
+	t.Run("ReopenedPrefixes", testReopenedPrefixes)
 	t.Run("Rename", testRename)
 	t.Run("Unwrap", testUnwrap)
 	t.Run("Remove", testRemove)
@@ -931,6 +932,43 @@ func testAttrs(t *testing.T) {
 	}
 	if got != want {
 		t.Errorf("edited attributes:\n got %s\nwant %s", got, want)
+	}
+}
+
+// testReopenedPrefixes checks that a formatting element reopened outside the
+// element binding the prefix of an attribute set on it by the hook declares
+// the prefix itself, like for prefixed attributes of the input, and that one
+// reopened inside it doesn't.
+func testReopenedPrefixes(t *testing.T) {
+	in := `<div xmlns:x="u"><b>1<i>2</div>3</i>4</b>`
+	want := `<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /></head><body><div xmlns:x="u"><b x:a="1">1<i x:b="2">2</i></b></div><b x:a="1" xmlns:x="u"><i x:b="2">3</i>4</b></body></html>`
+	wantWarnings := []string{`31: reopened b declares the prefix "x" of its attributes (the prefix isn't bound to namespace "u" where it's reopened, and HTML parsers will see an extra xmlns:x attribute when parsing the output)`}
+	var warnings []string
+	got, err := convertHookedErr(in, Options{
+		DoctypeMode: NoDoctype,
+		Warn: func(w Warning) {
+			warnings = append(warnings, fmt.Sprintf("%d: %s", w.Pos, w.Msg))
+		},
+		OnTag: func(e *Tag) {
+			if !e.Start || e.Reopened {
+				return
+			}
+			switch e.Name {
+			case "b":
+				e.SetAttr("x:a", "1")
+			case "i":
+				e.SetAttr("x:b", "2")
+			}
+		},
+	}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != want {
+		t.Errorf("output:\n got %s\nwant %s", got, want)
+	}
+	if !slices.Equal(warnings, wantWarnings) {
+		t.Errorf("warnings:\n got %q\nwant %q", warnings, wantWarnings)
 	}
 }
 

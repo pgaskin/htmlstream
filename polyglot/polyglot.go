@@ -4164,24 +4164,20 @@ func (p *polyglot) reconstruct() {
 	p.tagDecls, p.tagIndexed = tagDecls, tagIndexed
 }
 
-// boundPrefixes returns the prefixes of the attributes of a formatting
-// element's start tag which outer declarations bind, with their namespaces,
-// appended to p.bounds, or nil. If the element is reopened where a prefix
-// isn't bound to the same namespace, the reopened start tag declares it (see
-// reconstruct).
-func (p *polyglot) boundPrefixes(tok *htmlstream.Token, ns string) []nsDecl {
+// boundPrefixes returns the prefixes of the attributes written for a
+// formatting element's start tag (p.attrs, with the edits of the Tag hook)
+// which outer declarations bind, with their namespaces, appended to p.bounds,
+// or nil. If the element is reopened where a prefix isn't bound to the same
+// namespace, the reopened start tag declares it (see reconstruct).
+func (p *polyglot) boundPrefixes() []nsDecl {
 	off := len(p.bounds)
-	big := tok.NumAttrs() > internal.IndexMin
+	big := len(p.attrs) > internal.IndexMin
 	if big {
-		p.boundSet.Reset(tok.NumAttrs())
+		p.boundSet.Reset(len(p.attrs))
 	}
-	for a := range tok.Attrs() {
-		if bytes.IndexByte(a.Name(), ':') < 0 {
-			continue
-		}
-		an := attrName(a, ns)
-		prefix, _, ok := strings.Cut(an, ":")
-		if !ok || prefix == "xml" || prefix == "xmlns" || !htmlstream.ValidXMLName(an) {
+	for _, a := range p.attrs {
+		prefix, _, ok := strings.Cut(a.name, ":")
+		if !ok || prefix == "xml" || prefix == "xmlns" {
 			continue
 		}
 		if _, _, found := p.tagDecl(prefix); found {
@@ -5402,7 +5398,7 @@ func (p *polyglot) startTag(tok *htmlstream.Token) {
 			// unwrapped and removed elements aren't reopened
 			p.starts = append(p.starts, p.buf...)
 			f.start = p.starts[f.startOff:len(p.starts):len(p.starts)]
-			f.bound = p.boundPrefixes(tok, ns)
+			f.bound = p.boundPrefixes()
 		}
 		e.key = p.formattingKey(tok, name)
 		p.seq++
