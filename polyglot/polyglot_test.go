@@ -3231,6 +3231,8 @@ func FuzzConvert(f *testing.F) {
 	f.Add("</00</>", byte(5), byte(0x26))
 	// invalid UTF-8 around a dropped NUL
 	f.Add("000\xdd\x00\x98", byte(5), byte(0x59))
+	// NUL and other text in a noscript in the implied head in separate parts
+	f.Add("<nosCript>\x000", byte(1), byte(' '))
 	// text split into parts in an SVG or MathML element left open by a body
 	// end tag, before a comment
 	f.Add("<BodY><mAth></BodY>0000<!0", byte(3), byte(0))

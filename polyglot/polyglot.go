@@ -1502,7 +1502,8 @@ const (
 //     parsers;
 //   - noscript in an implied head or after a misplaced head start tag,
 //     where the Reader's rules for noscript in the head differ from HTML
-//     parsers (with scripting disabled);
+//     parsers (with scripting disabled), including at NUL in text, which
+//     closes a noscript in the head for them before they ignore it;
 //   - tables after an open p in quirks mode documents, where HTML parsers
 //     put the table in the p (or in the elements open in it), unless the
 //     output is in quirks mode too and only the p is open (see above): the
@@ -2943,6 +2944,7 @@ type polyglot struct {
 	skip     bool  // drop the rest of a comment split into multiple tokens
 	dash     bool  // the last character written in the current comment is '-'
 	warned   bool  // a warning was given for the current text
+	nul      bool  // the current text has NUL in a noscript in the implied head, reported at its end (see textPart)
 	raw      []byte
 	buf      []byte
 	sbuf     []byte // for space
@@ -3444,6 +3446,13 @@ func (p *polyglot) token(tok *htmlstream.Token) {
 	if p.replaced != 0 && !tok.Partial() {
 		p.warnReplaced(p.pos, p.replaced)
 		p.replaced = 0
+	}
+	if p.nul && !tok.Partial() {
+		p.nul = false
+		if !p.warned {
+			p.warned = true
+			p.warn(p.pos, "kept a noscript in the implied head open at a NUL (HTML parsers would have closed the noscript and put the content after the NUL in the body)")
+		}
 	}
 }
 
@@ -4774,7 +4783,7 @@ func (p *polyglot) textToken(tok *htmlstream.Token, start, end int) {
 		return
 	}
 	if !tok.Continued() {
-		p.warned, p.held, p.heldDone = false, p.held[:0], false
+		p.warned, p.nul, p.held, p.heldDone = false, false, p.held[:0], false
 	}
 	b := tok.AppendText(p.tbuf[:0])
 	p.tbuf = b
@@ -5075,8 +5084,23 @@ func (p *polyglot) textPart(tok *htmlstream.Token, b []byte, unchanged bool) {
 		// at a NUL they then ignore
 		p.popOut()
 	}
+	nul := bytes.IndexByte(b, 0) >= 0 && p.dropsNUL(tok)
 	var dropped bool
-	if b, dropped = p.dropNUL(tok, b); dropped {
+	b, dropped = p.dropNUL(tok, b)
+	if p.impliedHeadNoscript() && !p.warned {
+		// HTML parsers close the noscript (and the head) for text other than
+		// whitespace, including NUL, which they then ignore in the body. The
+		// NUL is reported at the end of the text (see token), unless other
+		// text in a later part of it is
+		switch {
+		case !ascii.IsBlank(b):
+			p.warned = true
+			p.warn(p.pos, "kept text in a noscript in the implied head (HTML parsers would have closed the noscript and moved the text to the body)")
+		case nul:
+			p.nul = true
+		}
+	}
+	if dropped {
 		return
 	}
 	// before formatting elements are reopened in the table
@@ -5093,10 +5117,6 @@ func (p *polyglot) textPart(tok *htmlstream.Token, b []byte, unchanged bool) {
 		}
 		p.nlWarned = true
 		p.warn(p.pos, "leading newline in pre, textarea or listing can't be represented")
-	}
-	if p.impliedHeadNoscript() && !ascii.IsBlank(b) && !p.warned {
-		p.warned = true
-		p.warn(p.pos, "kept text in a noscript in the implied head (HTML parsers would have closed the noscript and moved the text to the body)")
 	}
 	if t := p.top(); t != nil && t.name == "template" && t.ns == "" && t.tmode == 'c' && !ascii.IsBlank(b) && !p.warned {
 		p.warned = true

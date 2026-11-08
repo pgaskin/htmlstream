@@ -162,3 +162,6 @@ files.
 -- 195b2ef91500d82b --
 -- in quoted --
 "<nosCript><A></nosCript> "
+-- 9edb153d343abc54 --
+-- in quoted --
+"<nosCript>\x00 "

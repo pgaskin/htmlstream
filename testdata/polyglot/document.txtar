@@ -509,6 +509,34 @@ in the implied head.
 <html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><noscript> x</noscript></head><body></body></html>
 -- warn --
 17: kept text in a noscript in the implied head (HTML parsers would have closed the noscript and moved the text to the body)
+-- ImpliedHeadNoscriptNUL htmldiff --
+HTML parsers close the noscript at the NUL (then ignore it in the body) and
+put the whitespace after it in the body.
+-- in quoted --
+"<noscript>\x00 "
+-- out --
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><noscript> </noscript></head><body></body></html>
+-- warn --
+10: kept a noscript in the implied head open at a NUL (HTML parsers would have closed the noscript and put the content after the NUL in the body)
+-- ImpliedHeadNoscriptNULText htmldiff nonidempotent --
+the other text is reported, not the NUL
+-- in quoted --
+"<noscript>\x00x"
+-- out --
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><noscript>x</noscript></head><body></body></html>
+-- warn --
+10: kept text in a noscript in the implied head (HTML parsers would have closed the noscript and moved the text to the body)
+-- ImpliedHeadNoscriptNULComment htmldiff --
+the comment and the link after the NUL are in the body for HTML parsers
+-- in quoted --
+"<noscript>\x00<!--c--><link>"
+-- out --
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><noscript><!--c--><link /></noscript></head><body></body></html>
+-- warn --
+10: kept a noscript in the implied head open at a NUL (HTML parsers would have closed the noscript and put the content after the NUL in the body)
 -- HtmlEndInHead --
 HTML parsers close the head at a body or html end tag and start the body,
 where the whitespace after it goes (not in the head, kept open like other
