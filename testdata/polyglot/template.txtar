@@ -176,6 +176,14 @@ current node is the template, but not in the row
 <html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><template><col />x</template></head><body></body></html>
 -- warn --
 15: kept text after col in a template (HTML parsers would have ignored it)
+-- TemplateColNUL htmldiff --
+HTML parsers ignore the NUL after col in a template and insert the
+whitespace after it (x/net/html ignores both)
+-- in quoted --
+"<template><col>\x00 </template>"
+-- out --
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><template><col /> </template></head><body></body></html>
 -- TemplateInColgroup --
 template stays in a colgroup, explicit or implied
 -- in --

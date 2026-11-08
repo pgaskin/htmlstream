@@ -872,9 +872,15 @@ func xnetDroppedSlash(in string) string {
 // "in table" insertion mode handles text like in a table when the current
 // node is a template), while x/net handles it like other text in a table,
 // reopening formatting elements first (e.g., the a in
-// <template><tr></tr><a><tr></tr> ). The fuzz target only uses this if the
-// DOMs differ, and compares them without whitespace-only text then (see
-// checkPolyglot).
+// <template><tr></tr><a><tr></tr> ). It also removes text of whitespace and
+// NUL directly in a template whose contents are parsed like the contents of
+// a colgroup (the first child element is col). The HTML5 spec ignores each
+// character other than whitespace there and inserts the whitespace, while
+// x/net ignores a text token starting with another character as a whole,
+// including the whitespace after it (e.g., the space in <template><col>\x00 ,
+// which the polyglot package writes after dropping the NUL). The fuzz target
+// only uses this if the DOMs differ, and compares them without
+// whitespace-only text then (see checkPolyglot).
 func xnetTemplateTableSpace(s string) string {
 	if !strings.Contains(strings.ToLower(s), "<template") {
 		return s
@@ -882,22 +888,27 @@ func xnetTemplateTableSpace(s string) string {
 	r := htmlstream.NewReader(strings.NewReader(s))
 	type elem struct {
 		template bool
-		mode     byte // template: 't' for table contents, 'o' for other contents
+		mode     byte // template: 't' for table contents, 'c' for colgroup contents, 'o' for other contents
 	}
 	var stack htmlutil.Stack[elem]
 	var drop [][2]int
 	run := [2]int{-1, -1} // the current text run
-	space := false        // the text run is whitespace directly in such a template
+	space := false        // the text run is whitespace (or NUL for 'c') directly in such a template
+	cut := ""             // the characters such text consists of
 	for r.Next() {
 		tok := r.Token()
 		pos := int(tok.Pos())
 		if tok.Kind() == htmlstream.Text {
 			if run[0] < 0 {
 				t, ok := stack.Top()
-				run[0], space = pos, ok && t.template && t.mode == 't'
+				run[0], space = pos, ok && t.template && (t.mode == 't' || t.mode == 'c')
+				cut = " \t\n\f\r"
+				if ok && t.mode == 'c' {
+					cut += "\x00"
+				}
 			}
 			run[1] = pos + len(tok.Raw())
-			space = space && strings.Trim(string(tok.AppendText(nil)), " \t\n\f\r") == ""
+			space = space && strings.Trim(string(tok.AppendText(nil)), cut) == ""
 			continue
 		}
 		if run[0] >= 0 && space {
@@ -912,6 +923,8 @@ func xnetTemplateTableSpace(s string) string {
 					// head content, which doesn't select the insertion mode
 				case "caption", "colgroup", "tbody", "tfoot", "thead", "tr", "td", "th":
 					t.mode = 't'
+				case "col":
+					t.mode = 'c'
 				default:
 					t.mode = 'o'
 				}

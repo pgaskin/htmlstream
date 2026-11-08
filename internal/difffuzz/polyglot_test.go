@@ -145,7 +145,7 @@ func TestPolyglot(t *testing.T) {
 			if out = b.String(); len(warnings) != 0 {
 				return
 			}
-			if outDOM = htmlDOMScripting(t, out, tc.Scripting, true); html != "" && inDOM != outDOM {
+			if outDOM = htmlDOMScripting(t, out, tc.Scripting, true); !tc.HTMLDiff && html != "" && inDOM != outDOM {
 				t.Errorf("NoDoctype: HTML DOM differs (input -, output +):\n%s\noutput: %s", domDiff(inDOM, outDOM), out)
 			}
 			xmlDOM, err := xmlDOM(out, true)
