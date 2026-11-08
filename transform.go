@@ -62,7 +62,12 @@ import (
 // The editing methods apply to the current token, and each one documents the
 // kinds of token it accepts. Called without a current token or on another
 // kind of token, they return an error wrapping [ErrInvalidOp] and do
-// nothing else.
+// nothing else. On a start tag cut off by the end of the input (see
+// [Token.Incomplete]), the methods which edit the tag or its element (the
+// attribute edits, Rename, Wrap, Unwrap, Empty and ExpandSelfClosing) return
+// [ErrIncompleteTag] and leave it unchanged. Code which returns on errors
+// from these methods can skip the tags for which Incomplete reports true, so
+// that a truncated document isn't treated as an error.
 //
 // Errors are sticky and can be retrieved with Err or Close, except
 // [ErrInvalidOp], [ErrIncompleteTag], [ErrHeldOpen] and [ErrHoldReleased],

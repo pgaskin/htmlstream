@@ -24,6 +24,9 @@ func scaleImages(w io.Writer, r io.Reader) (err error) {
 		}
 	}()
 	for x.Find(htmlstream.Tag("img")) {
+		if x.Token().Incomplete() {
+			continue // cut off by the end of the input, so it can't be edited (see ErrIncompleteTag)
+		}
 		for _, name := range []string{"width", "height"} {
 			a, ok := x.Token().Attr(name)
 			if !ok {
@@ -53,6 +56,7 @@ func ExampleTransformer_Fail() {
 	for _, r := range []io.Reader{
 		strings.NewReader(page),
 		strings.NewReader(strings.Replace(page, "40", "40px", 1)),
+		strings.NewReader(strings.Replace(page, "40></p>", "40 alt", 1)),
 		io.MultiReader(strings.NewReader(page[:50]), iotest.ErrReader(errors.New("connection reset"))),
 	} {
 		var b bytes.Buffer
@@ -65,5 +69,6 @@ func ExampleTransformer_Fail() {
 	// Output:
 	// <p><img src=a.png width="200" height="100"> and <img src=b.png width="80"></p>
 	// error: img width at offset 43: strconv.Atoi: parsing "40px": invalid syntax (wrote 0 bytes)
+	// <p><img src=a.png width="200" height="100"> and <img src=b.png width=40 alt
 	// error: connection reset (wrote 0 bytes)
 }
